@@ -16,12 +16,12 @@ test('hero shows the real product photo without video or AI labels', async ({ pa
   await expect(page.getByText('Fotografía de referencia', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Animación ilustrativa', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /video de gomitas/ })).toHaveCount(0)
-  const glassButton = await page.getByRole('link', { name: /Ver catálogo/ }).evaluate(element => {
+  const glassButton = await page.getByRole('link', { name: 'Ver productos', exact: true }).evaluate(element => {
     const style = getComputedStyle(element)
-    return { background: style.backgroundColor, backdrop: style.backdropFilter, color: style.color }
+    return { background: style.backgroundImage, backdrop: style.backdropFilter, color: style.color }
   })
-  expect(glassButton.background).toBe('rgb(56, 36, 72)')
-  expect(glassButton.backdrop).toBe('none')
+  expect(glassButton.background).toContain('linear-gradient')
+  expect(glassButton.backdrop).toContain('blur(16px)')
   expect(glassButton.color).toBe('rgb(255, 255, 255)')
   expect(generationRequests).toEqual([])
 })

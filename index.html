@@ -10,6 +10,21 @@
     <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
+    <svg width="0" height="0" style="position:absolute;pointer-events:none;left:-9999px;top:-9999px;" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="onkys-liquid-glass" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="blur" />
+          <feSpecularLighting in="blur" surfaceScale="5.2" specularConstant="2.0" specularExponent="24" lighting-color="#ffffff" result="specular">
+            <fePointLight x="180" y="-70" z="210" />
+          </feSpecularLighting>
+          <feComposite in="specular" in2="SourceAlpha" operator="in" result="specular-clipped" />
+          <feOffset in="SourceAlpha" dx="0" dy="1" result="offset" />
+          <feComposite in="SourceGraphic" in2="offset" operator="over" result="base" />
+          <feBlend in="specular-clipped" in2="base" mode="screen" result="lit" />
+          <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#250b35" flood-opacity="0.25" />
+        </filter>
+      </defs>
+    </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

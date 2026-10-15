@@ -223,7 +223,7 @@ button, a, input, textarea { outline-offset: 4px; }
 .how-heading { display: flex; justify-content: space-between; align-items: end; }
 .how-heading .eyebrow { color: var(--purple); font-size: 9px; }
 .how-heading h2 { font-size: 33px; line-height: 1.2; font-weight: 450; letter-spacing: -1px; margin-top: 14px; }
-.how-heading > p { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.how-heading > p { color: #6a5f72; font-size: 12px; line-height: 1.8; }
 .how-steps { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 39px; gap: 35px; }
 .how-steps article { position: relative; padding: 25px 0 0; border-top: 1px solid #d9cde2; }
 .how-steps article > svg { color: #765389; margin-bottom: 16px; }
@@ -274,7 +274,27 @@ summary::-webkit-details-marker { display: none; }
 .product-options > .eyebrow { font-size: 8px; padding-right: 15px; }
 .product-options h2 { font-size: 28px; line-height: 1.17; letter-spacing: -.9px; font-weight: 500; margin: 13px 0 12px; }
 .premium-badge { position: absolute; top: 8px; right: 8px; z-index: 1; background: #382448a6; color: #fff; font-size: 8px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; padding: 5px 9px; border-radius: 20px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); white-space: nowrap; }
-.product-options h2.product-title-brand { font-family: 'Inter', 'DM Sans', sans-serif; font-weight: 600; letter-spacing: -.02em; }
+.product-options h2.product-title-brand {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 29px;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  margin: 12px 0 10px;
+  background: linear-gradient(
+    180deg,
+    #8a48b0 0%,
+    #522774 42%,
+    #35154b 82%,
+    #200a30 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: url(#onkys-liquid-glass);
+  display: inline-block;
+  padding-right: 4px;
+}
 .product-options > p.muted { font-size: 12px; line-height: 1.75; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .product-options fieldset { margin-top: 25px; }

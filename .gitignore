@@ -5,6 +5,7 @@ dist/
 .env.local
 .env.*
 !.env.payments.example
+!.env.store.example
 .data/
 test-results/
 .higgsfield/

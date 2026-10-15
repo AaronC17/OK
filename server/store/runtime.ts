@@ -7,6 +7,8 @@ import { newToken } from './security.ts'
 
 export function createShopRuntime() {
   const directory = resolve(process.env.STORE_DATA_DIR || '.data/store')
+  const unsafeRoots = [resolve('public'), resolve('dist')]
+  if (directory === resolve('.') || unsafeRoots.some(root => directory === root || directory.startsWith(`${root}/`) || directory.startsWith(`${root}\\`))) throw new Error('La carpeta de datos privados no puede ser la raíz del proyecto ni estar dentro de public/ o dist/.')
   mkdirSync(directory, { recursive: true })
   const database = new ShopDatabase(resolve(directory, 'orders.sqlite'), store)
   const setupPath = resolve(directory, 'admin-setup-token.txt')
@@ -29,5 +31,6 @@ export function createShopRuntime() {
     throw new Error('Para producción se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa también la guía de despliegue y privacidad.')
   }
   const handler = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath })
-  return { database, handler, close: () => database.close() }
+  let closed = false
+  return { database, handler, close: () => { if (!closed) { closed = true; database.close() } } }
 }

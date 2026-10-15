@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-
-const normalized = (text: string) => text.replaceAll('\u00a0', ' ')
+import { testAdmin } from './helpers/store.ts'
 
 test('only gummies are shown and a saved dessert is removed from the cart', async ({ page }) => {
   await page.addInitScript(() => {
@@ -33,26 +32,21 @@ test('mixto combines hidden catalog types as ingredients', async ({ page }, test
   await expect(page.getByRole('button', { name: 'Personalizar Gusanitos', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: testInfo.project.name === 'mobile' ? 'Personalizar gomitas mixtas' : 'Armar mi mix' }).click()
   const configurator = page.getByRole('dialog', { name: 'Tu mezcla. Tus reglas.' })
-  await expect(configurator.getByRole('radio', { name: 'Mixto', exact: true })).toBeChecked()
-  await expect(configurator.locator('.type-options input')).toHaveCount(3)
-  await configurator.getByRole('checkbox', { name: 'Gusanitos', exact: true }).uncheck()
+  await expect(configurator.getByText('Siempre mixto. Elige los gramos.', { exact: true })).toBeVisible()
+  await expect(configurator.locator('.type-options input')).toHaveCount(0)
+  await expect(configurator.locator('.weight-options input')).toHaveCount(3)
   await expect(configurator.locator('.configuration-price')).toContainText('₡1 400')
   await configurator.getByRole('button', { name: 'Añadir al carrito' }).click()
   await page.getByRole('button', { name: 'Abrir carrito, 1 artículos' }).click()
   await expect(page.locator('.cart-line')).toHaveCount(1)
   await expect(page.locator('.cart-line')).toContainText('Mix de gomitas enchiladas')
+  await expect(page.locator('.cart-line')).toContainText('Gusanitos')
 })
 
-test('gummies-only cart, variant prices, persistence, delivery, WhatsApp and clipboard fallbacks', async ({ page }) => {
+test('gummies-only cart, variant prices, persistence, delivery and server-created SINPE order', async ({ page, baseURL }) => {
+  await testAdmin(baseURL!)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  // Verify the real outgoing URL without leaving the local test or contacting the business.
-  await page.addInitScript(() => {
-    const state = window as unknown as { opened: string[]; copied: string }
-    state.opened = []
-    window.open = url => { state.opened.push(String(url)); return null }
-    Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async (text: string) => { state.copied = text } })
-  })
   await page.goto('/')
   await page.getByRole('button', { name: 'Abrir carrito, 0 artículos' }).click()
   await expect(page.getByText('Un buen momento por empezar.')).toBeVisible()
@@ -79,58 +73,35 @@ test('gummies-only cart, variant prices, persistence, delivery, WhatsApp and cli
 
   await page.reload()
   await page.getByRole('button', { name: 'Abrir carrito, 4 artículos' }).click()
-  const cart = page.getByRole('dialog', { name: /Tu carrito/ })
+  const cart = page.locator('.cart-drawer')
   await expect(cart.locator('.cart-line')).toHaveCount(2)
   await expect(cart.locator('.order-totals')).toContainText('₡12 000')
   await expect(cart.getByText('Envío por confirmar', { exact: true }).last()).toBeVisible()
   await expect(cart.locator('.total-row')).toHaveCount(0)
-  await cart.getByRole('button', { name: 'Enviar pedido por WhatsApp' }).click()
+  await cart.getByRole('button', { name: 'Crear pedido con SINPE' }).click()
   await expect(cart.getByText('¿Cómo te llamas? Escribe tu nombre.')).toBeVisible()
   await expect(cart.getByLabel('Tu nombre')).toBeFocused()
   await cart.getByLabel('Tu nombre').fill('Ana Pérez')
+  await cart.getByLabel('Teléfono de contacto').fill('61551234')
   await cart.getByLabel('Dirección o punto de entrega').fill('Calle del Sol 12, 2º B')
-  await cart.getByRole('button', { name: 'Enviar pedido por WhatsApp' }).click()
-  const readyTitle = 'Tu pedido está listo para enviar por WhatsApp.'
-  await expect(cart.getByRole('heading', { name: readyTitle })).toBeVisible()
-  await cart.getByText('Ver resumen completo', { exact: false }).click()
-  const rawSummary = await cart.getByRole('textbox', { name: 'Resumen de tu solicitud' }).inputValue()
-  const summary = normalized(rawSummary)
-  expect(summary).toContain('2 × Ositos enchilados\nUn solo tipo · Ositos · 500 g por bolsa')
-  expect(summary).toContain('2 × Ositos enchilados\nUn solo tipo · Ositos · 100 g por bolsa')
-  expect(summary).toContain('Subtotal: ₡12 000')
-  expect(summary).toContain('Envío: Por confirmar')
-  expect(summary).not.toMatch(/^Total:/m)
-  expect(summary).toContain('Nombre: Ana Pérez')
-  const opened = await page.evaluate(() => (window as unknown as { opened: string[] }).opened)
-  expect(opened).toHaveLength(1)
-  expect(new URL(opened[0]).pathname).toBe('/50661555619')
-  expect(new URL(opened[0]).searchParams.get('text')).toBe(rawSummary)
-  await expect(cart.getByRole('link', { name: 'Volver a abrir WhatsApp' })).toHaveAttribute('href', opened[0])
-  await cart.getByRole('button', { name: 'Copiar resumen del pedido' }).click()
-  await expect(cart.getByRole('button', { name: 'Resumen copiado' })).toBeVisible()
-  expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe(rawSummary)
-
-  await page.evaluate(() => Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async () => { throw new Error('Clipboard unavailable for this test') } }))
-  await cart.getByRole('button', { name: 'Resumen copiado' }).click()
-  await expect(cart.getByText('No pudimos acceder al portapapeles.', { exact: false })).toBeVisible()
-  await expect(cart.getByRole('textbox', { name: 'Resumen de tu solicitud' })).toBeFocused()
-  await expect(cart.locator('.cart-line')).toHaveCount(2)
-  await cart.getByRole('button', { name: 'Volver a los datos de entrega' }).click()
-  await expect(cart.getByLabel('Tu nombre')).toHaveValue('Ana Pérez')
+  await cart.getByLabel(/Acepto que la tienda guarde/).check()
   await cart.getByRole('radio', { name: /Recogida/ }).check()
   await expect(cart.getByLabel('Dirección o punto de entrega')).toHaveCount(0)
   await expect(cart.locator('.total-row')).toContainText('₡12 000')
-  await cart.getByRole('button', { name: 'Enviar pedido por WhatsApp' }).click()
-  await cart.getByText('Ver resumen completo', { exact: false }).click()
-  const pickup = normalized(await cart.getByRole('textbox', { name: 'Resumen de tu solicitud' }).inputValue())
-  expect(pickup).toContain('Total: ₡12 000')
-  expect(pickup).not.toContain('Calle del Sol')
   await cart.locator('.cart-line').first().getByRole('button', { name: /Aumentar cantidad/ }).click()
-  await expect(cart.getByRole('heading', { name: readyTitle })).toHaveCount(0)
   await expect(cart.locator('.total-row')).toContainText('₡16 800')
   await cart.locator('.cart-line').last().getByRole('button', { name: /Eliminar/ }).click()
   await expect(cart.locator('.cart-line')).toHaveCount(1)
   await expect(cart.locator('.total-row')).toContainText('₡14 400')
+  await cart.getByRole('button', { name: 'Crear pedido con SINPE' }).click()
+  await expect(cart.locator('#assigned-order-code')).toHaveValue(/^ONK-[A-F0-9]{16}$/)
+  await expect(cart.locator('.sinpe-instructions')).toContainText('₡14 400')
+  const result = await (await page.request.get('/api/orders/current')).json()
+  expect(result.order.customer.name).toBe('Ana Pérez')
+  expect(result.order.customer.address).toBe('')
+  expect(result.order.totalMinor).toBe(1440000)
+  expect(result.order.status).toBe('awaiting_payment')
+  await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0)
   await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
   expect(errors).toEqual([])
 })
