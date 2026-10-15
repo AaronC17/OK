@@ -1,0 +1,21 @@
+.food-direction .brand-intro h1 { font-size: clamp(36px,4.8vw,57px); }
+.food-direction-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 25px; }
+.food-direction-card { min-width: 0; display: flex; flex-direction: column; }
+.food-shot-board { position: relative; display: flex; flex-direction: column; padding: 32px 22px 22px; min-height: 310px; background: #fff; border: 1px solid var(--line); border-radius: 10px; color: var(--purple); }
+.food-board-number { position: absolute; top: 18px; right: 18px; font-size: 11px; color: #796485; }
+.food-shot-board > svg { margin-bottom: 24px; color: #765389; }
+.food-shot-board .eyebrow { font-size: 7px; letter-spacing: 1.1px; }
+.food-shot-board h2 { font-size: 24px; font-weight: 500; line-height: 1.2; letter-spacing: -.7px; margin-top: 13px; }
+.food-shot-board > p { font-size: 11px; line-height: 1.8; color: #706078; margin-top: 9px; }
+.food-shot-board ol { margin: 21px 0 0; padding: 0; list-style: none; counter-reset: shots; border-top: 1px solid var(--line); }
+.food-shot-board li { counter-increment: shots; display: flex; align-items: start; gap: 9px; font-size: 10px; line-height: 1.7; padding-top: 12px; color: #514857; }
+.food-shot-board li::before { content: '0' counter(shots); color: #796485; font-size: 9px; }
+.food-direction-description { font-size: 12px; line-height: 1.85; color: var(--muted); margin-top: 18px; flex: 1; }
+.food-direction-card .brand-motion-note { margin-top: 20px; }
+.food-direction-card .brand-prompt { margin-top: 0; }
+.food-process { border-top: 1px solid var(--line); margin-top: 32px; padding-top: 29px; }
+.food-process h2 { font-size: 28px; line-height: 1.3; font-weight: 500; letter-spacing: -.8px; margin-top: 12px; }
+.food-process > div { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; margin: 22px 0; }
+.food-process p { font-size: 12px; line-height: 1.85; color: #706078; }
+.food-process strong { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 550; color: var(--ink); }
+@media (max-width: 800px) { .food-direction-grid { grid-template-columns: 1fr; gap: 27px; } .food-shot-board { min-height: 0; } .food-process > div { grid-template-columns: 1fr; gap: 18px; } }

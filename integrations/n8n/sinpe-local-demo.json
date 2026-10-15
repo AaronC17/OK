@@ -1,0 +1,125 @@
+{
+  "name": "Onky's - SINPE - SOLO SIMULACION LOCAL",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "01837d83-4827-42f4-a6af-cbe4f88f2a40",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] } },
+      "id": "c68cd8bb-469c-48fb-92bc-d4f6f51ae737",
+      "name": "Cada minuto - demo",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 200]
+    },
+    {
+      "parameters": {
+        "assignments": { "assignments": [{ "id": "7e465305-cc8d-4dd7-81f6-ab40c88a77ca", "name": "backendBaseUrl", "value": "http://127.0.0.1:8787", "type": "string" }] },
+        "options": {}
+      },
+      "id": "a17288b3-109d-4b30-a7ad-0ea232ef44ed",
+      "name": "Backend local - sin secretos",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [260, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.backendBaseUrl + '/internal/reconciliation/run' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "ab44f0b4-84a7-4646-a054-0ef9114f477d",
+      "name": "Conciliar en backend - DEMO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 100],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notesInFlow": true,
+      "notes": "Seleccionar credencial Header Auth. Name: Authorization. Value: Bearer <PAYMENTS_RECONCILE_TOKEN>. Nunca usar el token de administración. No consulta BAC."
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nif (result.demoOnly !== true || !['disabled', 'mock'].includes(result.mode)) {\n  throw new Error('Este flujo solo admite simulaciones locales; no procesar pagos reales.');\n}\nfor (const key of ['processedCount', 'simulatedCount', 'reviewedCount', 'pendingCount', 'manualReviewCount', 'conflictCount']) {\n  if (!Number.isSafeInteger(result[key]) || result[key] < 0) throw new Error('Resumen de conciliación inválido.');\n}\nreturn [{ json: { ...result, aviso: 'SIMULACION. No notificar al cliente como pagado ni entregar productos.' } }];"
+      },
+      "id": "80a8c732-233e-4f0b-9d12-c8d5cd0251a2",
+      "name": "Impedir uso como pago real",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [{ "id": "0526f0a9-ea55-4602-853b-67d7e34604f5", "leftValue": "={{ $json.manualReviewCount + $json.conflictCount }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1876f526-b05e-430a-b3d5-a007035d987f",
+      "name": "Hay revisiones pendientes",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1040, 100]
+    },
+    {
+      "parameters": {},
+      "id": "267bb8d4-ef57-4821-bfa4-ce8b617e8da2",
+      "name": "Revisar en API local - no enviar avisos",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1300, 0]
+    },
+    {
+      "parameters": {},
+      "id": "57da45be-7c24-4caa-b7ee-756afefb30fa",
+      "name": "Fin de simulacion - no entregar",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "content": "## SOLO SIMULACION LOCAL\nNo hay conexión BAC, webhook bancario ni notificaciones reales. El backend usa SQLite y movimientos ficticios. Importar sin activar. Requiere n8n y backend en el mismo equipo/red local apropiada; localhost de n8n Cloud no es tu PC. Ver docs/pagos-sinpe-bac.md. La elegibilidad de una cuenta personal debe confirmarla BAC por escrito.",
+        "height": 240,
+        "width": 520
+      },
+      "id": "ea6bdcbf-e496-4faa-90db-7e977a80d076",
+      "name": "Advertencia",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [300, -280]
+    }
+  ],
+  "connections": {
+    "Prueba manual": { "main": [[{ "node": "Backend local - sin secretos", "type": "main", "index": 0 }]] },
+    "Cada minuto - demo": { "main": [[{ "node": "Backend local - sin secretos", "type": "main", "index": 0 }]] },
+    "Backend local - sin secretos": { "main": [[{ "node": "Conciliar en backend - DEMO", "type": "main", "index": 0 }]] },
+    "Conciliar en backend - DEMO": { "main": [[{ "node": "Impedir uso como pago real", "type": "main", "index": 0 }]] },
+    "Impedir uso como pago real": { "main": [[{ "node": "Hay revisiones pendientes", "type": "main", "index": 0 }]] },
+    "Hay revisiones pendientes": { "main": [[{ "node": "Revisar en API local - no enviar avisos", "type": "main", "index": 0 }], [{ "node": "Fin de simulacion - no entregar", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Costa_Rica",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,82 @@
+.brand-marquee {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  overflow: hidden;
+  background: #f7f4f8;
+  border-block: 1px solid #e9e1ed;
+  color: #5a4267;
+}
+
+.brand-marquee::before, .brand-marquee::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  pointer-events: none;
+}
+.brand-marquee::before { left: 0; background: linear-gradient(90deg, #f7f4f8, transparent); }
+.brand-marquee::after { right: 0; background: linear-gradient(270deg, #f7f4f8, transparent); }
+
+.brand-marquee-track {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  animation: brand-marquee-scroll 48s linear infinite;
+  will-change: transform;
+}
+
+.brand-marquee-group { display: flex; align-items: center; flex: none; }
+
+.brand-marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 23px;
+  padding-right: 23px;
+}
+
+.brand-marquee-item > span {
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: .07em;
+  text-transform: none;
+}
+
+.brand-marquee-bear {
+  display: block;
+  width: 16px;
+  height: 19px;
+  flex: none;
+  color: #382448;
+  filter: drop-shadow(0 1px 1px #38244819);
+}
+
+.brand-marquee-item .brand-marquee-name {
+  color: #382448;
+  font-size: 11px;
+}
+
+.brand-marquee-item .brand-marquee-product {
+  color: #382448;
+  font-size: 11px;
+}
+
+@keyframes brand-marquee-scroll { to { transform: translate3d(-50%, 0, 0); } }
+
+@media (max-width: 600px) {
+  .brand-marquee { height: 44px; }
+  .brand-marquee::before, .brand-marquee::after { width: 18px; }
+  .brand-marquee-item { gap: 18px; padding-right: 18px; }
+  .brand-marquee-item > span { font-size: 9px; letter-spacing: .055em; }
+  .brand-marquee-item .brand-marquee-name, .brand-marquee-item .brand-marquee-product { font-size: 9px; }
+  .brand-marquee-bear { width: 14px; height: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-marquee-track { animation: none; transform: none; will-change: auto; }
+  .brand-marquee-group + .brand-marquee-group { display: none; }
+}

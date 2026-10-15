@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+.env.*
+!.env.payments.example
+.data/
+test-results/
+.higgsfield/
+references/*.png
+references/*.jpg
+references/*.jpeg
+references/*.webp

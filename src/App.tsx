@@ -1,0 +1,116 @@
+import { useEffect, useState } from 'react'
+import { store } from './config/store.ts'
+import { MAX_QUANTITY, selectionKey, whatsappNumber } from './lib/shop.ts'
+import type { CartItem } from './types.ts'
+import { useCart } from './hooks/useCart.ts'
+import { Icon } from './components/Icon.tsx'
+import { Lightbox, Modal } from './components/ui.tsx'
+import { ProductDialog } from './components/ProductDialog.tsx'
+import type { ProductTarget } from './components/ProductDialog.tsx'
+import { CartDrawer } from './components/CartDrawer.tsx'
+import { Header } from './components/Header.tsx'
+import { Catalog } from './components/Catalog.tsx'
+import { MixExperience } from './components/MixExperience.tsx'
+import { HeroMedia } from './components/HeroMedia.tsx'
+import { BrandMarquee } from './components/BrandMarquee.tsx'
+
+export default function App() {
+  const cart = useCart()
+  const [cartOpen, setCartOpen] = useState(false)
+  const [product, setProduct] = useState<{ target: ProductTarget; instance: number } | null>(null)
+  const [productOpen, setProductOpen] = useState(false)
+  const [zoom, setZoom] = useState<{ src: string; alt: string; name: string } | null>(null)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
+  const number = whatsappNumber(store)
+
+  useEffect(() => { document.title = `${store.name} — Pequeños momentos, a tu manera` }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 6500)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
+
+  const openProduct = (target: ProductTarget) => {
+    setProduct({ target, instance: Date.now() })
+    setProductOpen(true)
+  }
+
+  const addProduct = (item: CartItem) => {
+    const previous = cart.items.find(entry => selectionKey(entry.selection) === selectionKey(item.selection))?.quantity ?? 0
+    const added = Math.min(MAX_QUANTITY - previous, item.quantity)
+    cart.add(item)
+    setProductOpen(false)
+    setToast({ text: added > 0 ? added < item.quantity ? `Añadimos ${added}. Límite de ${MAX_QUANTITY} por variante.` : 'Un gusto más en tu carrito.' : `Ya tienes el máximo de ${MAX_QUANTITY} de esta variante.`, id: Date.now() })
+  }
+
+  return <>
+    <a href="#catalogo" className="skip-link">Saltar al catálogo</a>
+    <Header count={cart.count} onCart={() => setCartOpen(true)} />
+    <main>
+      <section id="inicio" className="hero container" aria-labelledby="hero-title">
+        <div className="hero-copy">
+          <span className="eyebrow"><span className="eyebrow-line" />GOMITAS ENCHILADAS</span>
+          <h1 id="hero-title">Tu mezcla.<br /><span>Tus reglas.</span></h1>
+          <p>Elige tus favoritas y encuentra tu combinación ideal.</p>
+          <a href="#catalogo" className="button hero-catalog-cta">Ver productos <Icon name="arrow" size={19} /></a>
+        </div>
+        <div className={`hero-visual ${store.heroVideo ? 'has-video' : ''}`}>
+          <HeroMedia image={store.heroImage} alt={store.heroImageAlt} video={store.heroVideo} />
+          <div className="hero-photo-label"><Icon name="pepper" size={17} /> Dulce. Ácido. Picosito.</div>
+        </div>
+      </section>
+      <BrandMarquee />
+      <Catalog onProduct={openProduct} onZoom={setZoom} />
+      <MixExperience onCustomize={() => openProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} />
+      <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
+        <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Arma tu pedido y coordinamos los detalles por WhatsApp.</p></div>
+        <div className="how-steps">
+          <article><span className="how-number">01</span><Icon name="heart" size={26} /><h3>Elige</h3><p>Tu tipo de gomita favorito.</p></article>
+          <article><span className="how-number">02</span><Icon name="sliders" size={26} /><h3>Personaliza</h3><p>Tipos, mezclas y presentaciones en un mismo carrito.</p></article>
+          <article><span className="how-number">03</span><Icon name="whatsapp" size={28} /><h3>Conversemos</h3><p>Envía tu solicitud por WhatsApp y confirma <br />disponibilidad, entrega y forma de pago.</p></article>
+        </div>
+      </div></section>
+      <section className="questions-section container" aria-labelledby="questions-title">
+        <div><span className="eyebrow">PREGUNTAS FRECUENTES</span><h2 id="questions-title">Preguntas frecuentes</h2></div>
+        <div className="questions-list">
+          <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Al terminar tu carrito, preparamos un resumen. Debes enviarlo desde WhatsApp; la tienda te confirmará la disponibilidad, el método de entrega y la forma de pago. Abrir la conversación no confirma el pedido.</p></details>
+          <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
+          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Elige entre los métodos habilitados en el carrito. Cuando el envío requiera cotización, verás «Envío por confirmar». La cobertura, el punto de recogida y las condiciones se coordinan con la tienda.{store.demo ? ' En esta demostración, los métodos y tarifas son ejemplos.' : ''}</p></details>
+        </div>
+      </section>
+    </main>
+    <footer className="site-footer"><div className="container">
+      <div className="footer-main">
+        <div><a href="#inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></a></div>
+        <div className="footer-links"><span className="eyebrow">EXPLORA</span><a href="#gomitas">Gomitas enchiladas</a>{store.categories.dessertsEnabled && <a href="#postres">Postres</a>}<a href="#como-pedir">Cómo pedir</a></div>
+        <div className="footer-contact"><span className="eyebrow">CONVERSEMOS</span>
+          {number ? <a href={`https://wa.me/${number}`} target="_blank" rel="noopener noreferrer">WhatsApp <Icon name="arrow-up" size={16} /></a> : <button className="text-button" onClick={() => setInfoOpen(true)}>Contacto y detalles <Icon name="arrow-up" size={16} /></button>}
+          <p>{number ? `+${store.whatsapp.countryCode} ${store.whatsapp.localNumber}` : `${store.whatsapp.localNumber} · Prefijo por definir`}</p>
+          {store.contact.email && <a href={`mailto:${store.contact.email}`}>{store.contact.email}</a>}
+          {store.contact.instagramUrl && <a href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram <Icon name="arrow-up" size={14} /></a>}
+        </div>
+      </div>
+      <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
+    </div></footer>
+    {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
+    <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} />
+    <Lightbox image={zoom} onClose={() => setZoom(null)} />
+    <Modal open={infoOpen} onClose={() => setInfoOpen(false)} titleId="info-title" className="info-dialog">
+      <div className="info-dialog-inner">
+        <button className="icon-button modal-close" aria-label="Cerrar información" onClick={() => setInfoOpen(false)}><Icon name="close" /></button>
+        <span className="eyebrow">CONOCE LOS DETALLES</span><h2 id="info-title">Información de la tienda</h2>
+        <p>Explora, personaliza y prepara tu carrito. Este catálogo utiliza datos de demostración.</p>
+        <ul><li>Productos, disponibilidad, precios y métodos de entrega son de ejemplo y deben confirmarse.</li><li>Precios en colones costarricenses (CRC).</li><li>Puedes elegir un solo tipo de gomita o pedirlas mixtas; el peso es el total de la bolsa.</li><li>WhatsApp: <strong>+{store.whatsapp.countryCode} {store.whatsapp.localNumber}</strong>.</li></ul>
+        <p>Tu pedido es una solicitud. La tienda confirmará disponibilidad, entrega y forma de pago.</p>
+        <button className="button button-primary" onClick={() => setInfoOpen(false)}>Seguir explorando <Icon name="arrow" size={18} /></button>
+      </div>
+    </Modal>
+    <div className="toast-region" aria-live="polite" aria-atomic="true">{toast && <div className="toast" key={toast.id}>
+      <span className="toast-check"><Icon name="check" size={16} /></span><span>{toast.text}</span>
+      <button onClick={() => { setToast(null); setCartOpen(true) }}>Ver carrito <Icon name="arrow" size={16} /></button>
+      <button className="toast-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button>
+    </div>}</div>
+  </>
+}

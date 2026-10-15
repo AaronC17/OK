@@ -1,0 +1,38 @@
+{
+  "round": "onkys-gummies-02",
+  "updatedAt": "2026-10-14T12:52:58.364Z",
+  "image": "/brand-media/onkys-gummies-02/start.png",
+  "video": "/brand-media/onkys-gummies-02/hero.mp4",
+  "imageStatus": "completed",
+  "videoStatus": "completed",
+  "duration": 12,
+  "resolution": "720p",
+  "audio": false,
+  "imageModel": "marketing-studio/image/sunburst",
+  "videoModel": "bytedance/seedance-2.5/reference-to-video",
+  "estimatedTotalUsd": 5.96,
+  "pricingKind": "variable-planning-estimate",
+  "description": "Preparación ilustrativa generada con IA, basada en las gomitas de referencia: gusanitos, sandías, aros y ositos; se añade Tajín y se mezcla con espátula, con chamoy y jugo de limón ya incorporados. Sin envolturas ni fruta visible. No es una filmación del negocio.",
+  "imagePrompt": "Reference roles: the four candy-only crops show worms/rounded sour rods, watermelon wedges, orange-red/yellow rings, and gummy bears, in that order. They define only the candy shapes, colors and textures: do NOT copy their original pink backgrounds, arrangement, printing or watermark. Re-stage the loose candies together in the bowl described below. No collage, contact sheet, packages, logos or letters.\nNatural homemade food-preparation photography on a warm off-white kitchen counter matching #FBFAF9, with one ordinary white mixing bowl and one simple silicone spatula. Soft diffused window daylight, natural color and fine real food texture, not an artificial glossy product render. Moderate depth of field: every gummy shape and ingredient should be recognizable. Keep all important items in the central 75 percent of the frame and leave clean off-white room around the edges for the website's soft blend. No dark or colored backdrop, gift packaging, floating objects, dramatic lighting, oversaturated colors or text.\nFreshly squeezed lime juice has ALREADY been added to the chamoy coating. No whole citrus fruit, slices, halves, peels or squeezing action should appear. Small plain bowls may show the remaining red chamoy and granular chili-lime seasoning, and a small clear cup may show already-expressed lime juice to identify the ingredients without showing fruit. No commercial packets or branded bottles in the scene.\nUse only loose edible gummy candies with the shapes described by the customer's references:\n- sugar-dusted plump short sour worms or rounded gummy rods, multicolored, like the candies visible in reference 1;\n- small watermelon-wedge gummies with a red face and thin white and green layers, like reference 2;\n- red/orange and yellow two-tone sour gummy rings with a real central hole, like reference 3;\n- small recognizable translucent gummy bears.\nDo not reproduce the packages, logos, labels, brand mascots or text. Do not replace these with rainbow belts, fruit, beans or marshmallows. Preserve each shape under a thin coating.\nStarting reference: the loose candies are in the mixing bowl, lightly moistened with red chamoy and lime juice already added, but not covered in seasoning yet. The seasoning is in one small plain dish next to the bowl; the spatula rests naturally beside it. Small amounts of ingredients, a casual tidy home-kitchen setup, no sauce pool and no candy melting.",
+  "videoPrompt": "Natural homemade food-preparation photography on a warm off-white kitchen counter matching #FBFAF9, with one ordinary white mixing bowl and one simple silicone spatula. Soft diffused window daylight, natural color and fine real food texture, not an artificial glossy product render. Moderate depth of field: every gummy shape and ingredient should be recognizable. Keep all important items in the central 75 percent of the frame and leave clean off-white room around the edges for the website's soft blend. No dark or colored backdrop, gift packaging, floating objects, dramatic lighting, oversaturated colors or text.\nFreshly squeezed lime juice has ALREADY been added to the chamoy coating. No whole citrus fruit, slices, halves, peels or squeezing action should appear. Small plain bowls may show the remaining red chamoy and granular chili-lime seasoning, and a small clear cup may show already-expressed lime juice to identify the ingredients without showing fruit. No commercial packets or branded bottles in the scene.\nUse only loose edible gummy candies with the shapes described by the customer's references:\n- sugar-dusted plump short sour worms or rounded gummy rods, multicolored, like the candies visible in reference 1;\n- small watermelon-wedge gummies with a red face and thin white and green layers, like reference 2;\n- red/orange and yellow two-tone sour gummy rings with a real central hole, like reference 3;\n- small recognizable translucent gummy bears.\nDo not reproduce the packages, logos, labels, brand mascots or text. Do not replace these with rainbow belts, fruit, beans or marshmallows. Preserve each shape under a thin coating.\nCreate one believable continuous 12-second home-kitchen preparation shot based on the approved start, middle and final reference images. The first reference defines the initial setup, the second the seasoning stage and the third the completed mixture. The ingredients and utensils must remain consistent across the entire shot.\n0–2 seconds: show the mixing bowl and ingredient dishes, with chamoy and lime juice already lightly coating the loose gummies. Nothing floats or moves without a cause.\n2–4 seconds: one ordinary clean right hand enters naturally from the right edge HOLDING a small teaspoon, scoops a small amount from the visible seasoning dish and sprinkles it over the gummies. Small grains fall naturally, no dust explosion. The hand withdraws with the spoon; no utensil appears from nowhere or floats by itself.\n4–10 seconds: the same cook picks up the white silicone spatula with wooden handle that is already visible beside the bowl, and makes two or three slow gentle folding strokes. Show only one working hand at a time, with a natural grip and normal fingers. Each stroke makes physical contact, lifts a few gummies and lets them fall back naturally. Preserve the shapes and approximate number of the worms, watermelon wedges, rings and bears. Do not melt, stretch, multiply or transform them. Keep the bowl stationary on the counter.\n10–12 seconds: the spatula withdraws and the finished lightly coated mixture settles. Hold the view long enough to appreciate the seasoning and real gummy textures.\nFixed three-quarter camera angle, stable soft window light, lifelike utensil handling and natural anatomy. No jump cuts, magical morphing, floating spoons, robotic motion, extra hands, packaging, citrus fruit or text. This is an illustrative preparation scene, not a claim of filming the shop's actual kitchen.",
+  "frames": [
+    {
+      "name": "start",
+      "image": "/brand-media/onkys-gummies-02/start.png",
+      "status": "completed"
+    },
+    {
+      "name": "middle",
+      "image": "/brand-media/onkys-gummies-02/middle.png",
+      "status": "completed"
+    },
+    {
+      "name": "end",
+      "image": "/brand-media/onkys-gummies-02/end.png",
+      "status": "completed"
+    }
+  ],
+  "poster": "/brand-media/onkys-gummies-02/poster.webp",
+  "webVideo": "/brand-media/onkys-gummies-02/hero-web.mp4",
+  "webVideoBytes": 1257168
+}

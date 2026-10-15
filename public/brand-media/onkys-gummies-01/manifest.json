@@ -1,0 +1,19 @@
+{
+  "round": "onkys-gummies-01",
+  "updatedAt": "2026-10-13T21:07:26.579Z",
+  "image": "/brand-media/onkys-gummies-01/reference.png",
+  "video": "/brand-media/onkys-gummies-01/hero.mp4",
+  "imageStatus": "completed",
+  "videoStatus": "completed",
+  "estimatedTotalUsd": 0.76,
+  "imageModel": "marketing-studio/image",
+  "videoModel": "kling-video/v3.0/pro/image-to-video",
+  "duration": 5,
+  "audio": false,
+  "description": "Referencia visual generada con IA: gomitas con chamoy, sazonador tipo Tajín y jugo de limón. No es una filmación del producto real.",
+  "imagePrompt": "Premium realistic food photography for Onky's, a small store selling chamoy-coated spicy gummy candy and desserts. The food is the subject, not gift packaging or abstract branding.\nWarm-white background close to #FBFAF9, soft diffused daylight, subtle natural shadows, simple white tableware. Use realistic food textures and natural appetizing colors. Deep plum #382448 may appear as one tiny background accent, never as a colored backdrop. Keep the composition uncluttered and the full plate inside the frame, with room for responsive cropping. No text, logos, people, hands, gift boxes, ribbons, ceramic rings, decorative letters, jewelry, confetti or cosmetic products. Do not invent additional toppings or garnish.\nA small white shallow bowl containing a modest mix of gummy bears, gummy worms and candy strips, evenly coated in a glossy red chamoy sauce. Fine chili-lime seasoning grains are clearly visible on the gummy surfaces. The gummies remain recognizable, with natural translucent texture, not melted or fused together. One halved green lime beside the bowl communicates freshly squeezed lime juice. No other ingredients or props. Three-quarter close-up with the entire bowl visible. The red chamoy, subtle orange-red seasoning and green lime are the only strong colors.\nKeep the bowl and lime comfortably inside the frame with at least 15 percent margin on all sides. The gummy mix must show distinct bear and worm silhouettes under a thin appetizing chamoy coating, with a fine visible chili-lime seasoning dusting. Freshly squeezed lime juice is incorporated into the coating. Red sauce must not fill the bowl like soup. Bright natural studio food photography, no colored backdrop, no invented food ingredients.",
+  "videoPrompt": "Animate the approved food reference in one locked-camera shot. A very thin stream of red chamoy pours onto the already visible gummy candies in the bowl, then stops. Preserve the exact gummy shapes, bowl, lime, lighting and white background. Slow restrained movement, realistic sauce viscosity, no splashes, no cuts, no new objects, no text. Keep all branding and UI outside the generated video.",
+  "poster": "/brand-media/onkys-gummies-01/poster.webp",
+  "webVideo": "/brand-media/onkys-gummies-01/hero-web.mp4",
+  "webVideoBytes": 247385
+}

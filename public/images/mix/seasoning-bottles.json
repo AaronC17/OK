@@ -1,0 +1,42 @@
+{
+  "round": "onkys-seasoning-bottles-01 + onkys-seasoning-bottles-02 + onkys-seasoning-bottles-03",
+  "model": "marketing-studio/image/sunburst",
+  "generated": true,
+  "assets": [
+    {
+      "name": "chamoy",
+      "image": "/images/mix/bottle-chamoy.webp",
+      "width": 301,
+      "height": 768,
+      "pivot": {
+        "x": 155,
+        "y": 38
+      },
+      "source": "https://www.scorpion.com.mx/pub/media/catalog/product/2/2/22935.jpg",
+      "generated": true
+    },
+    {
+      "name": "tajin",
+      "image": "/images/mix/bottle-tajin.webp",
+      "width": 334,
+      "height": 768,
+      "pivot": {
+        "x": 122.958,
+        "y": 87.711
+      },
+      "source": "https://www.tajin.com/us/wp-content/uploads/2021/10/Clasico-142g-2026.png",
+      "generated": true
+    },
+    {
+      "name": "limon",
+      "image": "/images/mix/bottle-limon.webp",
+      "width": 384,
+      "height": 529,
+      "pivot": {
+        "x": 30.525,
+        "y": 14.056
+      },
+      "generated": true
+    }
+  ]
+}

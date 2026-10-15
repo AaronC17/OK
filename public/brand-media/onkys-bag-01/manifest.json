@@ -1,0 +1,16 @@
+{
+  "round": "onkys-bag-01",
+  "updatedAt": "2026-10-14T13:32:22.056Z",
+  "video": "/brand-media/onkys-bag-01/hero.mp4",
+  "webVideo": "/brand-media/onkys-bag-01/hero-web.mp4",
+  "webVideoBytes": 388730,
+  "poster": "/brand-media/onkys-bag-01/poster.webp",
+  "videoStatus": "completed",
+  "duration": 8,
+  "resolution": "720p",
+  "aspectRatio": "16:9",
+  "audio": false,
+  "videoModel": "bytedance/seedance-2.5/reference-to-video",
+  "estimatedTotalUsd": 3.698,
+  "description": "Anuncio ilustrativo generado con IA a partir de la bolsa de referencia: una mano abre el cierre, toma una gomita y la saca del encuadre. Sin texto ni logos. No es una filmación del producto real."
+}
