@@ -71,7 +71,7 @@ export const adminSettings = () => request<SinpeSettings>('/api/admin/settings',
 export const saveSettings = (settings: SinpeSettings) => request<SinpeSettings>('/api/admin/settings', 'PUT', settings, 'admin')
 export const adminOrders = (query: URLSearchParams) => request<AdminOrders>(`/api/admin/orders?${query}`, 'GET', undefined, 'admin')
 export const adminOrder = (id: string) => request<{ order: ShopOrder; audit: OrderAudit[] }>(`/api/admin/orders/${id}`, 'GET', undefined, 'admin')
-export const reviewOrder = (id: string, action: 'quote' | 'confirm' | 'reject', value: unknown) => request<ShopOrder>(`/api/admin/orders/${id}/${action}`, 'POST', value, 'admin')
+export const reviewOrder = (id: string, action: 'confirm' | 'reject', value: unknown) => request<ShopOrder>(`/api/admin/orders/${id}/${action}`, 'POST', value, 'admin')
 
 export function amountFromInput(value: string): number {
   const normalized = value.trim().replace(',', '.')

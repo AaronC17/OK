@@ -85,9 +85,9 @@ export const store: StoreConfig = {
   ],
   deliveryMethods: [
     {
-      id: 'delivery', name: 'A domicilio', description: 'Envío por confirmar', enabled: true,
-      requiresAddress: true, addressLabel: 'Dirección o punto de entrega', feeMinor: null,
-      coverage: null, conditions: 'Cobertura, tarifa y fecha a coordinar con la tienda. Método de ejemplo.',
+      id: 'delivery', name: 'Envío por Correos', description: '₡2.800 · Todo Costa Rica', enabled: true,
+      requiresAddress: true, addressLabel: 'Dirección o punto de entrega', feeMinor: 280000, freeAboveMinor: 1500000,
+      coverage: 'Todo Costa Rica', conditions: 'Correos de Costa Rica: ₡2.800. Envío gratis en compras mayores a ₡15.000, sin contar el envío.',
     },
     {
       id: 'pickup', name: 'Recogida', description: 'Punto por coordinar', enabled: true,

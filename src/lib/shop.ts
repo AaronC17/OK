@@ -110,9 +110,14 @@ export function restoreCart(raw: string | null, config: StoreConfig): { items: C
   }
 }
 
+export function shippingFee(subtotal: number, method: DeliveryMethod | undefined): number | null {
+  if (!method?.enabled || !validPrice(method.feeMinor)) return null
+  return validPrice(method.freeAboveMinor) && subtotal > method.freeAboveMinor ? 0 : method.feeMinor
+}
+
 export function totals(lines: CartLine[], method: DeliveryMethod | undefined) {
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotalMinor, 0)
-  const shipping = method?.enabled && validPrice(method.feeMinor) ? method.feeMinor : null
+  const shipping = shippingFee(subtotal, method)
   return { subtotal, shipping, total: shipping === null ? null : subtotal + shipping }
 }
 

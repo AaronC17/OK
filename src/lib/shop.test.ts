@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { store } from '../config/store.ts'
-import { addItem, money, resolveLine, restoreCart, selectionKey, totals, validateCheckout } from './shop.ts'
+import { addItem, money, resolveLine, restoreCart, selectionKey, shippingFee, totals, validateCheckout } from './shop.ts'
 import type { CartItem, Customer, StoreConfig } from '../types.ts'
 
 const gummy: CartItem = { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 2 }
@@ -122,11 +122,23 @@ test('corrupt storage and old discontinued categories/weights are handled gracef
 test('quoted, free and fixed delivery have honest totals with integer math', () => {
   const config = withDesserts()
   const lines = [resolveLine(gummy, config)!, resolveLine(dessert, config)!]
-  assert.deepEqual(totals(lines, store.deliveryMethods[0]), { subtotal: 760000, shipping: null, total: null })
+  assert.deepEqual(totals(lines, store.deliveryMethods[0]), { subtotal: 760000, shipping: 280000, total: 1040000 })
+  assert.deepEqual(totals(lines, { ...store.deliveryMethods[0], feeMinor: null }), { subtotal: 760000, shipping: null, total: null })
   assert.deepEqual(totals(lines, store.deliveryMethods[1]), { subtotal: 760000, shipping: 0, total: 760000 })
   assert.deepEqual(totals(lines, { ...store.deliveryMethods[0], feeMinor: 133333 }), { subtotal: 760000, shipping: 133333, total: 893333 })
   assert.equal(normalize(money(893333, store)), '₡8 933,33')
   assert.equal(normalize(money(120000, store)), '₡1 200')
+})
+
+test('Correos costs CRC 2800 through CRC 15000 and is free strictly above the product threshold', () => {
+  const delivery = store.deliveryMethods.find(method => method.id === 'delivery')!
+  assert.equal(shippingFee(1, delivery), 280000)
+  assert.equal(shippingFee(1499999, delivery), 280000)
+  assert.equal(shippingFee(1500000, delivery), 280000)
+  assert.equal(shippingFee(1500001, delivery), 0)
+  assert.equal(shippingFee(2000000, delivery), 0)
+  assert.equal(shippingFee(120000, { ...delivery, enabled: false }), null)
+  assert.equal(shippingFee(2000000, store.deliveryMethods.find(method => method.id === 'pickup')), 0)
 })
 
 test('delivery requires address, pickup does not; notes remain optional', () => {

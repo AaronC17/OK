@@ -48,6 +48,8 @@ export interface DeliveryMethod {
   requiresAddress: boolean
   addressLabel?: string
   feeMinor: number | null
+  /** Envío gratis solo si el subtotal de productos SUPERA este importe. */
+  freeAboveMinor?: number
   coverage: string | null
   conditions: string
   pickupPoint?: string | null

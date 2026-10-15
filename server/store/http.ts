@@ -172,13 +172,13 @@ export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = 
         json(response, 200, store.list(url.searchParams))
         return
       }
-      const adminOrder = new RegExp(`^/api/admin/orders/(${ID})(?:/(quote|confirm|reject))?$`).exec(path)
+      const adminOrder = new RegExp(`^/api/admin/orders/(${ID})(?:/(confirm|reject))?$`).exec(path)
       if (adminOrder) {
         requireSession('admin', method !== 'GET')
         if (!adminOrder[2] && method === 'GET') { json(response, 200, { order: store.getOrder(adminOrder[1]), audit: store.auditFor(adminOrder[1]) }); return }
         if (method === 'POST' && adminOrder[2]) {
           const data = await jsonBody(request)
-          const operation = adminOrder[2] === 'quote' ? store.quote.bind(store) : adminOrder[2] === 'confirm' ? store.confirm.bind(store) : store.reject.bind(store)
+          const operation = adminOrder[2] === 'confirm' ? store.confirm.bind(store) : store.reject.bind(store)
           json(response, 200, operation(adminOrder[1], data, store.adminName()!))
           return
         }

@@ -25,7 +25,11 @@ test('ledger: backend prices the current catalog and refuses unknown delivery to
   assert.match(order.reference, /^ONK-[A-F0-9]{16}$/)
   assert.equal(order.demoOnly, true)
   assert.throws(() => ledger.createOrder({ ...orderInput(), amountMinor: 1 }, randomUUID(), NOW), /campos no permitidos/)
-  assert.throws(() => ledger.createOrder({ ...orderInput(), deliveryId: 'delivery' }, randomUUID(), NOW), /costo de entrega/)
+  const catalog = structuredClone(store)
+  catalog.deliveryMethods[0].feeMinor = null
+  const unquoted = new DemoLedger(':memory:', { mode: 'mock', accountId: 'bac-personal-demo' }, catalog)
+  t.after(() => unquoted.close())
+  assert.throws(() => unquoted.createOrder({ ...orderInput(), deliveryId: 'delivery' }, randomUUID(), NOW), /costo de entrega/)
   assert.throws(() => ledger.createOrder({ items: [], deliveryId: 'pickup' }, randomUUID(), NOW), /variantes/)
   assert.throws(() => ledger.createOrder({ ...orderInput(), items: [{ ...orderInput().items[0], quantity: 100 }] }, randomUUID(), NOW), /Cantidad/)
   assert.throws(() => ledger.createOrder({ ...orderInput(), items: [{ selection: { kind: 'gummy', typeIds: ['unknown'], weight: 100 }, quantity: 1 }] }, randomUUID(), NOW), /no disponibles/)

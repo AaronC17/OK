@@ -58,9 +58,9 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
     <h3 id="sinpe-order-title">{title}</h3>
     <p>{order.status === 'pending_review' ? 'Validamos el código del pedido y recibimos tu archivo. La tienda debe comprobar el abono en BAC antes de confirmar el pago.'
       : order.status === 'ready' ? 'La tienda confirmó manualmente tu pago. Tu pedido está listo para empezar a prepararse; todavía no significa que esté listo para entregar.'
-      : order.status === 'pending_details' ? 'Antes de pagar, la tienda debe confirmar el total de entrega y los datos SINPE. Puedes consultar los cambios aquí.'
+      : order.status === 'pending_details' ? 'Tu pedido ya tiene el costo de entrega calculado. La tienda debe habilitar sus datos SINPE antes de solicitarte el pago.'
       : 'Usa el código de tu pedido en el detalle del SINPE y luego adjunta el comprobante. Subirlo no confirma automáticamente el pago.'}</p>
-    {order.demo && <p className="payment-warning"><Icon name="info" size={17} />Demostración: los precios y la entrega son de ejemplo. No envíes dinero real.</p>}
+    {order.demo && <p className="payment-warning"><Icon name="info" size={17} />Demostración: los precios de los productos son de ejemplo. No envíes dinero real.</p>}
     <div className="sinpe-pay-card">
       <div className="sinpe-pay-head">
         <img src="/images/sinpe-movil.png" alt="SINPE Móvil" width="64" height="64" />
@@ -95,6 +95,6 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
     </form>}
     {order.receipt && !canSubmit && <div className="receipt-received"><Icon name="receipt" size={20} /><div><strong>Comprobante recibido</strong><small>Referencia: {order.receipt.bankReference}</small></div><a className="icon-button" href={`/api/orders/${order.id}/receipts/${order.receipt.id}`} target="_blank" rel="noopener noreferrer" aria-label="Consultar mi comprobante"><Icon name="download" size={18} /></a></div>}
     <div className="order-panel-actions"><button type="button" className="button button-outline" disabled={busy || sending} onClick={onRefresh}><Icon name="refresh" size={17} />{busy ? 'Consultando…' : 'Actualizar estado'}</button><button type="button" className="text-button" disabled={sending} onClick={onNew}>Hacer otro pedido</button></div>
-    <p className="small-note">El seguimiento se conserva en este navegador mediante una cookie segura de sesión de compra. La confirmación bancaria automática todavía no está conectada.</p>
+    <p className="small-note">El seguimiento se conserva en este navegador mediante una cookie privada de compra. La confirmación bancaria automática todavía no está conectada.</p>
   </section>
 }

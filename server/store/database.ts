@@ -8,6 +8,7 @@ import { bankReference, fields, minorAmount, orderCode, parseNewOrder, parseSett
 import { constantEqual, createSession, findSession, passwordHash, passwordMatches, tokenHash } from './security.ts'
 import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
+import { shippingFee } from '../../src/lib/shop.ts'
 
 const statuses: ShopOrderStatus[] = ['pending_details', 'awaiting_payment', 'pending_review', 'ready', 'rejected']
 type Row = Record<string, SQLInputValue>
@@ -21,6 +22,9 @@ export class ShopDatabase {
     this.database = new DatabaseSync(path)
     this.catalog = catalog
     this.database.exec(schema)
+    // Complete only orders that have never received payment instructions.
+    // Never change the total/destination of an order already awaiting payment or review.
+    this.transaction(() => this.completePendingDetails())
   }
   close() { this.database.close() }
   private transaction<T>(operation: () => T): T {
@@ -89,10 +93,26 @@ export class ShopDatabase {
     return this.transaction(() => {
       this.database.prepare("INSERT INTO metadata (key, value) VALUES ('sinpe', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(settings))
       this.audit(null, 'sinpe.configured', actor, settings.enabled ? 'Destino SINPE habilitado. Los pedidos con instrucciones conservan su destino original.' : 'Nuevas instrucciones SINPE deshabilitadas.')
+      this.completePendingDetails()
       return settings
     })
   }
   isDemo() { return this.catalog.demo }
+
+  private completePendingDetails() {
+    const destination = this.destination()
+    for (const row of this.database.prepare("SELECT * FROM shop_orders WHERE status = 'pending_details' AND current_receipt_id IS NULL").all()) {
+      const delivery = JSON.parse(row.delivery_json as string) as ShopOrder['delivery']
+      const shipping = row.shipping_minor === null ? shippingFee(row.subtotal_minor as number, this.catalog.deliveryMethods.find(method => method.id === delivery.id)) : row.shipping_minor as number
+      const total = shipping === null ? null : minorAmount((row.subtotal_minor as number) + shipping)
+      const savedDestination = destination ? JSON.stringify(destination) : row.destination_json as string | null
+      const status = total !== null && destination ? 'awaiting_payment' : 'pending_details'
+      if (shipping === row.shipping_minor && total === row.total_minor && savedDestination === row.destination_json && status === row.status) continue
+      this.database.prepare('UPDATE shop_orders SET shipping_minor = ?, total_minor = ?, destination_json = ?, status = ?, version = version + 1, updated_at = ? WHERE id = ?')
+        .run(shipping, total, savedDestination, status, timestamp(), row.id)
+      this.audit(row.id as string, 'order.details_completed', 'system', 'Entrega calculada automáticamente. Las instrucciones SINPE se habilitan cuando el destino está configurado.')
+    }
+  }
 
   private fromRow(row: Row): ShopOrder {
     const receipt = row.current_receipt_id ? this.database.prepare('SELECT id, content_type, size, submitted_at, bank_reference FROM receipts WHERE id = ? AND order_id = ?').get(row.current_receipt_id, row.id) : undefined
@@ -194,41 +214,20 @@ export class ShopDatabase {
     if (!row) throw new StoreError(404, 'Comprobante no encontrado.')
     return { data: Buffer.from(row.data as Uint8Array), contentType: row.content_type as OrderReceipt['contentType'] }
   }
-  quote(id: string, value: unknown, actor: string): ShopOrder {
-    const data = record(value)
-    fields(data, ['version', 'shippingMinor', 'note'])
-    const expectedVersion = version(data.version)
-    const shipping = minorAmount(data.shippingMinor, true)
-    const note = text(data.note, 5, 500, 'Detalle para el cliente')
-    return this.transaction(() => {
-      const order = this.getOrder(id)
-      if (order.version !== expectedVersion || order.status !== 'pending_details') throw new StoreError(409, 'El pedido cambió o ya tiene instrucciones de pago. Actualiza la vista.')
-      if (order.shippingMinor !== null && order.shippingMinor !== shipping) throw new StoreError(422, 'No puedes cambiar una tarifa ya fijada para este pedido.')
-      const destination = this.destination()
-      if (!destination) throw new StoreError(409, 'Configura y habilita el número SINPE y el beneficiario antes de solicitar un pago.')
-      const total = minorAmount(order.subtotalMinor + shipping)
-      this.database.prepare("UPDATE shop_orders SET destination_json = ?, shipping_minor = ?, total_minor = ?, status = 'awaiting_payment', customer_message = ?, version = version + 1, updated_at = ? WHERE id = ?")
-        .run(JSON.stringify(destination), shipping, total, note, timestamp(), id)
-      this.audit(id, 'order.quoted', actor, note)
-      return this.getOrder(id)
-    })
-  }
   confirm(id: string, value: unknown, actor: string): ShopOrder {
     const data = record(value)
-    fields(data, ['version', 'code', 'bankReference', 'amountMinor', 'checkedBank', 'note'])
+    fields(data, ['version', 'receiptId'])
     const expectedVersion = version(data.version)
-    const reference = bankReference(data.bankReference)
-    const amount = minorAmount(data.amountMinor)
-    const note = text(data.note, 5, 1000, 'Nota de revisión')
-    if (data.checkedBank !== true) throw new StoreError(422, 'Debes comprobar el abono aplicado en banca en línea, no solamente la imagen.')
+    const receiptId = text(data.receiptId, 36, 36, 'Comprobante revisado')
     return this.transaction(() => {
       const order = this.getOrder(id)
-      this.assertCode(order, data.code)
-      if (order.totalMinor !== amount) throw new StoreError(422, 'El monto verificado no coincide exactamente con el total del pedido.')
-      const existing = this.database.prepare('SELECT bank_reference, amount_minor FROM manual_payments WHERE order_id = ?').get(id)
-      if (order.status === 'ready' && existing?.bank_reference === reference && existing.amount_minor === amount) return order
-      if (order.version !== expectedVersion || order.status !== 'pending_review' || !order.receipt || !order.destination) throw new StoreError(409, 'El pedido cambió o no tiene un comprobante pendiente de revisión. Actualiza la vista.')
-      if (order.receipt.bankReference !== reference) throw new StoreError(422, 'La referencia bancaria no coincide con la enviada por el cliente. Solicita la corrección antes de confirmar.')
+      const existing = this.database.prepare('SELECT receipt_id FROM manual_payments WHERE order_id = ?').get(id)
+      if (order.status === 'ready' && existing?.receipt_id === receiptId) return order
+      if (order.version !== expectedVersion || order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null) throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      const reference = bankReference(order.receipt.bankReference)
+      const amount = minorAmount(order.totalMinor)
+      // This records the authenticated administrator's manual decision, not bank verification.
+      const note = 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
       if (this.database.prepare('SELECT order_id FROM manual_payments WHERE bank_reference = ?').get(reference)) throw new StoreError(409, 'Esta referencia bancaria ya fue utilizada para confirmar otro pedido.')
       const now = timestamp()
       this.database.prepare('INSERT INTO manual_payments (order_id, bank_reference, amount_minor, receipt_id, confirmed_by, confirmed_at, note) VALUES (?, ?, ?, ?, ?, ?, ?)')

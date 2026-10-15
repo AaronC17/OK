@@ -88,7 +88,7 @@ test('store HTTP: real multipart, sanitized private receipt, manual review and r
   assert.equal((await outsider.call(`/api/orders/${order.id}`)).status, 404)
   assert.equal((await outsider.call(receiptPath)).status, 404)
   assert.equal((await outsider.call(`/api/admin/orders/${order.id}/receipts/${reviewed.receipt!.id}`)).status, 401)
-  const approval = { version: reviewed.version, code: reviewed.code, bankReference: reviewed.receipt!.bankReference, amountMinor: reviewed.totalMinor, checkedBank: true, note: 'Comprobación ficticia de prueba, sin banco.' }
+  const approval = { version: reviewed.version, receiptId: reviewed.receipt!.id }
   assert.equal((await buyer.call(`/api/admin/orders/${order.id}/confirm`, approval)).status, 401)
   const ready = await admin.call<ShopOrder>(`/api/admin/orders/${order.id}/confirm`, approval)
   assert.equal(ready.status, 200)

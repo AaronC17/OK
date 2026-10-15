@@ -37,7 +37,7 @@ El frontend se compila en `dist/`, pero **publicar solo esa carpeta ya no basta*
 - Se permite **un solo tipo** o **mixto**, eligiendo dos o tres tipos.
 - Nombre utilizado: **Onky’s**, tomado originalmente de la carpeta.
 
-`demo: true` señala que **nombres de productos, disponibilidad, recetas de postres, presentaciones, precios y métodos de entrega son ejemplos**. Las fotografías son de referencia. No se hizo una conversión de los antiguos precios de muestra: las nuevas tablas en colones también son provisionales.
+`demo: true` señala que **nombres de productos, disponibilidad, recetas de postres, presentaciones y precios de productos son ejemplos**. La tarifa nacional por Correos sí está confirmada: ₡2.800, gratis en compras mayores a ₡15.000. Las fotografías son de referencia.
 
 ## Cambiar los datos del negocio
 
@@ -117,15 +117,16 @@ En `deliveryMethods`:
 - `feeMinor: null`: **Envío por confirmar**; se muestra subtotal y se omite un total definitivo.
 - `feeMinor: 0`: sin cargo; permite calcular total.
 - `feeMinor: 150000`: ejemplo de cargo fijo de ₡1.500.
+- `freeAboveMinor`: el envío pasa a cero solo cuando el subtotal de productos supera ese umbral (sin incluir el envío).
 - `coverage`, `conditions`, `pickupPoint`: cobertura, condiciones y punto real de recogida.
 
-No hay zonas ni plazos inventados. La recogida gratuita actual es un ejemplo, no una condición comercial confirmada.
+El método actual **Envío por Correos** cubre todo Costa Rica: `feeMinor: 280000` (₡2.800), `freeAboveMinor: 1500000` (gratis por compras mayores a ₡15.000). A exactamente ₡15.000 se cobra el envío. Se calcula automáticamente en carrito y backend y se anuncia arriba de la tienda; no se cotiza desde administración. No se inventaron plazos de entrega. La recogida sin cargo conserva su configuración actual.
 
 ### Pedidos con SINPE Móvil
 
 El backend genera el código `ONK-` + 16 caracteres hexadecimales y calcula el precio desde el catálogo. El cliente recibe instrucciones cuando están confirmados total y beneficiario, y adjunta su comprobante con código y referencia bancaria. Se valida pertenencia del pedido, código y archivo; subir una imagen solo cambia el estado a **Comprobante en revisión**.
 
-La administración comprueba el abono en BAC por su cuenta e introduce código, monto y referencia verificados antes de pasar el pedido a **Listo para preparar**. Una referencia consumida no puede confirmar otro pedido. Hay correcciones, auditoría, bloqueo de versiones antiguas e idempotencia. No se automatiza BAC en esta fase. Detalles en [`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md).
+La administración revisa el pedido, su código y la imagen y pulsa **Confirmar pedido**, sin transcribir datos ni completar formularios. El backend usa el monto y la referencia guardados y registra la confirmación manual como **Listo para preparar**. Una referencia consumida no puede confirmar otro pedido. Hay correcciones, auditoría, bloqueo de versiones antiguas e idempotencia. No se automatiza BAC ni se garantiza la autenticidad de la imagen. Detalles en [`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md).
 
 ## Interacciones y accesibilidad
 

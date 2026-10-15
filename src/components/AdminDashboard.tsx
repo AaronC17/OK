@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { store } from '../config/store.ts'
 import { orderStatusLabels } from '../order-types.ts'
 import type { AdminAuth, AdminOrders, OrderAudit, ShopOrder, SinpeSettings } from '../order-types.ts'
-import { adminLogin, adminLogout, adminOrder, adminOrders, adminSession, adminSettings, adminSetup, amountFromInput, ApiError, errorMessage, orderDate, reviewOrder, saveSettings } from '../lib/orders-api.ts'
+import { adminLogin, adminLogout, adminOrder, adminOrders, adminSession, adminSettings, adminSetup, ApiError, errorMessage, orderDate, reviewOrder, saveSettings } from '../lib/orders-api.ts'
 import { money } from '../lib/shop.ts'
 import { Icon } from './Icon.tsx'
 import { Modal } from './ui.tsx'
@@ -67,24 +67,18 @@ function SettingsPanel({ initial, onSaved }: { initial: SinpeSettings; onSaved: 
 
 function AdminOrderDialog({ detail, onClose, onChanged, onRefresh }: { detail: OrderDetail; onClose: () => void; onChanged: (order: ShopOrder) => void; onRefresh: () => void }) {
   const order = detail.order
-  const [code, setCode] = useState('')
-  const [reference, setReference] = useState('')
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
-  const [checked, setChecked] = useState(false)
-  const [shipping, setShipping] = useState(order.shippingMinor === null ? '' : (order.shippingMinor / 100).toFixed(2))
   const [correction, setCorrection] = useState(false)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const perform = async (action: 'quote' | 'confirm' | 'reject', event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError('')
+  const perform = async (action: 'confirm' | 'reject', event?: FormEvent) => {
+    event?.preventDefault()
+    if (busy) return
+    setBusy(true); setError('')
     try {
-      const payload = action === 'quote' ? { version: order.version, shippingMinor: amountFromInput(shipping), note }
-        : action === 'reject' ? { version: order.version, reason }
-        : { version: order.version, code, bankReference: reference, amountMinor: amountFromInput(amount), checkedBank: checked, note }
+      const payload = action === 'reject' ? { version: order.version, reason } : { version: order.version, receiptId: order.receipt?.id }
       onChanged(await reviewOrder(order.id, action, payload))
-      setNote(''); setChecked(false); setCorrection(false)
+      setCorrection(false)
     } catch (error) { setError(errorMessage(error)) }
     finally { setBusy(false) }
   }
@@ -97,15 +91,8 @@ function AdminOrderDialog({ detail, onClose, onChanged, onRefresh }: { detail: O
       <details className="admin-audit"><summary>Historial del pedido <Icon name="chevron" size={16} /></summary><ol>{detail.audit.map((entry, index) => <li key={`${entry.createdAt}-${index}`}><strong>{entry.event}</strong><p>{entry.detail}</p><small>{entry.actor} · {orderDate(entry.createdAt)}</small></li>)}</ol></details>
     </div><div className="admin-payment-review"><section className="admin-receipt-card"><div className="admin-section-title"><h3>Comprobante</h3><Icon name="receipt" size={19} /></div>{order.receipt ? <><p className="small-note">Referencia indicada por el cliente: <strong>{order.receipt.bankReference}</strong></p>{order.receipt.contentType === 'image/webp' ? <a href={receiptUrl} target="_blank" rel="noopener noreferrer"><img className="admin-receipt-image" src={receiptUrl} alt={`Comprobante privado del pedido ${order.code}`} /></a> : <div className="admin-pdf-card"><Icon name="receipt" size={38} /><p>Comprobante PDF</p><small>Por seguridad se descarga; no se ejecuta ni se incrusta en el panel.</small></div>}<a className="button button-outline" href={receiptUrl} target="_blank" rel="noopener noreferrer" download><Icon name="download" size={17} />Descargar comprobante</a></> : <div className="admin-no-receipt"><Icon name="clock" size={30} /><p>El cliente aún no ha enviado un comprobante.</p></div>}</section>
       {error && <p className="field-error admin-action-error" role="alert">{error}</p>}
-      {order.status === 'pending_details' && <form className="admin-review-form" onSubmit={event => { void perform('quote', event) }}><h3>Confirmar total e instrucciones</h3><p>Configura primero el SINPE receptor en «Configuración». No se solicitará el pago hasta fijar todos los datos.</p><fieldset disabled={busy}><div className="form-field"><label htmlFor="quote-shipping">Costo de entrega en colones</label><input id="quote-shipping" inputMode="decimal" required value={shipping} readOnly={order.shippingMinor !== null} onChange={event => setShipping(event.target.value)} placeholder="Ejemplo: 1500" /></div><div className="form-field"><label htmlFor="quote-note">Detalle de entrega para el cliente</label><textarea id="quote-note" required minLength={5} maxLength={500} value={note} onChange={event => setNote(event.target.value)} placeholder="Confirma punto, horario o tarifa de entrega" /></div><button type="submit" className="button button-primary">{busy ? 'Guardando…' : 'Confirmar total y habilitar SINPE'}</button></fieldset></form>}
-      {order.status === 'pending_review' && !correction && <form className="admin-review-form" onSubmit={event => { void perform('confirm', event) }}><span className="eyebrow">VALIDACIÓN MANUAL</span><h3>Comprueba el abono en BAC</h3><p>Transcribe los datos del movimiento bancario. El comprobante por sí solo no confirma el pago.</p><fieldset disabled={busy}>
-        <div className="form-field"><label htmlFor="verified-code">Código verificado en el abono</label><input id="verified-code" autoComplete="off" spellCheck={false} required minLength={20} maxLength={20} value={code} onChange={event => setCode(event.target.value.toUpperCase())} /></div>
-        <div className="form-field"><label htmlFor="verified-reference">Referencia bancaria verificada</label><input id="verified-reference" autoComplete="off" required minLength={6} maxLength={80} value={reference} onChange={event => setReference(event.target.value)} /></div>
-        <div className="form-field"><label htmlFor="verified-amount">Monto verificado en colones</label><input id="verified-amount" inputMode="decimal" required value={amount} onChange={event => setAmount(event.target.value)} placeholder={order.totalMinor === null ? '' : (order.totalMinor / 100).toFixed(2)} /><small className="small-note">Sin separadores de miles. Debe coincidir exactamente con el total.</small></div>
-        <div className="form-field"><label htmlFor="verified-note">Nota de revisión</label><textarea id="verified-note" required minLength={5} maxLength={1000} value={note} onChange={event => setNote(event.target.value)} placeholder="Registro breve de la comprobación realizada" /></div>
-        <label className="privacy-check"><input type="checkbox" checked={checked} required onChange={event => setChecked(event.target.checked)} /><span>Comprobé en banca en línea el abono aplicado en la cuenta receptora, con este monto, código y referencia.</span></label>
-        <button type="submit" className="button button-primary" disabled={!checked || busy}><Icon name="check" size={18} />{busy ? 'Confirmando…' : 'Confirmar pago y pasar a listo'}</button><button type="button" className="text-button" onClick={() => { setCorrection(true); setError('') }}>Solicitar corrección del comprobante</button>
-      </fieldset></form>}
+      {order.status === 'pending_details' && <div className="admin-review-form"><h3>Falta habilitar SINPE</h3><p>El costo de entrega se calcula automáticamente. Configura el número receptor y el beneficiario en «Configuración»; el pedido se habilitará para pagar sin cotizaciones manuales.</p></div>}
+      {order.status === 'pending_review' && !correction && <section className="admin-review-form" aria-label="Confirmar pedido"><span className="eyebrow">REVISIÓN MANUAL</span><h3>¿Todo correcto?</h3><p>Revisa los productos, el código y el comprobante. Al confirmar, el pedido pasa a listo para preparar. La imagen por sí sola no verifica un abono bancario.</p><button type="button" className="button button-primary" disabled={busy} onClick={() => { void perform('confirm') }}><Icon name="check" size={18} />{busy ? 'Confirmando…' : 'Confirmar pedido'}</button><button type="button" className="text-button" disabled={busy} onClick={() => { setCorrection(true); setError('') }}>Solicitar corrección del comprobante</button></section>}
       {order.status === 'pending_review' && correction && <form className="admin-review-form" onSubmit={event => { void perform('reject', event) }}><h3>Solicitar una corrección</h3><p>El cliente verá este motivo y podrá adjuntar un nuevo archivo. No se elimina el historial.</p><fieldset disabled={busy}><div className="form-field"><label htmlFor="receipt-correction">Motivo para el cliente</label><textarea id="receipt-correction" required minLength={5} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} /></div><button className="button button-primary" type="submit">{busy ? 'Guardando…' : 'Enviar solicitud de corrección'}</button><button className="text-button" type="button" onClick={() => setCorrection(false)}>Volver a verificar</button></fieldset></form>}
       {order.status === 'ready' && <div className="admin-confirmed-card"><Icon name="shield" size={30} /><h3>Pago confirmado manualmente</h3><p>Listo para preparar. No se ha marcado como entregado ni se ha descontado inventario automáticamente.</p>{order.paymentConfirmedAt && <small>{orderDate(order.paymentConfirmedAt)}</small>}</div>}
       {order.status === 'rejected' && <p className="notice payment-message">Corrección solicitada: {order.customerMessage}</p>}

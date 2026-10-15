@@ -35,12 +35,12 @@ export async function testReceipt() {
   return { name: `comprobante-prueba-${randomUUID()}.png`, mimeType: 'image/png', buffer }
 }
 
-export async function checkoutOrder(page: Page, delivery: 'pickup' | 'delivery' = 'pickup') {
+export async function checkoutOrder(page: Page, delivery: 'pickup' | 'delivery' = 'pickup', quantity = 2) {
   await page.goto('/')
-  await page.evaluate(() => localStorage.setItem('onkys.cart.v1', JSON.stringify({ version: 1, items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 2 }] })))
+  await page.evaluate(quantity => localStorage.setItem('onkys.cart.v1', JSON.stringify({ version: 1, items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity }] })), quantity)
   await page.reload()
-  await page.getByRole('button', { name: 'Abrir carrito, 2 artículos' }).click()
-  await page.getByRole('radio', { name: delivery === 'pickup' ? /Recogida/ : /A domicilio/ }).check()
+  await page.getByRole('button', { name: `Abrir carrito, ${quantity} artículos` }).click()
+  await page.getByRole('radio', { name: delivery === 'pickup' ? /Recogida/ : /Envío por Correos/ }).check()
   await page.getByLabel('Tu nombre').fill(`Cliente prueba ${randomUUID().slice(0, 6)}`)
   await page.getByLabel('Teléfono de contacto').fill('61551234')
   if (delivery === 'delivery') await page.getByLabel('Dirección o punto de entrega').fill('Dirección ficticia para la prueba de envío.')

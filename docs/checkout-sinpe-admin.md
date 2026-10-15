@@ -36,9 +36,9 @@ En el panel, abre **Configuración** e introduce:
 
 El banco se identifica como BAC Credomatic. No se solicita IBAN ni acceso bancario. **No se asumió que el número del antiguo WhatsApp sea tu SINPE.**
 
-Sin configuración, se pueden registrar pedidos, pero quedan **«Por coordinar»** y no se muestran instrucciones para transferir. Cambiar el destino después no modifica las instrucciones de pedidos ya emitidos: cada pedido conserva su propio snapshot.
+Sin configuración, se pueden registrar pedidos con su entrega calculada, pero quedan **«Por coordinar»** y no se muestran instrucciones para transferir. Al habilitar SINPE, esos pedidos pasan automáticamente a pendientes de pago. Cambiar el destino después no modifica las instrucciones de pedidos ya emitidos: cada pedido conserva su propio snapshot.
 
-**El catálogo sigue con `demo: true`: precios y entrega son ejemplos. No envíes ni solicites dinero real hasta confirmar los datos comerciales, el beneficiario y las condiciones de entrega.** Cambiar el indicador no sustituye esas comprobaciones.
+**El catálogo sigue con `demo: true`: los precios de productos siguen siendo ejemplos. La tarifa de Correos ya fue confirmada: ₡2.800 y gratis por compras mayores a ₡15.000. No envíes ni solicites dinero real hasta confirmar el resto de los datos comerciales y el beneficiario.**
 
 ## 3. Recorrido del comprador
 
@@ -56,35 +56,35 @@ El carrito se vacía únicamente cuando el backend confirma que registró el ped
 
 Nombre, teléfono, dirección y comprobante se guardan en el servidor, no en `localStorage`. El carrito sigue guardando solo IDs y cantidades. Los archivos y datos de otros compradores no pueden consultarse conociendo únicamente el código o ID del pedido.
 
-### Entrega sin cotización
+### Entrega automática, sin cotizaciones
 
-El envío a domicilio actual tiene `feeMinor: null`. El pedido se registra **«Por coordinar»**, sin monto cobrable definitivo y sin formulario de comprobante. Desde su detalle en administración:
+- **Correos de Costa Rica a todo el país: ₡2.800.**
+- **Envío gratis cuando el subtotal de productos supera ₡15.000**, sin contar el propio envío. A exactamente ₡15.000 se cobran ₡2.800.
+- La recogida conserva su costo cero.
 
-- Introduce el costo de entrega en colones.
-- Escribe un detalle para el cliente: cobertura/punto/horario/tarifa acordados.
-- Pulsa **«Confirmar total y habilitar SINPE»**.
+Carrito y backend usan la misma política, definida en `src/config/store.ts` mediante `feeMinor: 280000` y `freeAboveMinor: 1500000` (céntimos enteros). El servidor calcula el total antes de pedir el pago; no hay campos administrativos de costo de entrega ni detalle de cotización. La franja superior anuncia ambas condiciones.
 
-El total se calcula desde el subtotal congelado. El cliente verá las nuevas instrucciones. No se permite cambiar el monto después de emitirlas. La recogida con tarifa de ejemplo cero conserva ese importe; no se puede reemplazar por un cargo arbitrario en este flujo.
+Los pedidos antiguos que seguían sin cotizar y sin comprobante se completan automáticamente con esta tarifa. **No se modifica el total ni el destino de los pedidos que ya recibieron instrucciones o enviaron un comprobante.**
 
 ## 4. Revisar y confirmar desde el dashboard
 
-El panel incluye búsqueda por código/cliente, filtros de estado, contadores, paginación, datos de entrega, productos, comprobante y auditoría. Los listados se actualizan periódicamente; el formulario de revisión no se reemplaza silenciosamente con datos nuevos.
+El panel incluye búsqueda por código/cliente, filtros de estado, contadores, paginación, datos de entrega, productos, código, comprobante y auditoría.
 
 Para confirmar:
 
 1. Abre **Revisar** en el pedido correspondiente.
-2. Consulta el comprobante y **comprueba por tu cuenta el abono aplicado en banca en línea**. Esta fase no conecta un navegador a BAC.
-3. Transcribe el código, referencia bancaria y monto que verificaste en el movimiento.
-4. Añade una nota y marca la declaración explícita de revisión bancaria.
-5. Pulsa **«Confirmar pago y pasar a listo»**.
+2. Revisa el pedido, la imagen, su código y la referencia mostrada. Comprueba el abono por tu cuenta cuando corresponda: esta fase no conecta a BAC.
+3. Pulsa **«Confirmar pedido»**. Listo: pasa a **«Listo para preparar»**.
+
+No hay que reescribir código, monto o referencia, añadir notas ni marcar casillas para confirmar. Es una decisión manual del administrador, no una verificación automática de la imagen o del banco.
 
 El servidor exige:
 
 - Sesión administrativa válida y CSRF correcto.
-- Un comprobante pendiente y la versión vigente del pedido.
-- Código exacto, monto exacto en CRC y referencia coincidente con la enviada por el cliente.
+- Un comprobante pendiente, su ID exacto y la versión vigente del pedido.
+- Total, código y referencia obtenidos de los datos guardados en el servidor, no de campos editables al confirmar.
 - Que esa referencia bancaria no haya confirmado ningún otro pedido.
-- Nota de revisión y declaración expresa de comprobación del abono.
+- Registro automático de quién confirmó, cuándo y qué comprobante revisó, sin afirmar que el sistema consultó BAC.
 
 Si el cliente escribió mal la referencia, solicita una corrección; no la reemplaces silenciosamente al aprobar. Si falta la descripción/correlación necesaria en el banco, no confirmes solo por monto.
 
@@ -126,7 +126,7 @@ Carpeta predeterminada: **`.data/store/`**, ignorada por Git y bloqueada por Vit
 | `POST /api/admin/login`, `/logout` | Credenciales / sesión + CSRF | Acceso y revocación. |
 | `GET /api/admin/orders` | Administrador | Buscar, filtrar y paginar. |
 | `GET /api/admin/orders/:id` | Administrador | Detalle e historial. |
-| `POST /api/admin/orders/:id/quote`, `/confirm`, `/reject` | Administrador + CSRF | Cotizar, confirmar manualmente o pedir corrección. |
+| `POST /api/admin/orders/:id/confirm`, `/reject` | Administrador + CSRF | Confirmar manualmente con `{ version, receiptId }` o pedir corrección. No existe cotización manual. |
 | `GET /api/admin/orders/:id/receipts/:receiptId` | Administrador | Evidencia privada. |
 | `GET` / `PUT /api/admin/settings` | Administrador; CSRF en PUT | Destino SINPE. |
 
@@ -154,7 +154,9 @@ npm.cmd run build
 
 Las pruebas de navegador levantan una instancia con puerto libre y base temporal propia dentro de `Temp/opencode/`. No usan tus credenciales, pedidos o archivos locales reales, no abren BAC y no envían dinero. Sus capturas y trazas quedan aisladas por ejecución en `test-results-sinpe/`; algunas pruebas visuales antiguas también escriben en `test-results/`.
 
-Antes de recibir datos/pagos reales faltan confirmar catálogo, tarifas, recogida y disponibilidad; desplegar HTTPS con secretos/permisos/backup; definir consentimiento, retención, borrado y recuperación de cuentas; añadir MFA, escaneo antimalware y límites de almacenamiento; y probar carga y respuesta a incidentes. Los límites de intentos actuales son locales al proceso, no distribuidos. No hay todavía gestión transaccional de stock ni avisos externos.
+Las comprobaciones de backend incluyen carga multipart real, aislamiento entre compradores, acceso administrativo, CSRF, saneamiento de imágenes, PDFs privados, códigos incorrectos, referencias duplicadas, versiones antiguas y persistencia después de reiniciar. Se verificó además que Vite responde **403** al intentar descargar el código de instalación o los módulos de `server/store/`.
+
+Antes de recibir datos/pagos reales faltan confirmar catálogo, recogida y disponibilidad; desplegar HTTPS con secretos/permisos/backup; definir consentimiento, retención, borrado y recuperación de cuentas; añadir MFA, escaneo antimalware y límites de almacenamiento; y probar carga y respuesta a incidentes. La tarifa nacional por Correos ya está definida. Los límites de intentos actuales son locales al proceso, no distribuidos. No hay todavía gestión transaccional de stock ni avisos externos.
 
 ## 8. Siguiente fase: n8n y lectura de BAC
 

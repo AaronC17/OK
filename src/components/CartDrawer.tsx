@@ -121,7 +121,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
           {amounts.total === null && <p className="shipping-pending">No pagues todavía: falta confirmar el costo de envío.</p>}
           {errors.cart && <p className="field-error" role="alert">{errors.cart}</p>}
           {!order && <><button form="checkout-form" type="submit" className="button button-primary checkout-button" disabled={preparing || loading || !config}><Icon name="bank" size={21} />{preparing ? 'Registrando tu pedido…' : 'Crear pedido con SINPE'}<Icon name="arrow" size={17} /></button><p className="checkout-footnote">El pedido se guarda aquí. El pago se confirma después de revisar el abono.</p></>}
-          {store.demo && <p className="demo-small">Precios y entrega de ejemplo · No envíes dinero real</p>}
+          {store.demo && <p className="demo-small">Precios de productos de ejemplo · No envíes dinero real</p>}
         </footer>
       </>}
     </div>

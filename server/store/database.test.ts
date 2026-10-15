@@ -20,7 +20,7 @@ function setup(t: TestContext, configured = true) {
   if (configured) db.configure({ enabled: true, phone: '80000000', beneficiary: 'Destino ficticio de pruebas' }, 'test-admin')
   const create = (owner = 'customer-a', key = randomUUID(), value: unknown = input()) => db.createOrder(value, owner, key)
   const upload = (order: ShopOrder, owner = 'customer-a', ref = 'BANK-TEST-123456', file = receipt()) => db.addReceipt(order.id, owner, order.code, ref, randomUUID(), order.version, file)
-  const confirm = (order: ShopOrder, extra: Record<string, unknown> = {}) => db.confirm(order.id, { version: order.version, code: order.code, bankReference: order.receipt!.bankReference, amountMinor: order.totalMinor, checkedBank: true, note: 'Revisión manual ficticia, sin dinero real.', ...extra }, 'test-admin')
+  const confirm = (order: ShopOrder, extra: Record<string, unknown> = {}) => db.confirm(order.id, { version: order.version, receiptId: order.receipt!.id, ...extra }, 'test-admin')
   return { db, catalog, create, upload, confirm }
 }
 
@@ -56,21 +56,54 @@ test('store: order retries are idempotent and scoped to the buyer, with no cross
   assert.equal(db.currentOrder('customer-a')!.id, order.id)
 })
 
-test('store: missing SINPE configuration or unknown delivery prevents requesting a payment', t => {
+test('store: configuring SINPE automatically enables pending orders without quoting shipping', t => {
   const { db, create, upload } = setup(t, false)
   const order = create()
   assert.equal(order.status, 'pending_details')
   assert.equal(order.destination, null)
   assert.throws(() => upload(order), /estado actual/)
-  assert.throws(() => db.quote(order.id, { version: order.version, shippingMinor: 0, note: 'Recogida de prueba confirmada.' }, 'admin'), /Configura/)
+  assert.equal(order.shippingMinor, 0)
   db.configure({ enabled: true, phone: '80000000', beneficiary: 'Destino ficticio de pruebas' }, 'admin')
+  assert.equal(db.getOrder(order.id).status, 'awaiting_payment')
   const delivery = create('customer-a', randomUUID(), { ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección de prueba' } })
-  assert.equal(delivery.totalMinor, null)
-  assert.equal(delivery.status, 'pending_details')
-  const quoted = db.quote(delivery.id, { version: delivery.version, shippingMinor: 150000, note: 'Envío ficticio de ₡1.500 confirmado.' }, 'admin')
-  assert.equal(quoted.totalMinor, 270000)
-  assert.equal(quoted.status, 'awaiting_payment')
-  assert.throws(() => db.quote(delivery.id, { version: quoted.version, shippingMinor: 1, note: 'No modificar el total congelado.' }, 'admin'), /ya tiene instrucciones/)
+  assert.equal(delivery.shippingMinor, 280000)
+  assert.equal(delivery.totalMinor, 400000)
+  assert.equal(delivery.status, 'awaiting_payment')
+})
+
+test('store: Correos shipping uses only the product subtotal and the strict CRC 15000 boundary', t => {
+  const { create, catalog } = setup(t)
+  for (const subtotal of [1499999, 1500000, 1500001, 1560000]) {
+    catalog.gummies.types[0].prices[100] = subtotal
+    const order = create('customer-a', randomUUID(), { ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección de prueba' } })
+    const shipping = subtotal > 1500000 ? 0 : 280000
+    assert.equal(order.shippingMinor, shipping)
+    assert.equal(order.totalMinor, subtotal + shipping)
+  }
+})
+
+test('store: legacy unpriced pending orders get automatic shipping without touching issued payment totals', t => {
+  mkdirSync(join(tmpdir(), 'opencode'), { recursive: true })
+  const directory = mkdtempSync(join(tmpdir(), 'opencode', 'shop-shipping-test-'))
+  const path = join(directory, 'orders.sqlite')
+  const oldCatalog = structuredClone(store)
+  oldCatalog.deliveryMethods[0].feeMinor = null
+  let db = new ShopDatabase(path, oldCatalog)
+  t.after(() => { db.close(); rmSync(directory, { recursive: true, force: true }) })
+  db.configure({ enabled: true, phone: '80000000', beneficiary: 'Destino ficticio' }, 'test-admin')
+  const value = { ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección ficticia' } }
+  const pending = db.createOrder(value, 'buyer-a', randomUUID())
+  assert.equal(pending.shippingMinor, null)
+  oldCatalog.deliveryMethods[0].feeMinor = 100000
+  const issued = db.createOrder(value, 'buyer-b', randomUUID())
+  assert.equal(issued.totalMinor, 220000)
+  db.close()
+  db = new ShopDatabase(path, store)
+  assert.equal(db.getOrder(pending.id).shippingMinor, 280000)
+  assert.equal(db.getOrder(pending.id).totalMinor, 400000)
+  assert.equal(db.getOrder(pending.id).status, 'awaiting_payment')
+  assert.equal(db.getOrder(issued.id).totalMinor, 220000)
+  assert.equal(db.getOrder(issued.id).version, issued.version)
 })
 
 test('store: correct code plus private receipt only moves to review; wrong code and owner fail', t => {
@@ -100,14 +133,15 @@ test('store: upload redelivery creates one receipt and reused files cannot claim
   assert.equal(db.database.prepare('SELECT count(*) AS count FROM receipts').get()!.count, 1)
 })
 
-test('store: manual confirmation checks code, amount, reference, explicit bank attestation and current version', t => {
+test('store: one-click confirmation uses saved code, amount and receipt, rejects forged data and stale evidence', t => {
   const { create, upload, confirm } = setup(t)
   const order = upload(create())
-  for (const patch of [{ checkedBank: false }, { amountMinor: 1 }, { bankReference: 'BANK-WRONG-123456' }, { code: 'ONK-0000000000000000' }, { version: order.version - 1 }, { status: 'ready' }]) assert.throws(() => confirm(order, patch))
+  for (const patch of [{ amountMinor: 1 }, { bankReference: 'BANK-WRONG-123456' }, { code: 'ONK-0000000000000000' }, { version: order.version - 1 }, { receiptId: randomUUID() }, { status: 'ready' }]) assert.throws(() => confirm(order, patch))
   const ready = confirm(order)
   assert.equal(ready.status, 'ready')
   assert.equal(ready.paymentVerification, 'manual')
   assert.ok(ready.paymentConfirmedAt)
+  assert.equal(order.receipt!.bankReference, 'BANK-TEST-123456')
 })
 
 test('store: one verified bank reference cannot confirm two orders, even with different screenshots', t => {
@@ -193,7 +227,7 @@ test('store: orders, receipt, sessions and manual confirmation persist after clo
   const order = db.createOrder(input(), buyer.session.hash, randomUUID())
   const prepared = receipt()
   const uploaded = db.addReceipt(order.id, buyer.session.hash, order.code, 'BANK-PERSIST-123456', randomUUID(), order.version, prepared)
-  db.confirm(order.id, { version: uploaded.version, code: order.code, bankReference: uploaded.receipt!.bankReference, amountMinor: uploaded.totalMinor, checkedBank: true, note: 'Verificación ficticia de persistencia.' }, 'test-admin')
+  db.confirm(order.id, { version: uploaded.version, receiptId: uploaded.receipt!.id }, 'test-admin')
   db.close()
   db = new ShopDatabase(path, store)
   const session = db.session(buyer.token!, 'customer')!
