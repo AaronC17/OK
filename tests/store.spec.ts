@@ -43,8 +43,8 @@ test('mixto combines hidden catalog types as ingredients', async ({ page }, test
   await expect(page.locator('.cart-line')).toContainText('Gusanitos')
 })
 
-test('gummies-only cart, variant prices, persistence, delivery and server-created SINPE order', async ({ page, baseURL }) => {
-  await testAdmin(baseURL!)
+test('gummies-only cart, variant prices, persistence, delivery and server-created SINPE order', async ({ page, request }) => {
+  await testAdmin(request)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')

@@ -40,6 +40,7 @@ export function requireCsrf(session: Session, supplied: string | undefined) {
 /** Bounded in-memory rate limits. Must be replaced/shared for a multi-instance deployment. */
 export class RateLimits {
   private entries = new Map<string, { count: number; expires: number }>()
+  clear(key: string) { this.entries.delete(key) }
   check(key: string, max: number, windowMs: number, now = Date.now()) {
     for (const [id, entry] of this.entries) if (entry.expires <= now) this.entries.delete(id)
     const entry = this.entries.get(key) ?? { count: 0, expires: now + windowMs }

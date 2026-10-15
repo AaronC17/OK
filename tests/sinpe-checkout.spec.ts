@@ -4,10 +4,10 @@ import { randomUUID } from 'node:crypto'
 import { checkoutOrder, loginAdminPage, sendReceipt, testAdmin, testReceipt } from './helpers/store.ts'
 import type { CheckoutConfig, ShopOrder } from '../src/order-types.ts'
 
-test('SINPE: order, backend code validation, private upload and admin confirmation without WhatsApp', async ({ page, context, baseURL }, testInfo) => {
+test('SINPE: order, backend code validation, private upload and admin confirmation without WhatsApp', async ({ page, context, request }, testInfo) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  await testAdmin(baseURL!)
+  await testAdmin(request)
   const order = await checkoutOrder(page)
   expect(order.code).toMatch(/^ONK-[A-F0-9]{16}$/)
   expect(order.totalMinor).toBe(240000)
@@ -35,7 +35,7 @@ test('SINPE: order, backend code validation, private upload and admin confirmati
   await expect(page.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
   const checkoutAccessibility = await new AxeBuilder({ page }).include('.cart-drawer').withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(checkoutAccessibility.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([])
-  await page.screenshot({ path: `test-results/${testInfo.project.name}-sinpe-pending.png` })
+  await page.screenshot({ path: testInfo.outputPath('sinpe-pending.png') })
 
   const adminPage = await context.newPage()
   await loginAdminPage(adminPage)
@@ -50,7 +50,7 @@ test('SINPE: order, backend code validation, private upload and admin confirmati
   await dialog.getByLabel(/Comprobé en banca en línea el abono aplicado/).check()
   await dialog.getByRole('button', { name: 'Confirmar pago y pasar a listo' }).click()
   await expect(dialog.locator('.admin-confirmed-card')).toContainText('Pago confirmado manualmente')
-  await adminPage.screenshot({ path: `test-results/${testInfo.project.name}-sinpe-admin-confirmed.png` })
+  await adminPage.screenshot({ path: testInfo.outputPath('sinpe-admin-confirmed.png') })
   await page.getByRole('button', { name: 'Actualizar estado', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Pago confirmado.', exact: true })).toBeVisible()
   await expect(page.locator('.sinpe-order-panel > .order-status')).toHaveText('Listo para preparar')
@@ -58,8 +58,8 @@ test('SINPE: order, backend code validation, private upload and admin confirmati
   expect(errors).toEqual([])
 })
 
-test('SINPE: corrections keep the same order and an old review cannot approve the new receipt', async ({ page, baseURL }) => {
-  const admin = await testAdmin(baseURL!)
+test('SINPE: corrections keep the same order and an old review cannot approve the new receipt', async ({ page, request }) => {
+  const admin = await testAdmin(request)
   const order = await checkoutOrder(page)
   await sendReceipt(page, order, `TEST-FIRST-${randomUUID()}`)
   await expect(page.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
@@ -77,8 +77,8 @@ test('SINPE: corrections keep the same order and an old review cannot approve th
   expect((await (await page.request.get(`/api/orders/${order.id}`)).json() as ShopOrder).status).toBe('pending_review')
 })
 
-test('SINPE: delivery without a quote cannot request payment; admin sets the immutable final total', async ({ page, context, baseURL }, testInfo) => {
-  await testAdmin(baseURL!)
+test('SINPE: delivery without a quote cannot request payment; admin sets the immutable final total', async ({ page, context, request }, testInfo) => {
+  await testAdmin(request)
   const order = await checkoutOrder(page, 'delivery')
   expect(order.status).toBe('pending_details')
   expect(order.totalMinor).toBeNull()
@@ -104,5 +104,5 @@ test('SINPE: delivery without a quote cannot request payment; admin sets the imm
     await adminPage.setViewportSize({ width, height: 900 })
     expect(await adminPage.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false)
   }
-  await adminPage.screenshot({ path: `test-results/${testInfo.project.name}-sinpe-admin-dashboard.png`, fullPage: true })
+  await adminPage.screenshot({ path: testInfo.outputPath('sinpe-admin-dashboard.png'), fullPage: true })
 })

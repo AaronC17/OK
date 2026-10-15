@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { TestContext } from 'node:test'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { store } from '../../src/config/store.ts'
 import type { ShopOrder } from '../../src/order-types.ts'
 import { ShopDatabase } from './database.ts'
@@ -177,4 +180,26 @@ test('store: admin setup token is one-use; passwords and cookies are hashed, rol
   assert.equal(db.session(auth.token, 'admin'), null)
   const buyer = createSession(db.database, 'customer')
   assert.equal(db.session(buyer.token, 'admin'), null)
+})
+
+test('store: orders, receipt, sessions and manual confirmation persist after closing and reopening SQLite', t => {
+  mkdirSync(join(tmpdir(), 'opencode'), { recursive: true })
+  const directory = mkdtempSync(join(tmpdir(), 'opencode', 'shop-persistence-test-'))
+  const path = join(directory, 'orders.sqlite')
+  let db = new ShopDatabase(path, store)
+  t.after(() => { db.close(); rmSync(directory, { recursive: true, force: true }) })
+  db.configure({ enabled: true, phone: '80000000', beneficiary: 'Destino ficticio' }, 'test-admin')
+  const buyer = db.customerSession(undefined)
+  const order = db.createOrder(input(), buyer.session.hash, randomUUID())
+  const prepared = receipt()
+  const uploaded = db.addReceipt(order.id, buyer.session.hash, order.code, 'BANK-PERSIST-123456', randomUUID(), order.version, prepared)
+  db.confirm(order.id, { version: uploaded.version, code: order.code, bankReference: uploaded.receipt!.bankReference, amountMinor: uploaded.totalMinor, checkedBank: true, note: 'Verificación ficticia de persistencia.' }, 'test-admin')
+  db.close()
+  db = new ShopDatabase(path, store)
+  const session = db.session(buyer.token!, 'customer')!
+  const saved = db.customerOrder(order.id, session.hash)
+  assert.equal(saved.status, 'ready')
+  assert.equal(saved.paymentVerification, 'manual')
+  assert.deepEqual(db.receipt(order.id, saved.receipt!.id).data, prepared.data)
+  assert.equal(db.auditFor(order.id).filter(entry => entry.event === 'payment.confirmed_manual').length, 1)
 })

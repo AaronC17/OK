@@ -93,6 +93,7 @@ export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = 
         limits.check(`login:${ip}`, 10, 15 * 60_000)
         const data = await jsonBody(request)
         const session = path.endsWith('/setup') ? store.setupAdmin(data) : store.login(data)
+        limits.clear(`login:${ip}`)
         const previous = store.session(cookie(request, ADMIN_COOKIE), 'admin')
         if (previous) store.logout(previous)
         setCookie(response, ADMIN_COOKIE, session.token, 8 * 3600, secureCookies)
@@ -132,6 +133,7 @@ export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = 
       if (uploadPath && method === 'POST') {
         const session = requireSession('customer', true)
         limits.check(`upload:${session.hash}`, 20, 3600_000)
+        limits.check(`upload-ip:${ip}`, 60, 3600_000)
         const type = request.headers['content-type'] ?? ''
         if (!type.toLowerCase().startsWith('multipart/form-data;')) throw new StoreError(415, 'Envía el comprobante como multipart/form-data.')
         const bytes = await body(request, MAX_RECEIPT_BYTES + 64 * 1024)

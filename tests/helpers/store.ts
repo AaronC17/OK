@@ -1,4 +1,3 @@
-import { request as playwrightRequest } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -8,12 +7,8 @@ import type { AdminAuth, ShopOrder } from '../../src/order-types.ts'
 
 // Test-only credentials, used exclusively with the isolated ONKYS_E2E_DIR database.
 export const adminCredentials = { username: 'admin-pruebas', password: 'Clave-unica-de-pruebas-2026!' }
-let adminPromise: Promise<{ api: APIRequestContext; csrf: string }> | null = null
-
-export function testAdmin(baseURL: string) {
-  adminPromise ??= (async () => {
+export async function testAdmin(api: APIRequestContext) {
     if (!process.env.ONKYS_E2E_DIR?.includes('onkys-store-e2e-')) throw new Error('Refusing to initialize a non-test store.')
-    const api = await playwrightRequest.newContext({ baseURL })
     const state = await (await api.get('/api/admin/session')).json() as AdminAuth
     let auth: AdminAuth | undefined
     if (!state.initialized) {
@@ -32,8 +27,6 @@ export function testAdmin(baseURL: string) {
     const configured = await api.put('/api/admin/settings', { headers: { 'X-CSRF-Token': csrf }, data: { enabled: true, phone: '80000000', beneficiary: 'Destino de prueba · No pagar' } })
     if (!configured.ok()) throw new Error('Could not configure the isolated test SINPE destination.')
     return { api, csrf }
-  })()
-  return adminPromise
 }
 
 export async function testReceipt() {

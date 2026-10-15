@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test'
 import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { createServer } from 'node:net'
 import type { AddressInfo } from 'node:net'
 
@@ -19,6 +19,7 @@ const baseURL = `http://127.0.0.1:${port}`
 
 export default defineConfig({
   testDir: './tests',
+  outputDir: join('test-results-sinpe', basename(process.env.ONKYS_E2E_DIR)),
   fullyParallel: true,
   workers: 2,
   timeout: 30_000,

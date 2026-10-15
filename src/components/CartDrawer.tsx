@@ -49,7 +49,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
     let alive = true
     const interval = window.setInterval(() => {
       if (document.hidden) return
-      void fetchOrder(order.id).then(next => { if (alive) setOrder(next) }).catch(() => { /* Manual refresh reports connection errors. */ })
+      void fetchOrder(order.id).then(next => { if (alive) setOrder(current => current?.id === next.id && current.version > next.version ? current : next) }).catch(() => { /* Manual refresh reports connection errors. */ })
     }, 10_000)
     return () => { alive = false; window.clearInterval(interval) }
   }, [open, order?.id, order?.status])
@@ -59,7 +59,10 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
     setServerError('')
     try {
       setConfig(await checkoutConfig())
-      if (order) setOrder(await fetchOrder(order.id))
+      if (order) {
+        const next = await fetchOrder(order.id)
+        setOrder(current => current?.id === next.id && current.version > next.version ? current : next)
+      }
       else if (!cart.items.length) setOrder((await currentOrder()).order)
     } catch (error) { setServerError(errorMessage(error)) }
     finally { setLoading(false) }

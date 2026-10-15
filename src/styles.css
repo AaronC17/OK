@@ -150,10 +150,10 @@ button, a, input, textarea { outline-offset: 4px; }
   margin: 25px 0 23px;
   background: linear-gradient(
     180deg,
-    #6e6774 0%,
-    #38323e 38%,
-    #1e1a22 75%,
-    #0f0d12 100%
+    #423c48 0%,
+    #25202a 45%,
+    #151219 80%,
+    #0a080d 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -165,10 +165,10 @@ button, a, input, textarea { outline-offset: 4px; }
   display: inline-block;
   background: linear-gradient(
     180deg,
-    #9c58c6 0%,
-    #613182 42%,
-    #3d1854 82%,
-    #250b33 100%
+    #783b9c 0%,
+    #4a1f66 45%,
+    #301144 80%,
+    #1e092c 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -313,10 +313,10 @@ summary::-webkit-details-marker { display: none; }
   margin: 12px 0 10px;
   background: linear-gradient(
     180deg,
-    #8a48b0 0%,
-    #522774 42%,
-    #35154b 82%,
-    #200a30 100%
+    #783b9c 0%,
+    #4a1f66 45%,
+    #301144 80%,
+    #1e092c 100%
   );
   -webkit-background-clip: text;
   background-clip: text;

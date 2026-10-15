@@ -152,7 +152,7 @@ npm.cmd run test:e2e
 npm.cmd run build
 ```
 
-Las pruebas de navegador levantan una instancia con puerto libre y base temporal propia dentro de `Temp/opencode/`. No usan tus credenciales, pedidos o archivos locales reales, no abren BAC y no envían dinero. Las capturas y trazas quedan en `test-results/`.
+Las pruebas de navegador levantan una instancia con puerto libre y base temporal propia dentro de `Temp/opencode/`. No usan tus credenciales, pedidos o archivos locales reales, no abren BAC y no envían dinero. Sus capturas y trazas quedan aisladas por ejecución en `test-results-sinpe/`; algunas pruebas visuales antiguas también escriben en `test-results/`.
 
 Antes de recibir datos/pagos reales faltan confirmar catálogo, tarifas, recogida y disponibilidad; desplegar HTTPS con secretos/permisos/backup; definir consentimiento, retención, borrado y recuperación de cuentas; añadir MFA, escaneo antimalware y límites de almacenamiento; y probar carga y respuesta a incidentes. Los límites de intentos actuales son locales al proceso, no distribuidos. No hay todavía gestión transaccional de stock ni avisos externos.
 

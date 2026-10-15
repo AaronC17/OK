@@ -8,6 +8,7 @@ dist/
 !.env.store.example
 .data/
 test-results/
+test-results-sinpe/
 .higgsfield/
 references/*.png
 references/*.jpg
