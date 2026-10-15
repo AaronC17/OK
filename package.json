@@ -23,7 +23,8 @@
     "@higgsfield/client": "^0.2.6",
     "lucide-react": "^1.56.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

@@ -98,12 +98,53 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
     const yy = ((r.y - p.y) * bx - (q.y - p.y) * cx) / determinant
     return `matrix(${round(xx)} ${round(yx)} ${round(xy)} ${round(yy)} ${round(p.x - xx * a.x - xy * a.y)} ${round(p.y - yx * a.x - yy * a.y)})`
   }
-  const bridges = [...svg.querySelectorAll('[data-bridge]')].map(node => ({ node, indices: node.getAttribute('data-bridge')!.split('-').map(Number), edges: [...node.querySelectorAll('path')] }))
+  const SURFACE_ANGLES = Array.from({ length: 64 }, (_, i) => {
+    const angle = i / 64 * Math.PI * 2
+    return { x: Math.cos(angle) * 102, z: Math.sin(angle) * 102 }
+  })
+  const CONTOUR_ROWS = [0, 1, 2, 3, 4].map(row => {
+    const depth = -56 + row * 27, radius = Math.sqrt(94 ** 2 - depth ** 2)
+    const xs = Array.from({ length: 23 }, (_, i) => -radius + i / 22 * radius * 2)
+    return { depth, xs }
+  })
+
+  const bridges = [...svg.querySelectorAll('[data-bridge]')].map(node => ({
+    node,
+    indices: node.getAttribute('data-bridge')!.split('-').map(Number),
+    edges: [...node.querySelectorAll('path')],
+    lastOpacity: 0,
+  }))
   const path = (points: number[][], close = false) => `${points.map(([x, y], index) => `${index ? 'L' : 'M'}${round(x)} ${round(y)}`).join(' ')}${close ? 'Z' : ''}`
+  const depthEntries = nodes.map((node, i) => ({ node, depth: 0, index: i }))
+  const patchLastWarp = mixBears.map(() => new Array<string>(GEL_TRIANGLES.length).fill(''))
+  const grainLastX = new Array<number>(grains.length).fill(-9999)
+  const grainLastY = new Array<number>(grains.length).fill(-9999)
+  const contourLastOp = new Array<number>(contours.length).fill(-1)
+  const meniscusLastOp = new Array<number>(mixBears.length).fill(-1)
+  const wetCutLastY = new Array<number>(mixBears.length).fill(-9999)
+  let ringsActive = false
+  let spoonActive = false
+  let lastFrameTime = 0
   let request = 0
   let running = false
+
   const sortDepth = () => {
     const time = (Number(animations[0].currentTime) % MIX_CYCLE) / 1000
+
+    // Throttle to steady 60fps to prevent high-refresh monitor frame spikes
+    const now = performance.now()
+    if (now - lastFrameTime < 14) {
+      if (running) request = requestAnimationFrame(sortDepth)
+      return
+    }
+    lastFrameTime = now
+
+    // When the bowl scene has faded out (10.4s to 15s), skip SVG mutations
+    if (time > 10.4) {
+      if (running) request = requestAnimationFrame(sortDepth)
+      return
+    }
+
     const index = Math.min(Math.floor(time * SAMPLE_RATE), frames.length - 1)
     const frame = frames[index], next = frames[Math.min(index + 1, frames.length - 1)]
     const progress = clamp((time - frame.time) * SAMPLE_RATE)
@@ -112,141 +153,233 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
       const b = i === mixBears.length ? next.spoon.z : next.bears[i].z
       return a + (b - a) * progress
     }
-    nodes.map((node, i) => ({ node, depth: z(i), index: i })).sort((a, b) => a.depth - b.depth || a.index - b.index).forEach(({ node }, i) => {
-      if (contents.children[i] !== node) contents.insertBefore(node, contents.children[i] ?? null)
-    })
 
     const sauceHeight = (x: number, z: number) => {
       const a = sampleSurface(frame.surface, x, z), b = sampleSurface(next.surface, x, z)
       return a + (b - a) * progress
     }
     const sauceY = (x: number, z: number) => screenY(sauceHeight(x, z), z)
-    const poses = frame.bears.map((body, i) => {
-      const nextBody = next.bears[i]
-      const x = body.x + (nextBody.x - body.x) * progress
-      const depth = z(i)
-      const y = body.y + (nextBody.y - body.y) * progress
-      const mesh = body.mesh.map((point, j) => ({ x: point.x + (nextBody.mesh[j].x - point.x) * progress, y: point.y + (nextBody.mesh[j].y - point.y) * progress }))
-      patches[i].forEach(({ node, triangle }) => node.setAttribute('transform', warp(triangle, mesh)))
-      return { x, y, z: depth, active: body.active, wetLine: body.wetLine + (nextBody.wetLine - body.wetLine) * progress, feet: {
-        x: body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress,
-        y: body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress,
-        z: body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress,
-      } }
-    })
-    poses.forEach((body, i) => {
-      const { x, y, z: depth } = body
-      const line = y - sauceHeight(x, depth)
-      wetCuts[i].setAttribute('y', String(round(Math.min(line, body.wetLine))))
-      const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
-      menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
-      menisci[i].setAttribute('opacity', String(round(body.active ? smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88 : 0)))
-    })
-    surface.setAttribute('d', path(Array.from({ length: 64 }, (_, i) => {
-      const angle = i / 64 * Math.PI * 2, x = Math.cos(angle) * 102, z = Math.sin(angle) * 102
-      return [180 + x, sauceY(x, z)]
-    }), true))
-    contours.forEach((contour, row) => {
-      const depth = -56 + row * 27, radius = Math.sqrt(94 ** 2 - depth ** 2)
-      let relief = 0, drawing = false, line = ''
-      for (let i = 0; i < 23; i++) {
-        const x = -radius + i / 22 * radius * 2
-        const height = sauceHeight(x, depth) - LIQUID_LEVEL
-        relief = Math.max(relief, height)
-        if (height < .8) { drawing = false; continue }
-        line += `${drawing ? 'L' : 'M'}${round(180 + x)} ${round(sauceY(x, depth) + 1)} `
-        drawing = true
+
+    if (time >= 3.2) {
+      depthEntries.forEach(entry => { entry.depth = z(entry.index) })
+      depthEntries.sort((a, b) => a.depth - b.depth || a.index - b.index)
+      for (let i = 0; i < depthEntries.length; i++) {
+        const node = depthEntries[i].node
+        if (contents.children[i] !== node) contents.insertBefore(node, contents.children[i] ?? null)
       }
-      contour.setAttribute('d', line)
-      contour.setAttribute('opacity', String(round(smooth(relief / 6) * .22)))
-    })
-    const tool = frame.spoon, nextTool = next.spoon
-    const sx = tool.x + (nextTool.x - tool.x) * progress, sy = tool.y + (nextTool.y - tool.y) * progress, sz = z(mixBears.length)
-    const gx = tool.grip.x + (nextTool.grip.x - tool.grip.x) * progress - sx
-    const gy = screenY(tool.grip.y + (nextTool.grip.y - tool.grip.y) * progress, tool.grip.z + (nextTool.grip.z - tool.grip.z) * progress) - screenY(sy, sz)
-    const length = Math.hypot(gx, gy), nx = -gy / length, ny = gx / length
-    handle.setAttribute('d', `M${round(-nx * 3)} ${round(-ny * 3)}L${round(gx - nx * 3.5)} ${round(gy - ny * 3.5)}Q${round(gx * 1.035)} ${round(gy * 1.035)} ${round(gx + nx * 3.5)} ${round(gy + ny * 3.5)}L${round(nx * 3)} ${round(ny * 3)}Z`)
-    handleGlint.setAttribute('d', `M${round(gx * .16 + nx)} ${round(gy * .16 + ny)}L${round(gx * .96 + nx)} ${round(gy * .96 + ny)}`)
-    spoonCoating.setAttribute('opacity', String(round(smooth((time - 4.95) / .4) * .96)))
-    const lift = sy - sauceHeight(sx, sz) - 11, neck = 3.6 * (1 - smooth(lift / 34))
-    const bottom = sauceY(sx, sz) - screenY(sy, sz)
-    spoonDrip.setAttribute('opacity', lift > 0 && lift < 34 && time > 9.3 ? '.9' : '0')
-    spoonDrip.setAttribute('d', `M-3 10Q${round(-neck)} ${round(bottom * .6)} -6 ${round(bottom)}Q0 ${round(bottom + 3)} 6 ${round(bottom)}Q${round(neck)} ${round(bottom * .6)} 3 10Z`)
-    const priorTool = spoonAt(time - .04), vx = sx - priorTool.x, vz = sz - priorTool.z, speed = Math.hypot(vx, vz) || 1
-    const direction = { x: vx / speed, z: vz / speed }
-    const lip = Array.from({ length: 19 }, (_, i) => {
-      const across = (i / 18 - .5) * 40, forward = 12 - (across / 20) ** 2 * 5
-      const x = sx + direction.x * forward - direction.z * across, z = sz + direction.z * forward + direction.x * across
-      return [180 + x, sauceY(x, z) - 2 * (1 - (across / 20) ** 2)]
-    })
-    mound.setAttribute('d', path([...lip, ...lip.map(([x, y]) => [x, y + 4]).reverse()], true))
-    moundGlint.setAttribute('d', path(lip.slice(3, -3)))
-    const gathered = stirStrength(time) * smooth(speed / 1.2) * smooth((sauceHeight(sx, sz) + 12 - sy) / 16)
-    mound.setAttribute('opacity', String(round(gathered * .85)))
-    moundGlint.setAttribute('opacity', String(round(gathered * .4)))
-    const recent = impacts.filter(impact => time >= impact.time && time - impact.time < 2.6).slice(-6)
-    rings.forEach((ring, i) => {
-      const impact = recent[i]
-      if (!impact) { ring.setAttribute('opacity', '0'); return }
-      const age = time - impact.time, radius = 14 + age * .5
-      ring.setAttribute('d', path(Array.from({ length: 40 }, (_, j) => {
-        const angle = j / 39 * Math.PI, x = impact.x + Math.cos(angle) * radius, z = impact.z + Math.sin(angle) * radius
+
+      const poses = frame.bears.map((body, i) => {
+        const nextBody = next.bears[i]
+        const x = body.x + (nextBody.x - body.x) * progress
+        const depth = z(i)
+        const y = body.y + (nextBody.y - body.y) * progress
+        if (body.active) {
+          const mesh = body.mesh.map((point, j) => ({
+            x: point.x + (nextBody.mesh[j].x - point.x) * progress,
+            y: point.y + (nextBody.mesh[j].y - point.y) * progress,
+          }))
+          const bearPatches = patches[i], bearLast = patchLastWarp[i]
+          for (let p = 0; p < bearPatches.length; p++) {
+            const matrix = warp(bearPatches[p].triangle, mesh)
+            if (bearLast[p] !== matrix) {
+              bearLast[p] = matrix
+              bearPatches[p].node.setAttribute('transform', matrix)
+            }
+          }
+        }
+        return {
+          x, y, z: depth, active: body.active,
+          wetLine: body.wetLine + (nextBody.wetLine - body.wetLine) * progress,
+          feet: {
+            x: body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress,
+            y: body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress,
+            z: body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress,
+          },
+        }
+      })
+
+      poses.forEach((body, i) => {
+        if (!body.active) return
+        const { x, y, z: depth } = body
+        const line = y - sauceHeight(x, depth)
+        const cutY = round(Math.min(line, body.wetLine))
+        if (wetCutLastY[i] !== cutY) {
+          wetCutLastY[i] = cutY
+          wetCuts[i].setAttribute('y', String(cutY))
+        }
+        const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
+        const op = round(smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88)
+        if (meniscusLastOp[i] !== op) {
+          meniscusLastOp[i] = op
+          menisci[i].setAttribute('opacity', String(op))
+        }
+        if (op > 0) {
+          menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
+        }
+      })
+
+      bridges.forEach(bridge => {
+        const [a, b] = bridge.indices
+        if (!poses[a]?.active || !poses[b]?.active) {
+          if (bridge.lastOpacity !== 0) {
+            bridge.lastOpacity = 0
+            bridge.node.setAttribute('opacity', '0')
+          }
+          return
+        }
+        const from = poses[a].feet, to = poses[b].feet
+        const dx = to.x - from.x, dz = to.z - from.z
+        if (Math.abs(dx) > 27 || Math.abs(dz) > 27) {
+          if (bridge.lastOpacity !== 0) {
+            bridge.lastOpacity = 0
+            bridge.node.setAttribute('opacity', '0')
+          }
+          return
+        }
+        const distance = Math.hypot(dx, dz)
+        if (distance > 27) {
+          if (bridge.lastOpacity !== 0) {
+            bridge.lastOpacity = 0
+            bridge.node.setAttribute('opacity', '0')
+          }
+          return
+        }
+        const immersed = smooth((sauceHeight(from.x, from.z) - from.y + GEL_RADII[2]) / 8) * smooth((sauceHeight(to.x, to.z) - to.y + GEL_RADII[2]) / 8)
+        const proximity = 1 - smooth((distance - 17) / 10)
+        const opacity = round(proximity * immersed * .8)
+        if (bridge.lastOpacity !== opacity) {
+          bridge.lastOpacity = opacity
+          bridge.node.setAttribute('opacity', String(opacity))
+        }
+        if (opacity === 0) return
+        const nx = dx / (distance || 1), nz = dz / (distance || 1)
+        const ax = from.x + nx * 7.5, az = from.z + nz * 7.5, bx = to.x - nx * 7.5, bz = to.z - nz * 7.5
+        const ay = sauceY(ax, az), by = sauceY(bx, bz)
+        const middle = round(180 + (ax + bx) / 2), height = (ay + by) / 2, width = 1 + proximity * 3
+        bridge.edges[0].setAttribute('d', `M${round(180 + ax)} ${round(ay - 3)}Q${middle} ${round(height - width)} ${round(180 + bx)} ${round(by - 3)}L${round(180 + bx)} ${round(by + 3)}Q${middle} ${round(height + width)} ${round(180 + ax)} ${round(ay + 3)}Z`)
+        bridge.edges[1].setAttribute('d', `M${round(180 + ax)} ${round(ay - 2)}Q${middle} ${round(height - width + 1)} ${round(180 + bx)} ${round(by - 2)}`)
+      })
+    }
+
+    if (time >= 0.28) {
+      surface.setAttribute('d', path(SURFACE_ANGLES.map(({ x, z }) => [180 + x, sauceY(x, z)]), true))
+      contours.forEach((contour, row) => {
+        const { depth, xs } = CONTOUR_ROWS[row]
+        let relief = 0, drawing = false, line = ''
+        for (let i = 0; i < 23; i++) {
+          const x = xs[i]
+          const height = sauceHeight(x, depth) - LIQUID_LEVEL
+          relief = Math.max(relief, height)
+          if (height < .8) { drawing = false; continue }
+          line += `${drawing ? 'L' : 'M'}${round(180 + x)} ${round(sauceY(x, depth) + 1)} `
+          drawing = true
+        }
+        const op = round(smooth(relief / 6) * .22)
+        if (contourLastOp[row] !== op) {
+          contourLastOp[row] = op
+          contour.setAttribute('opacity', String(op))
+        }
+        if (op > 0) contour.setAttribute('d', line)
+      })
+    }
+
+    if (time >= 4.2 && time <= 10.2) {
+      spoonActive = true
+      const tool = frame.spoon, nextTool = next.spoon
+      const sx = tool.x + (nextTool.x - tool.x) * progress, sy = tool.y + (nextTool.y - tool.y) * progress, sz = z(mixBears.length)
+      const gx = tool.grip.x + (nextTool.grip.x - tool.grip.x) * progress - sx
+      const gy = screenY(tool.grip.y + (nextTool.grip.y - tool.grip.y) * progress, tool.grip.z + (nextTool.grip.z - tool.grip.z) * progress) - screenY(sy, sz)
+      const length = Math.hypot(gx, gy), nx = -gy / length, ny = gx / length
+      handle.setAttribute('d', `M${round(-nx * 3)} ${round(-ny * 3)}L${round(gx - nx * 3.5)} ${round(gy - ny * 3.5)}Q${round(gx * 1.035)} ${round(gy * 1.035)} ${round(gx + nx * 3.5)} ${round(gy + ny * 3.5)}L${round(nx * 3)} ${round(ny * 3)}Z`)
+      handleGlint.setAttribute('d', `M${round(gx * .16 + nx)} ${round(gy * .16 + ny)}L${round(gx * .96 + nx)} ${round(gy * .96 + ny)}`)
+      spoonCoating.setAttribute('opacity', String(round(smooth((time - 4.95) / .4) * .96)))
+      const lift = sy - sauceHeight(sx, sz) - 11, neck = 3.6 * (1 - smooth(lift / 34))
+      const bottom = sauceY(sx, sz) - screenY(sy, sz)
+      spoonDrip.setAttribute('opacity', lift > 0 && lift < 34 && time > 9.3 ? '.9' : '0')
+      spoonDrip.setAttribute('d', `M-3 10Q${round(-neck)} ${round(bottom * .6)} -6 ${round(bottom)}Q0 ${round(bottom + 3)} 6 ${round(bottom)}Q${round(neck)} ${round(bottom * .6)} 3 10Z`)
+      const priorTool = spoonAt(time - .04), vx = sx - priorTool.x, vz = sz - priorTool.z, speed = Math.hypot(vx, vz) || 1
+      const direction = { x: vx / speed, z: vz / speed }
+      const lip = Array.from({ length: 19 }, (_, i) => {
+        const across = (i / 18 - .5) * 40, forward = 12 - (across / 20) ** 2 * 5
+        const x = sx + direction.x * forward - direction.z * across, z = sz + direction.z * forward + direction.x * across
+        return [180 + x, sauceY(x, z) - 2 * (1 - (across / 20) ** 2)]
+      })
+      mound.setAttribute('d', path([...lip, ...lip.map(([x, y]) => [x, y + 4]).reverse()], true))
+      moundGlint.setAttribute('d', path(lip.slice(3, -3)))
+      const gathered = stirStrength(time) * smooth(speed / 1.2) * smooth((sauceHeight(sx, sz) + 12 - sy) / 16)
+      mound.setAttribute('opacity', String(round(gathered * .85)))
+      moundGlint.setAttribute('opacity', String(round(gathered * .4)))
+
+      const trail = Array.from({ length: 33 }, (_, i) => {
+        const lag = i * .035
+        const point = spoonAt(time - lag), before = spoonAt(time - lag - .025)
+        const dx = point.x - before.x, dz = point.z - before.z, sp = Math.hypot(dx, dz) || 1
+        return { ...point, nx: -dz / sp, nz: dx / sp, width: 9 * (1 - smooth(i / 32)) * stirStrength(time - lag) }
+      })
+      const edge = (side: number) => trail.map(point => {
+        const x = point.x + point.nx * point.width * side, z = point.z + point.nz * point.width * side
         return [180 + x, sauceY(x, z)]
-      })))
-      ring.setAttribute('opacity', String(round(smooth(age / .09) * Math.exp(-age * 1.35) * (1 - smooth((age - 1.8) / .8)) * impact.energy * .38)))
-    })
-    // Draw the actual recent tool path, with a thick ridge that closes slowly.
-    // It must follow the centre-crossing stroke, not an unrelated circular swirl.
-    const trail = Array.from({ length: 33 }, (_, i) => {
-      const lag = i * .035
-      const point = spoonAt(time - lag), before = spoonAt(time - lag - .025)
-      const dx = point.x - before.x, dz = point.z - before.z, speed = Math.hypot(dx, dz) || 1
-      return { ...point, nx: -dz / speed, nz: dx / speed, width: 9 * (1 - smooth(i / 32)) * stirStrength(time - lag) }
-    })
-    const edge = (side: number) => trail.map(point => {
-      const x = point.x + point.nx * point.width * side, z = point.z + point.nz * point.width * side
-      return [180 + x, sauceY(x, z)]
-    })
-    fold.setAttribute('d', path([...edge(-1), ...edge(1).reverse()], true))
-    const foldOpacity = stirStrength(time - .4)
-    fold.setAttribute('opacity', String(round(foldOpacity * .94)))
-    wakes[0].setAttribute('d', path(edge(1)))
-    wakes[1].setAttribute('d', path(trail.map(point => [180 + point.x, sauceY(point.x, point.z) + 1])))
-    wakes[0].setAttribute('opacity', String(round(foldOpacity * .5)))
-    wakes[1].setAttribute('opacity', String(round(foldOpacity * .35)))
-    bridges.forEach(({ node, indices: [a, b], edges }) => {
-      const from = poses[a].feet, to = poses[b].feet
-      const dx = to.x - from.x, dz = to.z - from.z, distance = Math.hypot(dx, dz)
-      const immersed = smooth((sauceHeight(from.x, from.z) - from.y + GEL_RADII[2]) / 8) * smooth((sauceHeight(to.x, to.z) - to.y + GEL_RADII[2]) / 8)
-      const proximity = 1 - smooth((distance - 17) / 10)
-      const opacity = poses[a].active && poses[b].active ? proximity * immersed * .8 : 0
-      node.setAttribute('opacity', String(round(opacity)))
-      if (opacity === 0) return
-      const nx = dx / (distance || 1), nz = dz / (distance || 1)
-      const ax = from.x + nx * 7.5, az = from.z + nz * 7.5, bx = to.x - nx * 7.5, bz = to.z - nz * 7.5
-      const ay = sauceY(ax, az), by = sauceY(bx, bz)
-      const middle = round(180 + (ax + bx) / 2), height = (ay + by) / 2, width = 1 + proximity * 3
-      edges[0].setAttribute('d', `M${round(180 + ax)} ${round(ay - 3)}Q${middle} ${round(height - width)} ${round(180 + bx)} ${round(by - 3)}L${round(180 + bx)} ${round(by + 3)}Q${middle} ${round(height + width)} ${round(180 + ax)} ${round(ay + 3)}Z`)
-      edges[1].setAttribute('d', `M${round(180 + ax)} ${round(ay - 2)}Q${middle} ${round(height - width + 1)} ${round(180 + bx)} ${round(by - 2)}`)
-    })
-    grains.forEach((grain, i) => {
-      const from = frame.grains[i], to = next.grains[i]
-      const x = from.x + (to.x - from.x) * progress, z = from.z + (to.z - from.z) * progress
-      grain.setAttribute('cx', String(round(180 + x)))
-      grain.setAttribute('cy', String(round(sauceY(x, z))))
-    })
-    // Viscous beads stay attached to the raised lip and drain back into it.
-    beads.forEach((bead, i) => {
-      const impact = recent[Math.floor(i / 4)]
-      if (!impact) { bead.setAttribute('opacity', '0'); return }
-      const age = time - impact.time - (i % 4) * .025
-      if (age < 0 || age >= .65) { bead.setAttribute('opacity', '0'); return }
-      const swell = Math.sin(Math.PI * age / .65) * impact.energy
-      const angle = i * 2.39996, distance = 16 + age * 3
-      const x = impact.x + Math.cos(angle) * distance, z = impact.z + Math.sin(angle) * distance
-      bead.setAttribute('transform', `translate(${round(180 + x)} ${round(sauceY(x, z) - swell)}) scale(${round(.65 + swell * .35)})`)
-      bead.setAttribute('opacity', String(round(swell * .5)))
-    })
+      })
+      fold.setAttribute('d', path([...edge(-1), ...edge(1).reverse()], true))
+      const foldOpacity = stirStrength(time - .4)
+      fold.setAttribute('opacity', String(round(foldOpacity * .94)))
+      wakes[0].setAttribute('d', path(edge(1)))
+      wakes[1].setAttribute('d', path(trail.map(point => [180 + point.x, sauceY(point.x, point.z) + 1])))
+      wakes[0].setAttribute('opacity', String(round(foldOpacity * .5)))
+      wakes[1].setAttribute('opacity', String(round(foldOpacity * .35)))
+    } else if (spoonActive) {
+      spoonActive = false
+      fold.setAttribute('opacity', '0')
+      wakes[0].setAttribute('opacity', '0')
+      wakes[1].setAttribute('opacity', '0')
+      mound.setAttribute('opacity', '0')
+      moundGlint.setAttribute('opacity', '0')
+      spoonDrip.setAttribute('opacity', '0')
+    }
+
+    const recent = (time >= 3.2 && time <= 8.5) ? impacts.filter(impact => time >= impact.time && time - impact.time < 2.6).slice(-6) : []
+    if (recent.length > 0 || ringsActive) {
+      ringsActive = recent.length > 0
+      rings.forEach((ring, i) => {
+        const impact = recent[i]
+        if (!impact) { ring.setAttribute('opacity', '0'); return }
+        const age = time - impact.time, radius = 14 + age * .5
+        ring.setAttribute('d', path(Array.from({ length: 40 }, (_, j) => {
+          const angle = j / 39 * Math.PI, x = impact.x + Math.cos(angle) * radius, z = impact.z + Math.sin(angle) * radius
+          return [180 + x, sauceY(x, z)]
+        })))
+        ring.setAttribute('opacity', String(round(smooth(age / .09) * Math.exp(-age * 1.35) * (1 - smooth((age - 1.8) / .8)) * impact.energy * .38)))
+      })
+      beads.forEach((bead, i) => {
+        const impact = recent[Math.floor(i / 4)]
+        if (!impact) { bead.setAttribute('opacity', '0'); return }
+        const age = time - impact.time - (i % 4) * .025
+        if (age < 0 || age >= .65) { bead.setAttribute('opacity', '0'); return }
+        const swell = Math.sin(Math.PI * age / .65) * impact.energy
+        const angle = i * 2.39996, distance = 16 + age * 3
+        const x = impact.x + Math.cos(angle) * distance, z = impact.z + Math.sin(angle) * distance
+        bead.setAttribute('transform', `translate(${round(180 + x)} ${round(sauceY(x, z) - swell)}) scale(${round(.65 + swell * .35)})`)
+        bead.setAttribute('opacity', String(round(swell * .5)))
+      })
+    }
+
+    if (time >= 1.25) {
+      grains.forEach((grain, i) => {
+        const from = frame.grains[i], to = next.grains[i]
+        const x = round(180 + from.x + (to.x - from.x) * progress)
+        const z = from.z + (to.z - from.z) * progress
+        const y = round(sauceY(x - 180, z))
+        if (grainLastX[i] !== x) {
+          grainLastX[i] = x
+          grain.setAttribute('cx', String(x))
+        }
+        if (grainLastY[i] !== y) {
+          grainLastY[i] = y
+          grain.setAttribute('cy', String(y))
+        }
+      })
+    }
+
     if (running) request = requestAnimationFrame(sortDepth)
   }
 

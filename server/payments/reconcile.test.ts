@@ -60,3 +60,9 @@ test('SINPE: old, future, expired and timezone-less dates never auto-approve', (
   assert.equal(reconcile({ ...exampleOrder(), amountMinor: 850000.5 }, [exampleMovement()], new Set(), later(60)).reason, 'invalid_order')
   assert.equal(reconcile(exampleOrder(), [exampleMovement()], new Set(), NOW).reason, 'outside_payment_window')
 })
+
+test('SINPE: only pending demonstration orders can enter this matching engine', () => {
+  for (const status of ['manual_review', 'simulated_paid'] as const) {
+    assert.equal(reconcile({ ...exampleOrder(), status }, [exampleMovement()], new Set(), later(60)).reason, 'invalid_order')
+  }
+})

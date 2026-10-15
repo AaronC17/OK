@@ -14,7 +14,7 @@ function references(description: string | null): string[] {
 
 /** Pure matching. The caller must fetch trusted movements and allocate atomically. */
 export function reconcile(order: DemoOrder, movements: StoredMovement[], used: ReadonlySet<string>, now: string): Decision {
-  if (!ORDER_REFERENCE.test(order.reference) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0 || order.currency !== 'CRC'
+  if (order.status !== 'pending_payment' || order.demoOnly !== true || !ORDER_REFERENCE.test(order.reference) || !Number.isSafeInteger(order.amountMinor) || order.amountMinor <= 0 || order.currency !== 'CRC'
     || !order.accountId || !isInstant(now) || !isInstant(order.createdAt) || !isInstant(order.expiresAt)
     || order.createdAt >= order.expiresAt || now < order.createdAt) return { kind: 'review', reason: 'invalid_order' }
   if (now >= order.expiresAt) return { kind: 'review', reason: 'expired' }

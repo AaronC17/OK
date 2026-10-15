@@ -33,6 +33,11 @@ async function main() {
   await request('/internal/mock/movements', config.adminToken, movement)
   // Redelivery is intentional: it must not create a second movement or event.
   await request('/internal/mock/movements', config.adminToken, movement)
+  if (process.argv.includes('--prepare-only')) {
+    console.log(`${order.reference} · CRC ${(order.amountMinor / 100).toFixed(2)} · pending_payment (DEMO)`)
+    console.log('Pedido y movimiento ficticios preparados. Ejecuta «Prueba manual» en n8n. NO es un pago recibido.')
+    return
+  }
   await request('/internal/reconciliation/run', config.reconcileToken, {})
   await request('/internal/reconciliation/run', config.reconcileToken, {})
   const result = await request(`/internal/orders/${order.id}`, config.adminToken) as DemoOrder

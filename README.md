@@ -191,7 +191,20 @@ Se comprueban precios de variantes, mezclas, cantidades, disponibilidad, persist
 4. Definir disponibilidad real, cobertura, tarifas, recogida y condiciones comerciales.
 5. Completar contactos adicionales si se desean y cambiar `demo` a `false` al sustituir los ejemplos.
 
-Esta versión no necesita backend. Inventario sincronizado, pagos en línea, confirmaciones automáticas, historial o seguimiento real de pedidos requerirían servidor/base de datos e integraciones con el comercio o con WhatsApp Business Platform. La web actual prepara una solicitud; no registra pagos ni confirma pedidos.
+La tienda pública sigue funcionando sin backend: prepara una solicitud por WhatsApp; no registra pagos ni confirma pedidos. Inventario sincronizado, pagos reales, confirmaciones e historial requieren servidor/base de datos e integraciones comerciales.
+
+## SINPE Móvil + BAC + n8n — fase local, sin pagos reales
+
+La investigación, fuentes oficiales, consulta lista para BAC y proceso de implementación están en **[`docs/pagos-sinpe-bac.md`](docs/pagos-sinpe-bac.md)**. Las condiciones públicas de Tesorería Corporativa Digital limitan ese servicio a personas jurídicas. Simple Pay menciona APIs, pero su modalidad Lite describe acceso web; el acceso API con una cuenta personal requiere confirmación del banco.
+
+Se agregó un backend **aislado de demostración** en `server/payments/` y un flujo importable en `integrations/n8n/sinpe-local-demo.json`. No hay conexión a BAC ni cambios al checkout público. Solo admite `disabled` o `mock`, escucha en localhost y bloquea producción. Un resultado exitoso es `simulated_paid`, nunca un pago real.
+
+1. Seguir la guía para copiar `.env.payments.example` a `.env.payments.local` y generar dos tokens independientes. No modificar ni compartir `.env.local`.
+2. Para una simulación, elegir `PAYMENTS_MODE=mock` y ejecutar `npm.cmd run payments:dev`.
+3. En otra terminal: `npm.cmd run payments:demo`. Crea un pedido y movimiento ficticios y comprueba que repetirlos no duplique el evento.
+4. Pruebas específicas: `npm.cmd run test:payments`. `npm.cmd test` incluye también las pruebas existentes de la tienda.
+
+SQLite se guarda en `.data/`, ignorado por Git y bloqueado por Vite. **No exponer esta demo a Internet ni enviar dinero para probarla.** El workflow está desactivado, no incluye credenciales y necesita una instancia de n8n configurada; no se ha ejecutado allí. Dashboard, stock, notificaciones y adaptación bancaria real son fases posteriores a la autorización.
 
 ## Estudio de marca con Higgsfield
 

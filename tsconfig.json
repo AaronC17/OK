@@ -18,5 +18,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "vite.config.ts", "server/payments", "scripts/payments"]
+  "include": ["src", "vite.config.ts", "server/payments", "server/store", "scripts/payments"]
 }
