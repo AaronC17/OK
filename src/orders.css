@@ -27,19 +27,29 @@
 .sinpe-order-panel > .order-status { display: table; margin: 0 auto; }
 .sinpe-order-panel > h3 { text-align: center; font-size: 27px; font-weight: 550; letter-spacing: -.8px; margin: 17px 0 11px; }
 .sinpe-order-panel > p:not(.payment-warning):not(.payment-message) { font-size: 12px; color: #66596e; line-height: 1.8; }
-.payment-code-card { background: var(--purple); color: white; border-radius: 10px; padding: 17px 18px; margin-top: 23px; }
-.payment-code-card > label { font-size: 10px; letter-spacing: .6px; color: #e6d9ed; }
-.payment-code-card > div { display: flex; align-items: center; min-width: 0; gap: 2px; }
-.payment-code-card input { width: 100%; min-width: 0; border: 0; border-radius: 3px; padding: 9px 0; background: transparent; color: #fff; font-family: ui-monospace, monospace; font-size: 17px; font-weight: 650; letter-spacing: .1px; }
-.payment-code-card .icon-button { color: white; }
-.payment-code-card .icon-button:hover { background: #ffffff20; }
-.payment-code-card > small { display: block; font-size: 10px; line-height: 1.6; color: #e3d6ea; }
-.sinpe-instructions { margin: 14px 0 20px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
-.sinpe-instructions > div { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; padding: 11px 0; }
-.sinpe-instructions > div + div { border-top: 1px solid #eee8f0; }
-.sinpe-instructions dt { color: #6b5e73; font-size: 11px; line-height: 1.6; }
+.sinpe-pay-card { margin-top: 22px; border: 1px solid #e4dcea; border-radius: 16px; background: #fff; box-shadow: 0 10px 30px -18px #38244855; overflow: hidden; }
+.sinpe-pay-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #f0eaf3; }
+.sinpe-pay-head > img { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; border-radius: 12px; background: #fff; border: 1px solid #eee8f1; padding: 3px; }
+.sinpe-pay-head > div { flex: 1; min-width: 0; }
+.sinpe-pay-head strong { display: block; font-size: 14px; font-weight: 650; color: var(--ink); }
+.sinpe-pay-head small { display: block; font-size: 11px; color: #6b5e73; margin-top: 2px; }
+.sinpe-pay-amount { text-align: right; font-size: 19px; font-weight: 700; letter-spacing: -.4px; color: var(--purple); white-space: nowrap; }
+.sinpe-pay-amount > small { display: block; font-size: 10px; font-weight: 500; letter-spacing: .4px; color: #6b5e73; text-transform: uppercase; }
+.payment-code-card { margin: 14px; padding: 16px; border-radius: 12px; color: white; text-align: center; background: linear-gradient(160deg, #4a2f5e 0%, #382448 55%, #2a1a37 100%); box-shadow: inset 0 1px 0 #ffffff1f; }
+.payment-code-card > label { display: block; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: #e6d9ed; }
+.payment-code-card input { display: block; width: 100%; min-width: 0; margin: 10px 0 12px; padding: 12px 8px; border: 1px dashed #ffffff4d; border-radius: 10px; background: #ffffff12; color: #fff; text-align: center; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 19px; font-weight: 700; letter-spacing: 1.5px; }
+.payment-code-card input:focus { outline: 2px solid #c9a8de; outline-offset: 2px; }
+.code-copy-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; border-radius: 10px; background: #fff; color: var(--purple); font-size: 12px; font-weight: 650; transition: background .18s; }
+.code-copy-button:hover { background: #f1eaf6; }
+.payment-code-card > small { display: block; font-size: 10px; line-height: 1.6; color: #e3d6ea; margin-top: 10px; }
+.sinpe-instructions { margin: 0; padding: 4px 16px 8px; }
+.sinpe-instructions > div { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 12px 0; }
+.sinpe-instructions > div + div { border-top: 1px solid #f0eaf3; }
+.sinpe-instructions dt { display: flex; align-items: center; gap: 10px; color: #6b5e73; font-size: 11px; line-height: 1.5; }
+.sinpe-step { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: #f0e8f5; color: var(--purple); font-size: 10px; font-weight: 700; }
 .sinpe-instructions dd { margin: 0; text-align: right; font-size: 13px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
-.sinpe-instructions > div:first-child dd, .sinpe-instructions > div:last-child dd { font-size: 17px; }
+.sinpe-instructions > div:first-child dd { font-size: 18px; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
+.sinpe-instructions > div:last-child dd { font-size: 17px; color: var(--purple); }
 .recorded-order-summary { margin-top: 20px; border-block: 1px solid var(--line); padding: 14px 0; }
 .recorded-order-summary > summary, .admin-audit > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; font-size: 12px; font-weight: 600; list-style: none; min-height: 28px; }
 .recorded-order-summary > p { margin-top: 13px; font-size: 11px; line-height: 1.8; color: #66576e; overflow-wrap: anywhere; }
@@ -192,8 +202,8 @@
 }
 @media (max-width: 600px) {
   .sinpe-order-panel { padding-top: 23px; padding-bottom: 20px; }
-  .payment-code-card { padding-inline: 14px; }
-  .payment-code-card input { font-size: 15px; }
+  .payment-code-card { margin: 12px; padding: 14px 12px; }
+  .payment-code-card input { font-size: 15px; letter-spacing: .6px; }
   .privacy-check { font-size: 12px; }
   .payment-method small, .payment-method > p, .sinpe-order-panel .small-note { font-size: 11px; }
   .admin-topbar > .wordmark { font-size: 28px; }

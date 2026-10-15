@@ -61,13 +61,25 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
       : order.status === 'pending_details' ? 'Antes de pagar, la tienda debe confirmar el total de entrega y los datos SINPE. Puedes consultar los cambios aquí.'
       : 'Usa el código de tu pedido en el detalle del SINPE y luego adjunta el comprobante. Subirlo no confirma automáticamente el pago.'}</p>
     {order.demo && <p className="payment-warning"><Icon name="info" size={17} />Demostración: los precios y la entrega son de ejemplo. No envíes dinero real.</p>}
-    <div className="payment-code-card"><label htmlFor="assigned-order-code">Código de tu pedido</label><div><input id="assigned-order-code" ref={codeRef} readOnly value={order.code} onFocus={event => event.currentTarget.select()} /><button type="button" className="icon-button" onClick={() => { void copyValue(order.code) }} aria-label="Copiar código del pedido"><Icon name="copy" size={18} /></button></div><small role="status">{copy || 'Cópialo completo en el detalle de la transferencia.'}</small></div>
+    <div className="sinpe-pay-card">
+      <div className="sinpe-pay-head">
+        <img src="/images/sinpe-movil.png" alt="SINPE Móvil" width="64" height="64" />
+        <div><strong>Paga con SINPE Móvil</strong><small>Desde la app de tu banco</small></div>
+        {order.totalMinor !== null && order.status !== 'pending_details' && <span className="sinpe-pay-amount"><small>Total</small>{money(order.totalMinor, store)}</span>}
+      </div>
+      <div className="payment-code-card">
+        <label htmlFor="assigned-order-code">Código de tu pedido · escríbelo en el detalle</label>
+        <input id="assigned-order-code" ref={codeRef} readOnly value={order.code} onFocus={event => event.currentTarget.select()} />
+        <button type="button" className="code-copy-button" onClick={() => { void copyValue(order.code) }} aria-label="Copiar código del pedido"><Icon name={copy === 'Copiado' ? 'check' : 'copy'} size={16} />{copy === 'Copiado' ? 'Copiado' : 'Copiar código'}</button>
+        <small role="status">{copy && copy !== 'Copiado' ? copy : 'Cópialo completo, sin espacios, en el detalle de la transferencia.'}</small>
+      </div>
+      {order.destination && order.totalMinor !== null && order.status !== 'pending_details' && <dl className="sinpe-instructions">
+        <div><dt><span className="sinpe-step">1</span>SINPE Móvil · {order.destination.bank}</dt><dd>{order.destination.phone.slice(0, 4)} {order.destination.phone.slice(4)}</dd></div>
+        <div><dt><span className="sinpe-step">2</span>Beneficiario</dt><dd>{order.destination.beneficiary}</dd></div>
+        <div><dt><span className="sinpe-step">3</span>Monto exacto · CRC</dt><dd>{money(order.totalMinor, store)}</dd></div>
+      </dl>}
+    </div>
     {order.customerMessage && <p className="notice payment-message" role="status">{order.customerMessage}</p>}
-    {order.destination && order.totalMinor !== null && order.status !== 'pending_details' && <dl className="sinpe-instructions">
-      <div><dt>SINPE Móvil · {order.destination.bank}</dt><dd>{order.destination.phone.slice(0, 4)} {order.destination.phone.slice(4)}</dd></div>
-      <div><dt>Beneficiario</dt><dd>{order.destination.beneficiary}</dd></div>
-      <div><dt>Monto exacto · CRC</dt><dd>{money(order.totalMinor, store)}</dd></div>
-    </dl>}
     <details className="recorded-order-summary"><summary>Ver productos y entrega <Icon name="chevron" size={16} /></summary><OrderLines order={order} /><p>{order.delivery.name} · {order.customer.name}{order.customer.address ? ` · ${order.customer.address}` : ''}</p></details>
     {canSubmit && <form className="receipt-form" onSubmit={event => { void submit(event) }}>
       <div className="form-heading"><span className="step-marker">03</span><h3>Adjunta tu comprobante</h3></div>
