@@ -115,29 +115,16 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
     lastOpacity: 0,
   }))
   const path = (points: number[][], close = false) => `${points.map(([x, y], index) => `${index ? 'L' : 'M'}${round(x)} ${round(y)}`).join(' ')}${close ? 'Z' : ''}`
-  const depthEntries = nodes.map((node, i) => ({ node, depth: 0, index: i }))
-  const patchLastWarp = mixBears.map(() => new Array<string>(GEL_TRIANGLES.length).fill(''))
   const grainLastX = new Array<number>(grains.length).fill(-9999)
   const grainLastY = new Array<number>(grains.length).fill(-9999)
   const contourLastOp = new Array<number>(contours.length).fill(-1)
-  const meniscusLastOp = new Array<number>(mixBears.length).fill(-1)
-  const wetCutLastY = new Array<number>(mixBears.length).fill(-9999)
   let ringsActive = false
   let spoonActive = false
-  let lastFrameTime = 0
   let request = 0
   let running = false
 
   const sortDepth = () => {
     const time = (Number(animations[0].currentTime) % MIX_CYCLE) / 1000
-
-    // Throttle to steady 60fps to prevent high-refresh monitor frame spikes
-    const now = performance.now()
-    if (now - lastFrameTime < 14) {
-      if (running) request = requestAnimationFrame(sortDepth)
-      return
-    }
-    lastFrameTime = now
 
     // When the bowl scene has faded out (10.4s to 15s), skip SVG mutations
     if (time > 10.4) {
@@ -154,69 +141,38 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
       return a + (b - a) * progress
     }
 
+    nodes.map((node, i) => ({ node, depth: z(i), index: i })).sort((a, b) => a.depth - b.depth || a.index - b.index).forEach(({ node }, i) => {
+      if (contents.children[i] !== node) contents.insertBefore(node, contents.children[i] ?? null)
+    })
+
     const sauceHeight = (x: number, z: number) => {
       const a = sampleSurface(frame.surface, x, z), b = sampleSurface(next.surface, x, z)
       return a + (b - a) * progress
     }
     const sauceY = (x: number, z: number) => screenY(sauceHeight(x, z), z)
 
-    if (time >= 3.2) {
-      depthEntries.forEach(entry => { entry.depth = z(entry.index) })
-      depthEntries.sort((a, b) => a.depth - b.depth || a.index - b.index)
-      for (let i = 0; i < depthEntries.length; i++) {
-        const node = depthEntries[i].node
-        if (contents.children[i] !== node) contents.insertBefore(node, contents.children[i] ?? null)
-      }
+    const poses = frame.bears.map((body, i) => {
+      const nextBody = next.bears[i]
+      const x = body.x + (nextBody.x - body.x) * progress
+      const depth = z(i)
+      const y = body.y + (nextBody.y - body.y) * progress
+      const mesh = body.mesh.map((point, j) => ({ x: point.x + (nextBody.mesh[j].x - point.x) * progress, y: point.y + (nextBody.mesh[j].y - point.y) * progress }))
+      patches[i].forEach(({ node, triangle }) => node.setAttribute('transform', warp(triangle, mesh)))
+      return { x, y, z: depth, active: body.active, wetLine: body.wetLine + (nextBody.wetLine - body.wetLine) * progress, feet: {
+        x: body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress,
+        y: body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress,
+        z: body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress,
+      } }
+    })
 
-      const poses = frame.bears.map((body, i) => {
-        const nextBody = next.bears[i]
-        const x = body.x + (nextBody.x - body.x) * progress
-        const depth = z(i)
-        const y = body.y + (nextBody.y - body.y) * progress
-        if (body.active) {
-          const mesh = body.mesh.map((point, j) => ({
-            x: point.x + (nextBody.mesh[j].x - point.x) * progress,
-            y: point.y + (nextBody.mesh[j].y - point.y) * progress,
-          }))
-          const bearPatches = patches[i], bearLast = patchLastWarp[i]
-          for (let p = 0; p < bearPatches.length; p++) {
-            const matrix = warp(bearPatches[p].triangle, mesh)
-            if (bearLast[p] !== matrix) {
-              bearLast[p] = matrix
-              bearPatches[p].node.setAttribute('transform', matrix)
-            }
-          }
-        }
-        return {
-          x, y, z: depth, active: body.active,
-          wetLine: body.wetLine + (nextBody.wetLine - body.wetLine) * progress,
-          feet: {
-            x: body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress,
-            y: body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress,
-            z: body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress,
-          },
-        }
-      })
-
-      poses.forEach((body, i) => {
-        if (!body.active) return
-        const { x, y, z: depth } = body
-        const line = y - sauceHeight(x, depth)
-        const cutY = round(Math.min(line, body.wetLine))
-        if (wetCutLastY[i] !== cutY) {
-          wetCutLastY[i] = cutY
-          wetCuts[i].setAttribute('y', String(cutY))
-        }
-        const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
-        const op = round(smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88)
-        if (meniscusLastOp[i] !== op) {
-          meniscusLastOp[i] = op
-          menisci[i].setAttribute('opacity', String(op))
-        }
-        if (op > 0) {
-          menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
-        }
-      })
+    poses.forEach((body, i) => {
+      const { x, y, z: depth } = body
+      const line = y - sauceHeight(x, depth)
+      wetCuts[i].setAttribute('y', String(round(Math.min(line, body.wetLine))))
+      const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
+      menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
+      menisci[i].setAttribute('opacity', String(round(body.active ? smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88 : 0)))
+    })
 
       bridges.forEach(bridge => {
         const [a, b] = bridge.indices
@@ -259,7 +215,6 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
         bridge.edges[0].setAttribute('d', `M${round(180 + ax)} ${round(ay - 3)}Q${middle} ${round(height - width)} ${round(180 + bx)} ${round(by - 3)}L${round(180 + bx)} ${round(by + 3)}Q${middle} ${round(height + width)} ${round(180 + ax)} ${round(ay + 3)}Z`)
         bridge.edges[1].setAttribute('d', `M${round(180 + ax)} ${round(ay - 2)}Q${middle} ${round(height - width + 1)} ${round(180 + bx)} ${round(by - 2)}`)
       })
-    }
 
     if (time >= 0.28) {
       surface.setAttribute('d', path(SURFACE_ANGLES.map(({ x, z }) => [180 + x, sauceY(x, z)]), true))

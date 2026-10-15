@@ -58,7 +58,6 @@ export interface StoreConfig {
   demo: boolean
   categories: { dessertsEnabled: boolean }
   currency: { code: string; locale: string; fractionDigits: number }
-  whatsapp: { countryCode: string; localNumber: string }
   contact: { email: string | null; instagramUrl: string | null }
   heroImage: string
   heroImageAlt: string

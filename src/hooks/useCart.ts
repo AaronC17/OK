@@ -35,6 +35,7 @@ export function useCart() {
       setItems(current => current.map(item => selectionKey(item.selection) === key ? { ...item, quantity } : item))
     },
     remove: (key: string) => setItems(current => current.filter(item => selectionKey(item.selection) !== key)),
+    clear: () => setItems([]),
   }
 }
 

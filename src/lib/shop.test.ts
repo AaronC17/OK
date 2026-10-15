@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { store } from '../config/store.ts'
-import { addItem, buildOrderMessage, makeReference, money, resolveLine, restoreCart, selectionKey, totals, validateCheckout, whatsappNumber, whatsappUrl } from './shop.ts'
+import { addItem, money, resolveLine, restoreCart, selectionKey, totals, validateCheckout } from './shop.ts'
 import type { CartItem, Customer, StoreConfig } from '../types.ts'
 
 const gummy: CartItem = { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 2 }
@@ -137,50 +137,4 @@ test('delivery requires address, pickup does not; notes remain optional', () => 
   assert.deepEqual(validateCheckout(lines, { ...customer, deliveryId: 'pickup', address: '' }, store), {})
   assert.ok(validateCheckout(lines, { ...customer, deliveryId: 'missing' }, store).deliveryId)
   assert.ok(validateCheckout([], customer, store).cart)
-})
-
-test('WhatsApp summary matches gummies and desserts, accents, prices and shipping', () => {
-  const config = withDesserts()
-  const lines = [resolveLine(gummy, config)!, resolveLine(dessert, config)!]
-  const message = normalize(buildOrderMessage(lines, customer, 'ONK-TEST', config))
-  assert.ok(message.startsWith(`Hola, equipo de ${store.name}.`))
-  assert.match(message, /2 × Ositos enchilados\nUn solo tipo · Ositos · 100 g por bolsa\nPrecio unitario: ₡1 200\nImporte: ₡2 400/)
-  assert.match(message, /1 × Brownie de chocolate\nPostre · Para compartir · Caja de 4 unidades/)
-  assert.match(message, /Moneda: CRC/)
-  assert.match(message, /Subtotal: ₡7 600/)
-  assert.match(message, /Envío: Por confirmar/)
-  assert.doesNotMatch(message, /^Total:/m)
-  assert.match(message, /Nombre: Ana Pérez/)
-  assert.match(message, /Calle del Sol 12, 2º B/)
-  assert.doesNotMatch(message, /Observaciones:/)
-  assert.match(message, /DEMOSTRACIÓN/)
-})
-
-test('pickup summary omits unused address and includes notes and total', () => {
-  const message = normalize(buildOrderMessage([resolveLine(gummy, store)!], { ...customer, deliveryId: 'pickup', notes: 'Para José & María 🎁' }, 'ONK-PICKUP', store))
-  assert.doesNotMatch(message, /Calle del Sol/)
-  assert.match(message, /Total: ₡2 400/)
-  assert.match(message, /Punto de recogida: Por coordinar/)
-  assert.match(message, /Observaciones: Para José & María 🎁/)
-  assert.throws(() => buildOrderMessage([], customer, 'BAD', store))
-})
-
-test('WhatsApp uses confirmed +506 number and preserves encoded text', () => {
-  assert.equal(whatsappNumber(store), '50661555619')
-  const message = 'Hola, Onky’s.\n2 × Gomitas\nJosé & María: ₡2 333,33 🎁'
-  const url = new URL(whatsappUrl(message, store)!)
-  assert.equal(url.host, 'wa.me')
-  assert.equal(url.pathname, '/50661555619')
-  assert.equal(url.searchParams.get('text'), message)
-  const config = copy()
-  for (const countryCode of ['', '+506', ' 506', '001', '[CODIGO_DE_PAIS]']) {
-    config.whatsapp.countryCode = countryCode
-    assert.equal(whatsappNumber(config), null)
-    assert.equal(whatsappUrl(message, config), null)
-  }
-})
-
-test('references include a date and random component', () => {
-  assert.equal(makeReference(new Date(2026, 9, 13), 'abcd1234-0000-0000-0000-000000000000'), 'ONK-20261013-ABCD1234')
-  assert.notEqual(makeReference(), makeReference())
 })

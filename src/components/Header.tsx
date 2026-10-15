@@ -13,7 +13,7 @@ export function Header({ count, onCart }: { count: number; onCart: () => void })
   }, [])
 
   return <>
-    <div className="announcement"><span>Pedidos por WhatsApp <Icon name="arrow-up" size={12} /></span></div>
+    <div className="announcement"><span>Pedidos aquí · Pago con SINPE Móvil <Icon name="bank" size={12} /></span></div>
     <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="container header-inner">
         <a href="#inicio" className="wordmark" aria-label={`${store.name}, inicio`}>{store.name}<span className="brand-dot">.</span></a>

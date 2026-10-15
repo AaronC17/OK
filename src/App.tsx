@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { store } from './config/store.ts'
-import { MAX_QUANTITY, selectionKey, whatsappNumber } from './lib/shop.ts'
+import { MAX_QUANTITY, selectionKey } from './lib/shop.ts'
 import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
 import { Icon } from './components/Icon.tsx'
@@ -22,7 +22,6 @@ export default function App() {
   const [zoom, setZoom] = useState<{ src: string; alt: string; name: string } | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
-  const number = whatsappNumber(store)
 
   useEffect(() => { document.title = `${store.name} — Pequeños momentos, a tu manera` }, [])
 
@@ -65,19 +64,19 @@ export default function App() {
       <Catalog onProduct={openProduct} onZoom={setZoom} />
       <MixExperience onCustomize={() => openProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} />
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
-        <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Arma tu pedido y coordinamos los detalles por WhatsApp.</p></div>
+        <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
         <div className="how-steps">
           <article><span className="how-number">01</span><Icon name="heart" size={26} /><h3>Elige</h3><p>Tu tipo de gomita favorito.</p></article>
           <article><span className="how-number">02</span><Icon name="sliders" size={26} /><h3>Personaliza</h3><p>Tipos, mezclas y presentaciones en un mismo carrito.</p></article>
-          <article><span className="how-number">03</span><Icon name="whatsapp" size={28} /><h3>Conversemos</h3><p>Envía tu solicitud por WhatsApp y confirma <br />disponibilidad, entrega y forma de pago.</p></article>
+          <article><span className="how-number">03</span><Icon name="bank" size={28} /><h3>Paga con SINPE</h3><p>Registra tu pedido, usa su código en el SINPE y adjunta el comprobante para revisión.</p></article>
         </div>
       </div></section>
       <section className="questions-section container" aria-labelledby="questions-title">
         <div><span className="eyebrow">PREGUNTAS FRECUENTES</span><h2 id="questions-title">Preguntas frecuentes</h2></div>
         <div className="questions-list">
-          <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Al terminar tu carrito, preparamos un resumen. Debes enviarlo desde WhatsApp; la tienda te confirmará la disponibilidad, el método de entrega y la forma de pago. Abrir la conversación no confirma el pedido.</p></details>
+          <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Registra el pedido desde el carrito. Cuando estén confirmados el total y el destino SINPE, recibirás instrucciones y un código para el detalle de tu transferencia. Adjunta el comprobante y la referencia bancaria. La tienda comprobará el abono antes de marcarlo como listo para preparar; subir una imagen no confirma el pago.</p></details>
           <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
-          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Elige entre los métodos habilitados en el carrito. Cuando el envío requiera cotización, verás «Envío por confirmar». La cobertura, el punto de recogida y las condiciones se coordinan con la tienda.{store.demo ? ' En esta demostración, los métodos y tarifas son ejemplos.' : ''}</p></details>
+          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Elige entre los métodos habilitados en el carrito. Si el envío requiere cotización, el pedido queda por coordinar y no debes pagar hasta que la tienda confirme su costo. Puedes consultar el total y el estado del pedido desde este mismo navegador.{store.demo ? ' En esta demostración, los métodos y tarifas son ejemplos; no envíes dinero real.' : ''}</p></details>
         </div>
       </section>
     </main>
@@ -85,14 +84,14 @@ export default function App() {
       <div className="footer-main">
         <div><a href="#inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></a></div>
         <div className="footer-links"><span className="eyebrow">EXPLORA</span><a href="#gomitas">Gomitas enchiladas</a>{store.categories.dessertsEnabled && <a href="#postres">Postres</a>}<a href="#como-pedir">Cómo pedir</a></div>
-        <div className="footer-contact"><span className="eyebrow">CONVERSEMOS</span>
-          {number ? <a href={`https://wa.me/${number}`} target="_blank" rel="noopener noreferrer">WhatsApp <Icon name="arrow-up" size={16} /></a> : <button className="text-button" onClick={() => setInfoOpen(true)}>Contacto y detalles <Icon name="arrow-up" size={16} /></button>}
-          <p>{number ? `+${store.whatsapp.countryCode} ${store.whatsapp.localNumber}` : `${store.whatsapp.localNumber} · Prefijo por definir`}</p>
+        <div className="footer-contact"><span className="eyebrow">TU PEDIDO, AQUÍ</span>
+          <button className="text-button" onClick={() => setCartOpen(true)}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
+          <p>Pago con SINPE Móvil · Revisión del abono</p>
           {store.contact.email && <a href={`mailto:${store.contact.email}`}>{store.contact.email}</a>}
           {store.contact.instagramUrl && <a href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram <Icon name="arrow-up" size={14} /></a>}
         </div>
       </div>
-      <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
+      <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span><a href="/admin">Administración</a>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
     </div></footer>
     {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
     <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} />
@@ -102,8 +101,8 @@ export default function App() {
         <button className="icon-button modal-close" aria-label="Cerrar información" onClick={() => setInfoOpen(false)}><Icon name="close" /></button>
         <span className="eyebrow">CONOCE LOS DETALLES</span><h2 id="info-title">Información de la tienda</h2>
         <p>Explora, personaliza y prepara tu carrito. Este catálogo utiliza datos de demostración.</p>
-        <ul><li>Productos, disponibilidad, precios y métodos de entrega son de ejemplo y deben confirmarse.</li><li>Precios en colones costarricenses (CRC).</li><li>Puedes elegir un solo tipo de gomita o pedirlas mixtas; el peso es el total de la bolsa.</li><li>WhatsApp: <strong>+{store.whatsapp.countryCode} {store.whatsapp.localNumber}</strong>.</li></ul>
-        <p>Tu pedido es una solicitud. La tienda confirmará disponibilidad, entrega y forma de pago.</p>
+        <ul><li>Productos, disponibilidad, precios y métodos de entrega son de ejemplo y deben confirmarse.</li><li>Precios en colones costarricenses (CRC).</li><li>Puedes elegir un solo tipo de gomita o pedirlas mixtas; el peso es el total de la bolsa.</li><li>Los pedidos se registran en esta tienda y se pagan mediante SINPE Móvil, después de confirmar el destino y el total.</li></ul>
+        <p>El comprobante y el código se revisan antes de confirmar el pago. En esta demostración no envíes dinero real.</p>
         <button className="button button-primary" onClick={() => setInfoOpen(false)}>Seguir explorando <Icon name="arrow" size={18} /></button>
       </div>
     </Modal>
