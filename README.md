@@ -1,6 +1,6 @@
 # Onky’s — Pequeños momentos, a tu manera
 
-Tienda de gomitas enchiladas, con configuración de productos, carrito persistente y solicitudes por WhatsApp. El módulo de postres permanece en el código, pero está oculto y deshabilitado hasta que se confirmen el catálogo y las fotografías. React + TypeScript + Vite.
+Tienda de gomitas enchiladas con carrito, checkout SINPE Móvil, comprobantes privados y dashboard administrativo para confirmar pagos manualmente. WhatsApp dejó de ser una opción. React + TypeScript + Vite + backend Node/SQLite. El módulo de postres permanece oculto hasta confirmar catálogo y fotografías.
 
 ## Ejecutar
 
@@ -18,6 +18,8 @@ npm.cmd install
 npm.cmd run dev
 ```
 
+Administración: **http://localhost:5173/admin**. El backend arranca junto con la tienda. En el primer inicio, leer el código privado de instalación con `Get-Content '.data/store/admin-setup-token.txt'` y crear tu propio usuario/contraseña. Luego configurar número SINPE y beneficiario desde el panel. **No existe una contraseña predeterminada y no se asumió ningún número receptor.** Guía: **[`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md)**.
+
 ### Producción
 
 ```sh
@@ -25,11 +27,11 @@ npm run build
 npm run preview
 ```
 
-Publicar la carpeta `dist/` en un alojamiento estático con HTTPS (por ejemplo, Netlify, Cloudflare Pages o Vercel). `preview` sirve para comprobar la compilación local, no como servidor comercial. No hay rutas de servidor: la navegación usa anclas.
+El frontend se compila en `dist/`, pero **publicar solo esa carpeta ya no basta**: los pedidos y comprobantes necesitan el backend. `preview` comprueba localmente frontend + API; no es un servidor comercial. Para despliegue se requiere HTTPS y `/api/*` hacia el backend del mismo origen, además de resolver `/admin` a la aplicación. Ver la guía de checkout y sus pendientes de seguridad/privacidad.
 
 ## Datos confirmados y demostración
 
-- WhatsApp: **+506 6155 5619**, enlace `https://wa.me/50661555619`.
+- El flujo de WhatsApp fue retirado. El número SINPE y beneficiario se configuran explícitamente desde administración.
 - Moneda: **colón costarricense, CRC**, símbolo **₡**.
 - Bolsas: **100, 200 y 500 g**, según la última indicación del usuario.
 - Se permite **un solo tipo** o **mixto**, eligiendo dos o tres tipos.
@@ -48,7 +50,7 @@ Editar **`src/config/store.ts`**. Toda la información comercial se encuentra al
 | Activar postres más adelante | `categories.dessertsEnabled` |
 | Ocultar tipos de gomita del catálogo | `visible: false` en cada tipo (`tiritas`, `gusanitos`) |
 | Moneda y formato | `currency.code`, `locale`, `fractionDigits` |
-| Teléfono | `whatsapp.countryCode`, `localNumber` |
+| SINPE receptor y beneficiario | Dashboard `/admin` → Configuración; no usar un teléfono inferido |
 | Contactos adicionales | `contact.email`, `instagramUrl` |
 | Portada | `heroImage`, `heroImageAlt` |
 | Tipos de gomita | `gummies.types` |
@@ -119,15 +121,11 @@ En `deliveryMethods`:
 
 No hay zonas ni plazos inventados. La recogida gratuita actual es un ejemplo, no una condición comercial confirmada.
 
-### WhatsApp
+### Pedidos con SINPE Móvil
 
-```ts
-whatsapp: { countryCode: '506', localNumber: '61555619' }
-```
+El backend genera el código `ONK-` + 16 caracteres hexadecimales y calcula el precio desde el catálogo. El cliente recibe instrucciones cuando están confirmados total y beneficiario, y adjunta su comprobante con código y referencia bancaria. Se valida pertenencia del pedido, código y archivo; subir una imagen solo cambia el estado a **Comprobante en revisión**.
 
-Usar solo dígitos, sin `+`, espacios ni signos. Se genera una referencia `ONK-fecha-identificador`, se validan los campos y se codifica el mensaje con `encodeURIComponent`. La apertura ocurre sin retrasos dentro de la acción del cliente. La tienda no recibe el mensaje hasta que el cliente lo envía desde WhatsApp.
-
-Siempre hay enlace **«Volver a abrir WhatsApp»**, opción de **copiar resumen** y selección manual del texto si el navegador impide copiar. Si se elimina el prefijo, se conserva el flujo para preparar/copiar el resumen, sin inventar el país. El carrito no se vacía automáticamente.
+La administración comprueba el abono en BAC por su cuenta e introduce código, monto y referencia verificados antes de pasar el pedido a **Listo para preparar**. Una referencia consumida no puede confirmar otro pedido. Hay correcciones, auditoría, bloqueo de versiones antiguas e idempotencia. No se automatiza BAC en esta fase. Detalles en [`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md).
 
 ## Interacciones y accesibilidad
 
@@ -146,19 +144,25 @@ Siempre hay enlace **«Volver a abrir WhatsApp»**, opción de **copiar resumen*
 
 Los artículos eliminados del catálogo o pesos antiguos se descartan al restaurar y se informa al visitante. Los datos corruptos y el bloqueo del almacenamiento tienen recuperación controlada. Límite técnico: 99 presentaciones por variante (`MAX_QUANTITY`).
 
-Nombre, dirección y observaciones se conservan en memoria mientras la página esté abierta; no se guardan en `localStorage`, ni se envían a un servidor. Se incluyen en el resumen que el cliente decide compartir por WhatsApp.
+Al registrar un pedido, nombre, teléfono, dirección, observaciones y aceptación de privacidad se envían al backend y se guardan en SQLite privado. No se guardan en `localStorage`. Una cookie HttpOnly permite recuperar el último pedido en el mismo navegador durante hasta siete días. Los comprobantes son privados y no se publican en `public/`; solo el comprador propietario y el administrador autenticado pueden consultarlos.
 
 ## Organización
 
 ```text
 src/config/store.ts               Catálogo y negocio
 src/types.ts                      Tipos del dominio
-src/lib/shop.ts                   Precios, variantes, validación y mensaje
+src/lib/shop.ts                   Precios, variantes y validación del carrito
+src/lib/orders-api.ts             Cliente de la API y conversión exacta de importes
+src/order-types.ts                Contrato de pedidos y estados
 src/hooks/useCart.ts              Carrito y persistencia
 src/components/Header.tsx         Navegación y efecto vidrio
 src/components/Catalog.tsx        Catálogo compartido
 src/components/ProductDialog.tsx  Configuración de productos
-src/components/CartDrawer.tsx     Entrega y solicitud por WhatsApp
+src/components/CartDrawer.tsx     Entrega y registro del pedido SINPE
+src/components/OrderPanel.tsx     Instrucciones, comprobante y seguimiento
+src/components/AdminDashboard.tsx Acceso, revisión, confirmación y configuración
+server/store/                    API, SQLite, sesiones y comprobantes privados
+src/orders.css                   Checkout SINPE y dashboard
 src/components/MixExperience.tsx  Animación ilustrativa
 src/components/ui.tsx            Diálogos, imágenes, cantidades y ampliador
 src/styles.css                   Sistema visual adaptable
@@ -181,7 +185,7 @@ npx playwright install chromium
 
 PowerShell: `$env:PW_CHANNEL='chromium'` antes de ejecutar las pruebas. En Linux/macOS: `PW_CHANNEL=chromium npm run test:e2e`.
 
-Se comprueban precios de variantes, mezclas, cantidades, disponibilidad, persistencia, resumen, teléfono internacional, apertura bloqueada, copia y alternativa manual, entrega, teclado, contraste, menú centrado, proporciones de iconos y anchuras de 320 a 1440 px. Las pruebas sustituyen la apertura de WhatsApp: no contactan al comercio.
+Se comprueban catálogo, carrito, entrega, códigos generados en backend, idempotencia, comprobantes privados, autenticación/CSRF, referencias no reutilizables, correcciones, confirmación manual y rollback, además de teclado, contraste y adaptación móvil. Las pruebas de navegador usan una base temporal aislada y un puerto libre; no acceden a BAC ni envían dinero.
 
 ## Pendientes para uso comercial
 
@@ -191,20 +195,20 @@ Se comprueban precios de variantes, mezclas, cantidades, disponibilidad, persist
 4. Definir disponibilidad real, cobertura, tarifas, recogida y condiciones comerciales.
 5. Completar contactos adicionales si se desean y cambiar `demo` a `false` al sustituir los ejemplos.
 
-La tienda pública sigue funcionando sin backend: prepara una solicitud por WhatsApp; no registra pagos ni confirma pedidos. Inventario sincronizado, pagos reales, confirmaciones e historial requieren servidor/base de datos e integraciones comerciales.
+La tienda registra pedidos en backend y el panel permite confirmar pagos **manualmente**. Siguen pendientes para uso comercial la disponibilidad/inventario real, condiciones de entrega, despliegue seguro, gestión de datos y controles adicionales descritos en la guía.
 
-## SINPE Móvil + BAC + n8n — fase local, sin pagos reales
+## Laboratorio anterior de conciliación + n8n
 
 La investigación, fuentes oficiales, consulta lista para BAC y proceso de implementación están en **[`docs/pagos-sinpe-bac.md`](docs/pagos-sinpe-bac.md)**. Las condiciones públicas de Tesorería Corporativa Digital limitan ese servicio a personas jurídicas. Simple Pay menciona APIs, pero su modalidad Lite describe acceso web; el acceso API con una cuenta personal requiere confirmación del banco.
 
-Se agregó un backend **aislado de demostración** en `server/payments/` y un flujo importable en `integrations/n8n/sinpe-local-demo.json`. No hay conexión a BAC ni cambios al checkout público. Solo admite `disabled` o `mock`, escucha en localhost y bloquea producción. Un resultado exitoso es `simulated_paid`, nunca un pago real.
+Se conserva el backend **aislado de demostración** en `server/payments/` y el flujo de `integrations/n8n/sinpe-local-demo.json`, separados del checkout actual en `server/store/`. No hay conexión a BAC. Solo admite `disabled` o `mock`, escucha en localhost y bloquea producción. `simulated_paid` no puede confirmar pedidos del nuevo panel.
 
 1. Seguir la guía para copiar `.env.payments.example` a `.env.payments.local` y generar dos tokens independientes. No modificar ni compartir `.env.local`.
 2. Para una simulación, elegir `PAYMENTS_MODE=mock` y ejecutar `npm.cmd run payments:dev`.
 3. En otra terminal: `npm.cmd run payments:demo`. Crea un pedido y movimiento ficticios y comprueba que repetirlos no duplique el evento.
 4. Pruebas específicas: `npm.cmd run test:payments`. `npm.cmd test` incluye también las pruebas existentes de la tienda.
 
-SQLite se guarda en `.data/`, ignorado por Git y bloqueado por Vite. **No exponer esta demo a Internet ni enviar dinero para probarla.** El workflow está desactivado, no incluye credenciales y necesita una instancia de n8n configurada; no se ha ejecutado allí. Dashboard, stock, notificaciones y adaptación bancaria real son fases posteriores a la autorización.
+El SQLite del laboratorio se guarda en `.data/`, separado del nuevo `.data/store/`. **No exponer el laboratorio a Internet ni enviar dinero para probarlo.** El workflow está desactivado y no se ha ejecutado en n8n. El dashboard manual actual se describe en [`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md); stock, notificaciones y lector bancario automático siguen pendientes.
 
 ## Estudio de marca con Higgsfield
 

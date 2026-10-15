@@ -1,5 +1,7 @@
 # SINPE Móvil + BAC personal + n8n
 
+> **Documento de investigación y laboratorio anterior.** El checkout ya fue sustituido por SINPE con comprobantes privados y confirmación administrativa manual, sin WhatsApp. Su estado e instrucciones vigentes están en [`checkout-sinpe-admin.md`](checkout-sinpe-admin.md). Las secciones de implementación de este documento describen el laboratorio aislado, no el nuevo backend de pedidos. La conexión automática a BAC sigue pendiente.
+
 **Investigación: 15 de octubre de 2026. Implementación: laboratorio local, NO habilitado para recibir o confirmar pagos reales.**
 
 ## 1. Resultado de la investigación
