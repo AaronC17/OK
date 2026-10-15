@@ -10,6 +10,7 @@
     "test": "node --experimental-strip-types --test src/lib/*.test.ts server/payments/*.test.ts server/store/*.test.ts",
     "test:store": "node --experimental-strip-types --test server/store/*.test.ts",
     "store:api": "node --env-file-if-exists=.env.store.local --experimental-strip-types server/store/index.ts",
+    "migrate:mongo": "node --env-file-if-exists=.env.store.local --experimental-strip-types scripts/migrate-sqlite-to-mongo.ts",
     "test:payments": "node --experimental-strip-types --test server/payments/*.test.ts",
     "payments:dev": "node --env-file=.env.payments.local --experimental-strip-types server/payments/index.ts",
     "payments:demo": "node --env-file=.env.payments.local --experimental-strip-types scripts/payments/demo.ts",
@@ -24,6 +25,7 @@
   "dependencies": {
     "@higgsfield/client": "^0.2.6",
     "lucide-react": "^1.56.0",
+    "mongodb": "^7.7.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sharp": "^0.35.5"

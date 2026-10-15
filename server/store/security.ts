@@ -20,9 +20,14 @@ export function passwordMatches(value: unknown, stored: string): boolean {
 
 export interface Session { hash: string; role: 'admin' | 'customer'; csrf: string; expiresAt: number }
 
-export function createSession(db: DatabaseSync, role: Session['role'], now = Date.now()) {
+export function generateSession(role: Session['role'], now = Date.now()) {
   const token = newToken()
   const session: Session = { hash: tokenHash(token), role, csrf: newToken(), expiresAt: now + (role === 'admin' ? 8 * 3600_000 : 7 * 86400_000) }
+  return { token, session }
+}
+
+export function createSession(db: DatabaseSync, role: Session['role'], now = Date.now()) {
+  const { token, session } = generateSession(role, now)
   db.prepare('INSERT INTO sessions (token_hash, role, csrf, expires_at) VALUES (?, ?, ?, ?)').run(session.hash, role, session.csrf, session.expiresAt)
   return { token, session }
 }

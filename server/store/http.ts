@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { unlinkSync } from 'node:fs'
-import type { ShopDatabase } from './database.ts'
+import type { ShopRepository } from './repository.ts'
 import type { Session } from './security.ts'
 import { RateLimits, requireCsrf } from './security.ts'
 import { MAX_RECEIPT_BYTES, prepareReceipt } from './receipts.ts'
@@ -50,7 +50,7 @@ async function jsonBody(request: IncomingMessage) {
 
 export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string }
 
-export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = {}) {
+export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions = {}) {
   const limits = new RateLimits()
   const secureCookies = options.secureCookies ?? false
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -69,69 +69,74 @@ export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = 
         if (!allowed) throw new StoreError(403, 'Origen no autorizado. Abre la tienda y el panel desde la misma dirección.')
       }
       const ip = request.socket.remoteAddress ?? 'local'
-      const requireSession = (role: Session['role'], mutate = false) => {
-        const session = store.session(cookie(request, role === 'admin' ? ADMIN_COOKIE : CUSTOMER_COOKIE), role)
+      const requireSession = async (role: Session['role'], mutate = false) => {
+        const session = await store.session(cookie(request, role === 'admin' ? ADMIN_COOKIE : CUSTOMER_COOKIE), role)
         if (!session) throw new StoreError(401, role === 'admin' ? 'Inicia sesión en administración.' : 'Tu sesión de compra venció. Actualiza la tienda.')
         if (mutate) requireCsrf(session, request.headers['x-csrf-token'] as string | undefined)
         return session
       }
-      const authReply = (session: Session | null) => ({ initialized: store.initialized(), authenticated: !!session, username: session ? store.adminName() : null, csrfToken: session?.csrf ?? null })
+      const authReply = async (session: Session | null) => ({
+        initialized: await store.initialized(),
+        authenticated: !!session,
+        username: session ? await store.adminName() : null,
+        csrfToken: session?.csrf ?? null
+      })
 
       if (path === '/api/checkout' && method === 'GET') {
         const token = cookie(request, CUSTOMER_COOKIE)
-        if (!store.session(token, 'customer')) limits.check(`session:${ip}`, 120, 3600_000)
-        const customer = store.customerSession(token)
+        if (!await store.session(token, 'customer')) limits.check(`session:${ip}`, 120, 3600_000)
+        const customer = await store.customerSession(token)
         if (customer.token) setCookie(response, CUSTOMER_COOKIE, customer.token, 7 * 86400, secureCookies)
-        json(response, 200, { csrfToken: customer.session.csrf, sinpe: store.destination(), demo: store.isDemo(), maxReceiptBytes: MAX_RECEIPT_BYTES })
+        json(response, 200, { csrfToken: customer.session.csrf, sinpe: await store.destination(), demo: store.isDemo(), maxReceiptBytes: MAX_RECEIPT_BYTES })
         return
       }
       if (path === '/api/admin/session' && method === 'GET') {
-        json(response, 200, authReply(store.session(cookie(request, ADMIN_COOKIE), 'admin')))
+        json(response, 200, await authReply(await store.session(cookie(request, ADMIN_COOKIE), 'admin')))
         return
       }
       if ((path === '/api/admin/setup' || path === '/api/admin/login') && method === 'POST') {
         limits.check(`login:${ip}`, 10, 15 * 60_000)
         const data = await jsonBody(request)
-        const session = path.endsWith('/setup') ? store.setupAdmin(data) : store.login(data)
+        const session = await (path.endsWith('/setup') ? store.setupAdmin(data) : store.login(data))
         limits.clear(`login:${ip}`)
-        const previous = store.session(cookie(request, ADMIN_COOKIE), 'admin')
-        if (previous) store.logout(previous)
+        const previous = await store.session(cookie(request, ADMIN_COOKIE), 'admin')
+        if (previous) await store.logout(previous)
         setCookie(response, ADMIN_COOKIE, session.token, 8 * 3600, secureCookies)
         if (path.endsWith('/setup') && options.setupTokenPath) { try { unlinkSync(options.setupTokenPath) } catch { /* Token is already invalidated in the database. */ } }
-        json(response, 200, authReply(session.session))
+        json(response, 200, await authReply(session.session))
         return
       }
       if (path === '/api/admin/logout' && method === 'POST') {
-        store.logout(requireSession('admin', true))
+        await store.logout(await requireSession('admin', true))
         setCookie(response, ADMIN_COOKIE, '', 0, secureCookies)
         json(response, 200, { ok: true })
         return
       }
       if (path === '/api/admin/settings') {
-        requireSession('admin', method === 'PUT')
-        if (method === 'GET') { json(response, 200, store.settings()); return }
-        if (method === 'PUT') { json(response, 200, store.configure(await jsonBody(request), store.adminName()!)); return }
+        await requireSession('admin', method === 'PUT')
+        if (method === 'GET') { json(response, 200, await store.settings()); return }
+        if (method === 'PUT') { json(response, 200, await store.configure(await jsonBody(request), (await store.adminName())!)); return }
       }
       if (path === '/api/orders/current' && method === 'GET') {
-        json(response, 200, { order: store.currentOrder(requireSession('customer').hash) })
+        json(response, 200, { order: await store.currentOrder((await requireSession('customer')).hash) })
         return
       }
       if (path === '/api/orders' && method === 'POST') {
-        const session = requireSession('customer', true)
+        const session = await requireSession('customer', true)
         limits.check(`order:${session.hash}`, 20, 15 * 60_000)
         const key = request.headers['idempotency-key']
         if (typeof key !== 'string') throw new StoreError(422, 'Falta Idempotency-Key.')
-        json(response, 200, store.createOrder(await jsonBody(request), session.hash, key))
+        json(response, 200, await store.createOrder(await jsonBody(request), session.hash, key))
         return
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path)
       if (orderPath && method === 'GET') {
-        json(response, 200, store.customerOrder(orderPath[1], requireSession('customer').hash))
+        json(response, 200, await store.customerOrder(orderPath[1], (await requireSession('customer')).hash))
         return
       }
       const uploadPath = new RegExp(`^/api/orders/(${ID})/receipt$`).exec(path)
       if (uploadPath && method === 'POST') {
-        const session = requireSession('customer', true)
+        const session = await requireSession('customer', true)
         limits.check(`upload:${session.hash}`, 20, 3600_000)
         limits.check(`upload-ip:${ip}`, 60, 3600_000)
         const type = request.headers['content-type'] ?? ''
@@ -142,22 +147,22 @@ export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = 
         catch { throw new StoreError(400, 'No se pudo leer el formulario del comprobante.') }
         const entries = [...form.entries()]
         if (entries.length !== 5 || new Set(entries.map(([key]) => key)).size !== 5 || entries.some(([key]) => !['code', 'bankReference', 'uploadKey', 'version', 'receipt'].includes(key))) throw new StoreError(422, 'El formulario contiene campos ausentes, repetidos o no permitidos.')
-        store.checkUpload(uploadPath[1], session.hash, form.get('code'))
+        await store.checkUpload(uploadPath[1], session.hash, form.get('code'))
         const file = form.get('receipt')
         if (!(file instanceof Blob)) throw new StoreError(422, 'Selecciona un comprobante.')
         if (file.size > MAX_RECEIPT_BYTES) throw new StoreError(413, 'El comprobante no puede superar 5 MB.')
         const version = form.get('version')
         if (typeof version !== 'string' || !/^[1-9]\d{0,8}$/.test(version)) throw new StoreError(422, 'Versión del pedido inválida.')
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type)
-        json(response, 200, store.addReceipt(uploadPath[1], session.hash, form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared))
+        json(response, 200, await store.addReceipt(uploadPath[1], session.hash, form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared))
         return
       }
       const receiptPath = new RegExp(`^/api/(admin/)?orders/(${ID})/receipts/(${ID})$`).exec(path)
       if (receiptPath && method === 'GET') {
-        if (receiptPath[1]) requireSession('admin')
-        else store.customerOrder(receiptPath[2], requireSession('customer').hash)
-        const receipt = store.receipt(receiptPath[2], receiptPath[3])
-        const order = store.getOrder(receiptPath[2])
+        if (receiptPath[1]) await requireSession('admin')
+        else await store.customerOrder(receiptPath[2], (await requireSession('customer')).hash)
+        const receipt = await store.receipt(receiptPath[2], receiptPath[3])
+        const order = await store.getOrder(receiptPath[2])
         const pdf = receipt.contentType === 'application/pdf'
         response.writeHead(200, {
           'Content-Type': receipt.contentType, 'Content-Length': receipt.data.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
@@ -168,18 +173,18 @@ export function makeShopHandler(store: ShopDatabase, options: ShopHttpOptions = 
         return
       }
       if (path === '/api/admin/orders' && method === 'GET') {
-        requireSession('admin')
-        json(response, 200, store.list(url.searchParams))
+        await requireSession('admin')
+        json(response, 200, await store.list(url.searchParams))
         return
       }
       const adminOrder = new RegExp(`^/api/admin/orders/(${ID})(?:/(confirm|reject))?$`).exec(path)
       if (adminOrder) {
-        requireSession('admin', method !== 'GET')
-        if (!adminOrder[2] && method === 'GET') { json(response, 200, { order: store.getOrder(adminOrder[1]), audit: store.auditFor(adminOrder[1]) }); return }
+        await requireSession('admin', method !== 'GET')
+        if (!adminOrder[2] && method === 'GET') { json(response, 200, { order: await store.getOrder(adminOrder[1]), audit: await store.auditFor(adminOrder[1]) }); return }
         if (method === 'POST' && adminOrder[2]) {
           const data = await jsonBody(request)
           const operation = adminOrder[2] === 'confirm' ? store.confirm.bind(store) : store.reject.bind(store)
-          json(response, 200, operation(adminOrder[1], data, store.adminName()!))
+          json(response, 200, await operation(adminOrder[1], data, (await store.adminName())!))
           return
         }
       }

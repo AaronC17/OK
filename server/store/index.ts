@@ -4,7 +4,7 @@ import { createShopRuntime } from './runtime.ts'
 try {
   const port = Number(process.env.STORE_API_PORT || '8788')
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('STORE_API_PORT debe estar entre 1024 y 65535.')
-  const runtime = createShopRuntime()
+  const runtime = await createShopRuntime()
   const server = createServer((request, response) => { void runtime.handler(request, response) })
   server.requestTimeout = 30_000
   server.headersTimeout = 15_000

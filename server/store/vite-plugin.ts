@@ -5,16 +5,16 @@ import { createShopRuntime } from './runtime.ts'
 export function shopApiPlugin(): Plugin {
   return {
     name: 'onkys-private-order-api',
-    configureServer(server) {
-      const runtime = createShopRuntime()
+    async configureServer(server) {
+      const runtime = await createShopRuntime()
       server.httpServer?.once('close', runtime.close)
       server.middlewares.use((request, response, next) => {
         if (request.url?.startsWith('/api/')) void runtime.handler(request, response)
         else next()
       })
     },
-    configurePreviewServer(server) {
-      const runtime = createShopRuntime()
+    async configurePreviewServer(server) {
+      const runtime = await createShopRuntime()
       server.httpServer.once('close', runtime.close)
       server.middlewares.use((request, response, next) => {
         if (request.url?.startsWith('/api/')) void runtime.handler(request, response)

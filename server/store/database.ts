@@ -9,12 +9,13 @@ import { constantEqual, createSession, findSession, passwordHash, passwordMatche
 import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { shippingFee } from '../../src/lib/shop.ts'
+import type { ShopRepository } from './repository.ts'
 
 const statuses: ShopOrderStatus[] = ['pending_details', 'awaiting_payment', 'pending_review', 'ready', 'rejected']
 type Row = Record<string, SQLInputValue>
 const timestamp = () => new Date().toISOString()
 
-export class ShopDatabase {
+export class ShopDatabase implements ShopRepository {
   readonly database: DatabaseSync
   private catalog: StoreConfig
 
