@@ -150,10 +150,10 @@ button, a, input, textarea { outline-offset: 4px; }
   margin: 25px 0 23px;
   background: linear-gradient(
     180deg,
-    #8a48b0 0%,
-    #522774 42%,
-    #35154b 82%,
-    #200a30 100%
+    #6e6774 0%,
+    #38323e 38%,
+    #1e1a22 75%,
+    #0f0d12 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -162,6 +162,7 @@ button, a, input, textarea { outline-offset: 4px; }
   display: inline-block;
 }
 .hero h1 > span {
+  display: inline-block;
   background: linear-gradient(
     180deg,
     #9c58c6 0%,
