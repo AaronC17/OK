@@ -14,3 +14,6 @@ references/*.png
 references/*.jpg
 references/*.jpeg
 references/*.webp
+
+.vercel
+.env*

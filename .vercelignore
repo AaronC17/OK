@@ -1,0 +1,8 @@
+node_modules
+dist
+.data
+.higgsfield
+references
+test-results*
+.git
+.env*.local
