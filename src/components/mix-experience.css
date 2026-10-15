@@ -12,7 +12,7 @@
   overflow: hidden;
   min-height: 50px;
   padding: 13px 26px;
-  border-radius: 12px;
+  border-radius: 12px !important;
   color: #ffffff;
   font-size: 13px;
   font-weight: 650;

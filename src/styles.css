@@ -54,17 +54,20 @@ button, a, input, textarea { outline-offset: 4px; }
 .button-primary:not(:disabled):hover { background: #503260; box-shadow: 0 4px 14px #38244815; }
 .button-outline { border-color: #d7cddb; background: transparent; color: var(--purple); }
 .button-outline:hover { background: #f0ebf3; }
-.hero-catalog-cta {
+.hero-catalog-cta,
+.experience-cta,
+.button.experience-cta {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   min-height: 50px;
   padding: 13px 26px;
-  border-radius: 12px;
+  border-radius: 12px !important;
   color: #ffffff;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.15px;
+  gap: 20px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(195, 162, 224, 0.38);
   background:
@@ -79,7 +82,9 @@ button, a, input, textarea { outline-offset: 4px; }
     0 2px 6px -1px rgba(56, 36, 72, 0.16);
   transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .22s ease;
 }
-.hero-catalog-cta::after {
+.hero-catalog-cta::after,
+.experience-cta::after,
+.button.experience-cta::after {
   content: '';
   position: absolute;
   inset: -50% -30%;
@@ -88,7 +93,9 @@ button, a, input, textarea { outline-offset: 4px; }
   transition: transform .65s cubic-bezier(.2,.8,.2,1);
   pointer-events: none;
 }
-.hero-catalog-cta:hover {
+.hero-catalog-cta:hover,
+.experience-cta:hover,
+.button.experience-cta:hover {
   color: #ffffff;
   transform: translateY(-1px);
   border-color: rgba(220, 190, 245, 0.55);
@@ -101,23 +108,33 @@ button, a, input, textarea { outline-offset: 4px; }
     0 12px 30px -4px rgba(56, 36, 72, 0.42),
     0 3px 8px -1px rgba(56, 36, 72, 0.22);
 }
-.hero-catalog-cta:hover::after {
+.hero-catalog-cta:hover::after,
+.experience-cta:hover::after,
+.button.experience-cta:hover::after {
   transform: translateX(110%);
 }
-.hero-catalog-cta svg {
+.hero-catalog-cta svg,
+.experience-cta svg,
+.button.experience-cta svg {
   transition: transform .2s ease;
 }
-.hero-catalog-cta:hover svg {
+.hero-catalog-cta:hover svg,
+.experience-cta:hover svg,
+.button.experience-cta:hover svg {
   transform: translateX(2px);
 }
-.hero-catalog-cta:active {
+.hero-catalog-cta:active,
+.experience-cta:active,
+.button.experience-cta:active {
   transform: translateY(1px);
   box-shadow:
     inset 0 1.5px 3px 0 rgba(0, 0, 0, 0.4),
     inset 0 -1px 2px 0 rgba(255, 255, 255, 0.25),
     0 4px 12px -2px rgba(56, 36, 72, 0.25);
 }
-.hero-catalog-cta:focus-visible { outline-color: #9c7bb1; }
+.hero-catalog-cta:focus-visible,
+.experience-cta:focus-visible,
+.button.experience-cta:focus-visible { outline-color: #9c7bb1; }
 .icon-button { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: transparent; flex-shrink: 0; transition: background .18s; }
 .icon-button:hover { background: #eee8f0; }
 .text-button { padding: 9px 0; font-size: 13px; background: transparent; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: underline; text-underline-offset: 4px; }
@@ -180,11 +197,11 @@ button, a, input, textarea { outline-offset: 4px; }
 }
 .hero-copy > p { font-size: 14px; line-height: 1.85; color: #5d5664; margin-bottom: 27px; }
 .hero-copy > p > span { color: #6c6174; }
-.hero .button { font-size: 12px; gap: 24px; }
+.hero .button { font-size: 13px; gap: 20px; }
 .hero-secondary { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #716778; margin-top: 18px; width: fit-content; }
 .hero-secondary:hover { color: var(--purple); }
 .hero-visual { position: relative; margin: 20px 20px 20px 17px; min-width: 0; }
-.hero-photo { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; object-position: center 49%; border-radius: 8px; filter: saturate(.87) drop-shadow(0 30px 28px #2a163659) drop-shadow(0 7px 10px #2a16363d); }
+.hero-photo { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; object-position: center 49%; border-radius: 8px; filter: saturate(.87) drop-shadow(0 30px 28px #2a163659) drop-shadow(0 7px 10px #2a16363d); transform: scale(0.97); transform-origin: center; }
 .hero-photo-label { position: absolute; top: 18px; left: 18px; border-radius: 30px; padding: 10px 14px; background: #fcf9f4f2; font-size: 10px; color: var(--purple); display: flex; align-items: center; gap: 8px; }
 .hero-mini-card { position: absolute; width: 174px; bottom: 27px; left: -25px; background: #fffef9; border-radius: 9px; padding: 8px; box-shadow: 6px 10px 25px #29193335; transform: rotate(-6deg); transition: transform .3s; }
 .hero-mini-card:hover { transform: rotate(-3deg) translateY(-4px); }
