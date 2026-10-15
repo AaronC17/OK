@@ -5,6 +5,7 @@ Chamoy Mega and Tajin are preserved untouched; the secreto bottle is retired.
 """
 import json
 from pathlib import Path
+from shutil import copyfile
 
 import numpy as np
 from PIL import Image, ImageFilter
@@ -53,4 +54,5 @@ previous = json.loads((OUTPUT / 'seasoning-bottles.json').read_text(encoding='ut
 kept = [asset for asset in previous['assets'] if asset['name'] in ('chamoy', 'tajin')]
 merged = {'round': f"{previous['round']} + {manifest['round']}", 'model': manifest['model'], 'generated': True, 'assets': [*kept, limon]}
 (OUTPUT / 'seasoning-bottles.json').write_text(json.dumps(merged, indent=2), encoding='utf-8')
+copyfile(OUTPUT / 'seasoning-bottles.json', ROOT / 'src' / 'config' / 'seasoning-bottles.json')
 print('merged seasoning-bottles.json; secreto retired')

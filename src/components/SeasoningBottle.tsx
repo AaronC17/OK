@@ -1,4 +1,5 @@
-import bottles from '../../public/images/mix/seasoning-bottles.json'
+// The media preparation scripts mirror this metadata for Vite's module graph.
+import bottles from '../config/seasoning-bottles.json'
 
 /** Reference-guided Higgsfield packshots, cropped locally with real alpha.
  * The opening is the rotation pivot, keeping the pour attached to the bottle.

@@ -5,6 +5,7 @@ Tajin from round 01 is preserved untouched.
 """
 import json
 from pathlib import Path
+from shutil import copyfile
 
 import numpy as np
 from PIL import Image, ImageFilter
@@ -56,4 +57,5 @@ tajin = next(asset for asset in previous['assets'] if asset['name'] == 'tajin')
 merged = {'round': f"{previous['round']} + {manifest['round']}", 'model': manifest['model'], 'generated': True,
           'assets': [next(asset for asset in results if asset['name'] == 'chamoy'), tajin, next(asset for asset in results if asset['name'] == 'secreto')]}
 (OUTPUT / 'seasoning-bottles.json').write_text(json.dumps(merged, indent=2), encoding='utf-8')
+copyfile(OUTPUT / 'seasoning-bottles.json', ROOT / 'src' / 'config' / 'seasoning-bottles.json')
 print('merged seasoning-bottles.json; tajin preserved')

@@ -8,6 +8,13 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // Native Windows file watches can fail with EBUSY while images are replaced.
+      usePolling: process.platform === 'win32',
+      interval: 350,
+      binaryInterval: 1000,
+      ignored: ['**/test-results*/**', '**/playwright-report/**', '**/.data/**'],
+    },
     fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/.higgsfield/**', '**/references/**', '**/.data/**', '**/server/**', '**/*.sqlite', '**/*.sqlite-*', '**/admin-setup-token.txt', `${normalizePath(resolve(process.env.STORE_DATA_DIR || '.data/store'))}/**`] },
   },
 })

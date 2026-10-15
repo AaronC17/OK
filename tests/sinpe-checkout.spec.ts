@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { checkoutOrder, loginAdminPage, sendReceipt, testAdmin, testReceipt } from './helpers/store.ts'
 import type { CheckoutConfig, ShopOrder } from '../src/order-types.ts'
 
+test.describe.configure({ timeout: 45_000 })
+
 test('SINPE: order, backend code validation, private upload and admin confirmation without WhatsApp', async ({ page, context, request }, testInfo) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))

@@ -4,6 +4,7 @@ Requires Pillow, numpy, scipy and rembg. Source generations stay in .higgsfield.
 """
 import json
 from pathlib import Path
+from shutil import copyfile
 
 import numpy as np
 from PIL import Image, ImageFilter
@@ -51,3 +52,4 @@ for subject in manifest['subjects']:
     results.append({'name': name, 'image': f'/images/mix/{filename}', 'width': size[0], 'height': size[1], 'pivot': pivot, 'source': subject['reference'], 'generated': True})
     print(name, size, pivot, (OUTPUT / filename).stat().st_size, 'bytes')
 (OUTPUT / 'seasoning-bottles.json').write_text(json.dumps({'round': manifest['round'], 'model': manifest['model'], 'generated': True, 'assets': results}, indent=2), encoding='utf-8')
+copyfile(OUTPUT / 'seasoning-bottles.json', ROOT / 'src' / 'config' / 'seasoning-bottles.json')

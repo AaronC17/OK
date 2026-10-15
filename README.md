@@ -41,7 +41,7 @@ El frontend se compila en `dist/`, pero **publicar solo esa carpeta ya no basta*
 
 ## Cambiar los datos del negocio
 
-Editar **`src/config/store.ts`**. Toda la información comercial se encuentra allí; no es necesario cambiar los componentes.
+Editar **`src/config/store.ts`** para catálogo, precios y entrega; no es necesario cambiar los componentes. El destino SINPE se configura de forma privada desde administración.
 
 | Dato | Configuración |
 | --- | --- |
@@ -67,7 +67,7 @@ prices: { 100: 120000, 200: 220000, 500: 480000 }
 // ₡1.200, ₡2.200 y ₡4.800, respectivamente.
 ```
 
-Cada peso tiene un importe independiente. Los cálculos de líneas, subtotal y entrega utilizan exclusivamente enteros. El formato `es-CR` muestra el símbolo ₡, separa miles y conserva decimales cuando existen; el mensaje indica además `Moneda: CRC`. `null` significa **precio pendiente** y bloquea esa variante; no se interpreta como gratis.
+Cada peso tiene un importe independiente. Los cálculos de líneas, subtotal y entrega utilizan exclusivamente enteros. El formato `es-CR` muestra el símbolo ₡, separa miles y conserva decimales cuando existen; las instrucciones de pago identifican CRC. `null` significa **precio pendiente** y bloquea esa variante; no se interpreta como gratis.
 
 ### Gomitas y mezclas
 
@@ -105,7 +105,7 @@ Colocar las imágenes en **`public/images/`** y cambiar su ruta en la configurac
 
 Las tarjetas usan proporciones uniformes y `object-fit: cover`; el ampliador muestra la foto completa con `contain`. Si una imagen falla se usa `placeholder.svg`. Las imágenes bajo la portada tienen carga diferida. Fotos y fuente se sirven localmente, sin depender de servicios de imágenes en tiempo de ejecución.
 
-Iconos de **Lucide**, con relación 1:1 y trazo consistente. El icono de WhatsApp mantiene su `viewBox` cuadrado. Fuentes y atribuciones en **`ASSETS.md`**.
+Iconos de **Lucide**, con relación 1:1 y trazo consistente. Fuentes y atribuciones en **`ASSETS.md`**.
 
 ### Entrega
 

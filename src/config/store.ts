@@ -2,7 +2,8 @@ import type { StoreConfig } from '../types.ts'
 
 /**
  * CONFIGURACIÓN COMERCIAL
- * Moneda y teléfono confirmados por el usuario. Catálogo y precios de EJEMPLO.
+ * Moneda confirmada por el usuario. Catálogo y precios de EJEMPLO.
+ * El destino SINPE se configura desde administración, sin inferir un teléfono.
  * Todos los importes son enteros en céntimos: 120000 = ₡1.200.
  * Cada variante tiene su precio propio; no hay fórmulas por peso ni recargos implícitos.
  */

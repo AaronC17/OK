@@ -35,7 +35,7 @@ export default defineConfig({
     { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   ],
   webServer: {
-    command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${port}`,
+    command: 'node --experimental-strip-types scripts/testing/store-preview.ts',
     url: baseURL,
     reuseExistingServer: false,
     env: { NODE_ENV: 'test', STORE_DATA_DIR: process.env.ONKYS_E2E_DIR, STORE_PUBLIC_ORIGIN: baseURL, STORE_SECURE_COOKIES: 'false' },
