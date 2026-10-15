@@ -81,60 +81,34 @@
 .ingredient-photo { position: relative; width: 54px; height: 54px; border-radius: 13px; border: 2px solid #e4dfe7; padding: 4px; background: #faf7fc; display: flex; align-items: center; justify-content: center; }
 .ingredient-photo img { width: 100%; height: 100%; border-radius: 8px; object-fit: contain; }
 .film-ingredient > span { font-size: 9px; color: var(--muted); text-align: center; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.ingredient-tick { position: absolute; bottom: -5px; right: -5px; width: 19px; height: 19px; display: grid; place-items: center; background: #765389; border: 2px solid #fff; color: #fff; border-radius: 50%; }
-.ingredient-0 .ingredient-tick { animation: ingredient-one var(--cycle) infinite; }
-.ingredient-1 .ingredient-tick { animation: ingredient-two var(--cycle) infinite; }
-.ingredient-2 .ingredient-tick { animation: ingredient-three var(--cycle) infinite; }
-.ingredient-3 .ingredient-tick { animation: ingredient-four var(--cycle) infinite; }
-.ingredient-0 .ingredient-photo { animation: border-one var(--cycle) infinite; }
-.ingredient-1 .ingredient-photo { animation: border-two var(--cycle) infinite; }
-.ingredient-2 .ingredient-photo { animation: border-three var(--cycle) infinite; }
-.ingredient-3 .ingredient-photo { animation: border-four var(--cycle) infinite; }
+.ingredient-tick { position: absolute; bottom: -5px; right: -5px; width: 19px; height: 19px; display: grid; place-items: center; background: #765389; border: 2px solid #fff; color: #fff; border-radius: 50%; opacity: 0; }
 .mix-stage { position: relative; isolation: isolate; height: 306px; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, #fff 0%, #faf7fc 63%, #f3edf7 100%); border: 1px solid #eee6f3; border-radius: 14px; margin-top: 17px; contain: paint; }
-.mix-bowl-scene { position: absolute; inset: 0 0 17px; animation: bowl-scene var(--cycle) infinite; }
+.mix-bowl-scene { position: absolute; inset: 0 0 17px; }
 .bowl-illustration { display: block; width: 100%; height: 100%; position: absolute; inset: 0; overflow: visible; }
 .bowl-gummy, .spoon-motion, .spoon-head, .gummy-contact-shadows > ellipse, .tajin-grain, .limon-drop { transform-box: view-box; transform-origin: 0 0; }
 .sauce-pool { transform-box: view-box; transform-origin: 180px 203px; }
 .chamoy-bottle { transform-box: view-box; transform-origin: 140px 84px; }
 .tajin-shaker { transform-box: view-box; transform-origin: 231px 82px; }
 .limon-bottle { transform-box: view-box; transform-origin: 186px 84px; }
-.finished-mix { position: absolute; inset: 20px 0 39px; display: flex; justify-content: center; align-items: center; animation: finished-mix var(--cycle) infinite; }
-.mix-pouch { position: relative; overflow: hidden; width: 139px; height: 186px; border: 1px solid #cfc0d9; border-radius: 10px 10px 21px 21px; background: linear-gradient(105deg, #eee5f4 0%, #fff 15%, #fffafc 74%, #eadef0 100%); box-shadow: inset 4px 0 6px #ffffffc9, inset -3px 0 6px #bda7cb1a, 3px 12px 22px -9px #74538c42; display: flex; flex-direction: column; align-items: center; padding: 0 15px; }
-.mix-pouch::after { content: ''; position: absolute; inset: -40% -80%; pointer-events: none; background: linear-gradient(110deg, transparent 42%, #fff9 48%, #fffc 50%, transparent 57%); animation: pouch-shine var(--cycle) infinite; }
-.pouch-seal { width: 100%; border-bottom: 3px double #c4b4ce; height: 17px; }
-.pouch-brand { font-size: 29px; font-weight: 750; letter-spacing: -1.8px; margin-top: 9px; color: var(--purple); }
-.pouch-tagline { font-size: 5px; letter-spacing: 1.2px; color: #74617f; margin-top: 1px; }
-.pouch-window { position: relative; overflow: hidden; border: 1px solid #decedf; width: 94px; height: 68px; border-radius: 12px 12px 18px 18px; background: linear-gradient(130deg, #f8e5df90, #f2e7f1); margin-top: 13px; box-shadow: inset 0 2px 5px #7444530a; }
-.pouch-window::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(115deg, #fff6, transparent 35%, transparent 75%, #ffffff45); box-shadow: inset 0 0 0 2px #ffffff45; }
-.packaged-gummies { width: 100%; height: 100%; }
-.pouch-bottom { color: #74617f; font-size: 4.5px; letter-spacing: .6px; margin-top: 11px; }
-.finished-tick { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 50%; color: #45664e; background: #eaf1eb; border: 3px solid #fff; position: absolute; left: calc(50% + 47px); top: calc(50% + 65px); animation: finish-tick var(--cycle) infinite; }
-.finish-sparkle { position: absolute; color: #af88c0; font-size: 23px; animation: finish-sparkle var(--cycle) infinite; }
+.finished-mix { position: absolute; inset: 20px 0 39px; display: flex; justify-content: center; align-items: center; opacity: 0; }
+.finished-package { position: relative; width: 155px; height: 206px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 14px 22px rgba(116, 83, 140, 0.38)) drop-shadow(0 4px 10px rgba(56, 36, 72, 0.22)); }
+.finished-package-img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+.finished-tick { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 50%; color: #45664e; background: #eaf1eb; border: 3px solid #fff; position: absolute; left: calc(50% + 50px); top: calc(50% + 64px); opacity: 0; }
+.finish-sparkle { position: absolute; color: #af88c0; font-size: 23px; opacity: 0; }
 .sparkle-one { left: calc(50% - 104px); top: 27%; }
 .sparkle-two { left: calc(50% + 88px); top: 15%; font-size: 16px; }
 .sparkle-three { left: calc(50% + 100px); top: 61%; font-size: 22px; }
 .film-captions { position: absolute; bottom: 13px; left: 0; right: 0; height: 16px; text-align: center; font-size: 10px; color: #706078; }
-.film-captions > span { position: absolute; inset: 0; }
-.caption-season { animation: caption-season var(--cycle) infinite; }
-.caption-select { animation: caption-select var(--cycle) infinite; }
-.caption-mix { animation: caption-mix var(--cycle) infinite; }
-.caption-ready { animation: caption-ready var(--cycle) infinite; }
+.film-captions > span { position: absolute; inset: 0; opacity: 0; }
+.caption-season { opacity: 1; }
 .film-timeline { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 20px; }
 .film-step { position: relative; padding-top: 12px; text-align: center; font-size: 9px; color: #706078; }
 .film-step::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #eee8f2; }
-.film-step i { position: absolute; inset: 0 0 auto; height: 2px; background: #9276a4; transform-origin: left; }
-.film-step-1 i { animation: progress-one var(--cycle) linear infinite; }
-.film-step-2 i { animation: progress-two var(--cycle) linear infinite; }
-.film-step-3 i { animation: progress-three var(--cycle) linear infinite; }
-.film-bottom { display: flex; justify-content: flex-end; align-items: center; border-top: 1px solid #eee9f0; margin-top: 20px; padding-top: 12px; }
-.film-bottom > span { font-size: 9px; color: var(--muted); }
-.film-bottom button { display: inline-flex; justify-content: center; align-items: center; gap: 7px; color: #6c507d; background: transparent; border-radius: 6px; font-size: 10px; min-height: 36px; padding: 6px 7px; }
-.film-bottom button:hover { background: #f5f1f8; }
-.mix-film[data-paused="true"] *, .mix-film[data-paused="true"] *::before, .mix-film[data-paused="true"] *::after { animation-play-state: paused !important; }
+.film-step i { position: absolute; inset: 0 0 auto; height: 2px; background: #9276a4; transform-origin: left; transform: scaleX(0); }
+
 .mix-film[data-static="true"] *, .mix-film[data-static="true"] *::after { animation: none !important; }
 .mix-film[data-static="true"] .mix-bowl-scene, .mix-film[data-static="true"] .caption-season, .mix-film[data-static="true"] .caption-select, .mix-film[data-static="true"] .caption-mix { opacity: 0; }
 .mix-film[data-static="true"] .finished-mix, .mix-film[data-static="true"] .caption-ready { opacity: 1; }
-.mix-film[data-static="true"] .mix-pouch::after { display: none; }
 .mix-film[data-static="true"] .ingredient-tick { opacity: 1 !important; transform: scale(1) !important; }
 .mix-film[data-static="true"] .ingredient-photo { border-color: #9276a4 !important; }
 
@@ -182,8 +156,10 @@
   .film-ingredient > span { font-size: 8.5px; }
   .film-captions { font-size: 9px; }
   .film-bottom button { min-height: 44px; }
+  .finished-package { width: 140px; height: 186px; }
+  .finished-tick { left: calc(50% + 44px); top: calc(50% + 56px); width: 32px; height: 32px; }
 }
-@media (max-width: 360px) { .mix-film { padding: 13px; } .film-top > div { font-size: 10px; } .film-ingredients { gap: 5px; } .ingredient-photo { width: 42px; height: 42px; padding: 2px; } .film-ingredient > span { font-size: 8px; } .film-captions { font-size: 8px; } }
+@media (max-width: 360px) { .mix-film { padding: 13px; } .film-top > div { font-size: 10px; } .film-ingredients { gap: 5px; } .ingredient-photo { width: 42px; height: 42px; padding: 2px; } .film-ingredient > span { font-size: 8px; } .film-captions { font-size: 8px; } .finished-package { width: 125px; height: 166px; } .finished-tick { left: calc(50% + 38px); top: calc(50% + 48px); width: 28px; height: 28px; } }
 @media (prefers-reduced-motion: reduce) {
   /* Playback starts only after an explicit click when reduced motion is preferred. */
   .mix-film[data-static="false"] *, .mix-film[data-static="false"] *::after { animation-duration: var(--cycle) !important; animation-iteration-count: infinite !important; }

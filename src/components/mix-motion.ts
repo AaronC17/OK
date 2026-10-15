@@ -7,31 +7,165 @@ const transform = (x: number, y: number, rotation = 0, sx = 1, sy = sx) => `tran
 const screenY = (y: number, z: number) => 227 + z * .34 - y
 let baked: MixSimulation | undefined
 
+const warp = (triangle: readonly number[] | number[], mesh: Point2[]) => {
+  const [a, b, c] = triangle.map(index => GEL_MESH[index]), [p, q, r] = triangle.map(index => mesh[index])
+  const bx = b.x - a.x, by = b.y - a.y, cx = c.x - a.x, cy = c.y - a.y, determinant = bx * cy - cx * by
+  const xx = ((q.x - p.x) * cy - (r.x - p.x) * by) / determinant
+  const xy = ((r.x - p.x) * bx - (q.x - p.x) * cx) / determinant
+  const yx = ((q.y - p.y) * cy - (r.y - p.y) * by) / determinant
+  const yy = ((r.y - p.y) * bx - (q.y - p.y) * cx) / determinant
+  return `matrix(${round(xx)} ${round(yx)} ${round(xy)} ${round(yy)} ${round(p.x - xx * a.x - xy * a.y)} ${round(p.y - yx * a.x - yy * a.y)})`
+}
+
 export interface MixSceneMotion {
   animations: Animation[]
   setRunning: (running: boolean) => void
   dispose: () => void
 }
 
-export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
+export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | null): MixSceneMotion {
   const { frames, impacts } = baked ??= simulateMix()
   const animations: Animation[] = []
   const animate = (element: Element | null, keyframes: Keyframe[]) => {
     if (!element) return
     const last = keyframes.at(-1)!
     const animation = element.animate([...keyframes, { ...last, offset: 1 }], { duration: MIX_CYCLE, iterations: Infinity, easing: 'linear', fill: 'both' })
-    animation.pause()
     animations.push(animation)
   }
   const envelope = (selector: string, entries: [number, number, string?][]) => {
     animate(svg.querySelector(selector), entries.map(([time, opacity, motion]) => ({ offset: time / seconds, opacity, ...(motion ? { transform: motion } : {}) })))
   }
 
+  // Synchronize HTML film timeline, captions, bowl scene and ingredients to the exact same WAAPI timeline
+  if (container) {
+    // 1. Timeline progress bar
+    animate(container.querySelector('.film-step-1 i'), [
+      { offset: 0, transform: 'scaleX(0)' },
+      { offset: .33, transform: 'scaleX(1)' },
+      { offset: .96, transform: 'scaleX(1)' },
+      { offset: .9601, transform: 'scaleX(0)' },
+    ])
+    animate(container.querySelector('.film-step-2 i'), [
+      { offset: 0, transform: 'scaleX(0)' },
+      { offset: .33, transform: 'scaleX(0)' },
+      { offset: .68, transform: 'scaleX(1)' },
+      { offset: .96, transform: 'scaleX(1)' },
+      { offset: .9601, transform: 'scaleX(0)' },
+    ])
+    animate(container.querySelector('.film-step-3 i'), [
+      { offset: 0, transform: 'scaleX(0)' },
+      { offset: .68, transform: 'scaleX(0)' },
+      { offset: .96, transform: 'scaleX(1)' },
+      { offset: .9601, transform: 'scaleX(0)' },
+    ])
+
+    // 2. Bowl scene and finished pouch transitions
+    animate(container.querySelector('.mix-bowl-scene'), [
+      { offset: 0, opacity: 1, transform: 'translateY(0) scale(1)' },
+      { offset: .64, opacity: 1, transform: 'translateY(0) scale(1)' },
+      { offset: .70, opacity: 0, transform: 'translateY(12px) scale(.96)' },
+      { offset: .95, opacity: 0, transform: 'translateY(12px) scale(.96)' },
+      { offset: 1, opacity: 1, transform: 'translateY(0) scale(1)' },
+    ])
+    animate(container.querySelector('.finished-mix'), [
+      { offset: 0, opacity: 0, transform: 'translateY(22px) rotate(-6deg) scale(.9)' },
+      { offset: .68, opacity: 0, transform: 'translateY(22px) rotate(-6deg) scale(.9)' },
+      { offset: .73, opacity: 1, transform: 'translateY(-5px) rotate(2deg) scale(1.025)' },
+      { offset: .77, opacity: 1, transform: 'translateY(1px) rotate(-.6deg) scale(.995)' },
+      { offset: .81, opacity: 1, transform: 'translateY(0) rotate(0) scale(1)' },
+      { offset: .87, opacity: 1, transform: 'translateY(-3px) rotate(.5deg) scale(1)' },
+      { offset: .93, opacity: 1, transform: 'translateY(0) rotate(0) scale(1)' },
+      { offset: .97, opacity: 0, transform: 'translateY(-8px) rotate(2deg) scale(.98)' },
+      { offset: 1, opacity: 0, transform: 'translateY(22px) rotate(-6deg) scale(.9)' },
+    ])
+    animate(container.querySelector('.finished-tick'), [
+      { offset: 0, opacity: 0, transform: 'scale(.4)' },
+      { offset: .75, opacity: 0, transform: 'scale(.4)' },
+      { offset: .79, opacity: 1, transform: 'scale(1.15)' },
+      { offset: .82, opacity: 1, transform: 'scale(1)' },
+      { offset: .96, opacity: 1, transform: 'scale(1)' },
+      { offset: 1, opacity: 0, transform: 'scale(.4)' },
+    ])
+    container.querySelectorAll('.finish-sparkle').forEach(sparkle => {
+      animate(sparkle, [
+        { offset: 0, opacity: 0, transform: 'translateY(5px) scale(.4) rotate(-25deg)' },
+        { offset: .72, opacity: 0, transform: 'translateY(5px) scale(.4) rotate(-25deg)' },
+        { offset: .78, opacity: .8, transform: 'translateY(-3px) scale(1.1) rotate(8deg)' },
+        { offset: .84, opacity: .55, transform: 'translateY(0) scale(.85) rotate(0)' },
+        { offset: .90, opacity: .55, transform: 'translateY(0) scale(.85) rotate(0)' },
+        { offset: .96, opacity: 0, transform: 'translateY(5px) scale(.4) rotate(-25deg)' },
+      ])
+    })
+
+    // 3. Captions
+    animate(container.querySelector('.caption-season'), [
+      { offset: 0, opacity: 1, transform: 'translateY(0)' },
+      { offset: .195, opacity: 1, transform: 'translateY(0)' },
+      { offset: .215, opacity: 0, transform: 'translateY(-3px)' },
+      { offset: .97, opacity: 0, transform: 'translateY(-3px)' },
+      { offset: 1, opacity: 1, transform: 'translateY(0)' },
+    ])
+    animate(container.querySelector('.caption-select'), [
+      { offset: 0, opacity: 0, transform: 'translateY(3px)' },
+      { offset: .21, opacity: 0, transform: 'translateY(3px)' },
+      { offset: .23, opacity: 1, transform: 'translateY(0)' },
+      { offset: .30, opacity: 1, transform: 'translateY(0)' },
+      { offset: .33, opacity: 0, transform: 'translateY(3px)' },
+      { offset: 1, opacity: 0, transform: 'translateY(3px)' },
+    ])
+    animate(container.querySelector('.caption-mix'), [
+      { offset: 0, opacity: 0, transform: 'translateY(3px)' },
+      { offset: .32, opacity: 0, transform: 'translateY(3px)' },
+      { offset: .37, opacity: 1, transform: 'translateY(0)' },
+      { offset: .62, opacity: 1, transform: 'translateY(0)' },
+      { offset: .68, opacity: 0, transform: 'translateY(3px)' },
+      { offset: 1, opacity: 0, transform: 'translateY(3px)' },
+    ])
+    animate(container.querySelector('.caption-ready'), [
+      { offset: 0, opacity: 0, transform: 'translateY(3px)' },
+      { offset: .68, opacity: 0, transform: 'translateY(3px)' },
+      { offset: .74, opacity: 1, transform: 'translateY(0)' },
+      { offset: .94, opacity: 1, transform: 'translateY(0)' },
+      { offset: .97, opacity: 0, transform: 'translateY(3px)' },
+      { offset: 1, opacity: 0, transform: 'translateY(3px)' },
+    ])
+
+    // 4. Ingredient checkmarks & border pulses
+    const ingredientTimings = [
+      { on: .013, tick: .023, settle: .033 },
+      { on: .072, tick: .082, settle: .092 },
+      { on: .138, tick: .148, settle: .158 },
+      { on: .207, tick: .217, settle: .227 },
+    ]
+    ingredientTimings.forEach(({ on, tick, settle }, i) => {
+      animate(container.querySelector(`.ingredient-${i} .ingredient-tick`), [
+        { offset: 0, opacity: 0, transform: 'scale(.5)' },
+        { offset: on, opacity: 0, transform: 'scale(.5)' },
+        { offset: tick, opacity: 1, transform: 'scale(1.18)' },
+        { offset: settle, opacity: 1, transform: 'scale(1)' },
+        { offset: .94, opacity: 1, transform: 'scale(1)' },
+        { offset: 1, opacity: 0, transform: 'scale(.5)' },
+      ])
+      animate(container.querySelector(`.ingredient-${i} .ingredient-photo`), [
+        { offset: 0, borderColor: '#e4dfe7', transform: 'translateY(0)' },
+        { offset: on, borderColor: '#e4dfe7', transform: 'translateY(0)' },
+        { offset: tick, borderColor: '#9276a4', transform: 'translateY(-3px)' },
+        { offset: settle, borderColor: '#9276a4', transform: 'translateY(0)' },
+        { offset: .94, borderColor: '#9276a4', transform: 'translateY(0)' },
+        { offset: 1, borderColor: '#e4dfe7', transform: 'translateY(0)' },
+      ])
+    })
+  }
+
   mixBears.forEach((bear, index) => {
     const keyframes: Keyframe[] = []
     for (const frame of frames) {
       const body = frame.bears[index]
-      keyframes.push({ offset: frame.time / seconds, transform: transform(180 + body.x, screenY(body.y, body.z)), opacity: body.active ? 1 : 0 })
+      keyframes.push({
+        offset: frame.time / seconds,
+        transform: transform(180 + body.x, screenY(body.y, body.z)),
+        opacity: body.active ? 1 : 0,
+      })
     }
     animate(svg.querySelector(`[data-bear="${index}"]`), keyframes)
     animate(svg.querySelector(`[data-bear-shadow="${index}"]`), frames.map(frame => {
@@ -72,7 +206,10 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
   // A real depth order, including the entire spoon, replaces front/back duplicates.
   const contents = svg.querySelector('.mix-contents')!
   const nodes = [...mixBears.map((_, index) => svg.querySelector(`[data-bear="${index}"]`)!), svg.querySelector('.spoon-motion')!]
-  const wetCuts = mixBears.map((_, index) => svg.querySelector(`[data-wet-cut="${index}"]`)!)
+  const patches = mixBears.map((_, index) => GEL_TRIANGLES.map((triangle, patch) => ({
+    node: svg.querySelector<SVGGraphicsElement>(`[data-gel-patch="${index}-${patch}"]`)!,
+    triangle,
+  })))
   const menisci = mixBears.map((_, index) => svg.querySelector(`[data-meniscus="${index}"]`)!)
   const surface = svg.querySelector('.liquid-surface')!
   const rings = [...svg.querySelectorAll('.impact-ring')]
@@ -84,20 +221,8 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
   const contours = [...svg.querySelectorAll('.sauce-contour')]
   const handle = svg.querySelector('.spoon-handle')!, handleGlint = svg.querySelector('.spoon-handle-glint')!
   const spoonDrip = svg.querySelector('.spoon-drip')!, spoonCoating = svg.querySelector('.spoon-coating')!
-  const patches = mixBears.map((_, index) => GEL_TRIANGLES.map((triangle, patch) => ({
-    node: svg.querySelector(`[data-gel-patch="${index}-${patch}"]`)!, triangle,
-  })))
-  // Each photograph is a shared, triangulated texture. Head, belly and feet
-  // follow their own material points rather than scaling a rigid sprite.
-  const warp = (triangle: number[], mesh: Point2[]) => {
-    const [a, b, c] = triangle.map(index => GEL_MESH[index]), [p, q, r] = triangle.map(index => mesh[index])
-    const bx = b.x - a.x, by = b.y - a.y, cx = c.x - a.x, cy = c.y - a.y, determinant = bx * cy - cx * by
-    const xx = ((q.x - p.x) * cy - (r.x - p.x) * by) / determinant
-    const xy = ((r.x - p.x) * bx - (q.x - p.x) * cx) / determinant
-    const yx = ((q.y - p.y) * cy - (r.y - p.y) * by) / determinant
-    const yy = ((r.y - p.y) * bx - (q.y - p.y) * cx) / determinant
-    return `matrix(${round(xx)} ${round(yx)} ${round(xy)} ${round(yy)} ${round(p.x - xx * a.x - xy * a.y)} ${round(p.y - yx * a.x - yy * a.y)})`
-  }
+  const currentOrder = nodes.map((_, i) => i)
+
   const SURFACE_ANGLES = Array.from({ length: 64 }, (_, i) => {
     const angle = i / 64 * Math.PI * 2
     return { x: Math.cos(angle) * 102, z: Math.sin(angle) * 102 }
@@ -141,9 +266,28 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
       return a + (b - a) * progress
     }
 
-    nodes.map((node, i) => ({ node, depth: z(i), index: i })).sort((a, b) => a.depth - b.depth || a.index - b.index).forEach(({ node }, i) => {
-      if (contents.children[i] !== node) contents.insertBefore(node, contents.children[i] ?? null)
-    })
+    const depths = nodes.map((_, i) => z(i))
+    let orderChanged = false
+    for (let i = 1; i < currentOrder.length; i++) {
+      let j = i
+      while (j > 0) {
+        const prev = currentOrder[j - 1], curr = currentOrder[j]
+        if (depths[curr] < depths[prev] - 1.5) {
+          currentOrder[j - 1] = curr
+          currentOrder[j] = prev
+          orderChanged = true
+          j--
+        } else {
+          break
+        }
+      }
+    }
+    if (orderChanged) {
+      currentOrder.forEach((idx, i) => {
+        const node = nodes[idx]
+        if (contents.children[i] !== node) contents.insertBefore(node, contents.children[i] ?? null)
+      })
+    }
 
     const sauceHeight = (x: number, z: number) => {
       const a = sampleSurface(frame.surface, x, z), b = sampleSurface(next.surface, x, z)
@@ -154,10 +298,8 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
     const poses = frame.bears.map((body, i) => {
       const nextBody = next.bears[i]
       const x = body.x + (nextBody.x - body.x) * progress
-      const depth = z(i)
+      const depth = depths[i]
       const y = body.y + (nextBody.y - body.y) * progress
-      const mesh = body.mesh.map((point, j) => ({ x: point.x + (nextBody.mesh[j].x - point.x) * progress, y: point.y + (nextBody.mesh[j].y - point.y) * progress }))
-      patches[i].forEach(({ node, triangle }) => node.setAttribute('transform', warp(triangle, mesh)))
       return { x, y, z: depth, active: body.active, wetLine: body.wetLine + (nextBody.wetLine - body.wetLine) * progress, feet: {
         x: body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress,
         y: body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress,
@@ -166,9 +308,19 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
     })
 
     poses.forEach((body, i) => {
+      if (body.active) {
+        const fromMesh = frame.bears[i].mesh, toMesh = next.bears[i].mesh
+        const mesh = fromMesh.map((point, j) => ({
+          x: point.x + (toMesh[j].x - point.x) * progress,
+          y: point.y + (toMesh[j].y - point.y) * progress,
+        }))
+        const bearPatches = patches[i]
+        for (let p = 0; p < bearPatches.length; p++) {
+          bearPatches[p].node.setAttribute('transform', warp(bearPatches[p].triangle, mesh))
+        }
+      }
       const { x, y, z: depth } = body
       const line = y - sauceHeight(x, depth)
-      wetCuts[i].setAttribute('y', String(round(Math.min(line, body.wetLine))))
       const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
       menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
       menisci[i].setAttribute('opacity', String(round(body.active ? smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88 : 0)))
@@ -238,7 +390,7 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
       })
     }
 
-    if (time >= 4.2 && time <= 10.2) {
+    if (time >= 5.0 && time <= 10.2) {
       spoonActive = true
       const tool = frame.spoon, nextTool = next.spoon
       const sx = tool.x + (nextTool.x - tool.x) * progress, sy = tool.y + (nextTool.y - tool.y) * progress, sz = z(mixBears.length)
@@ -247,10 +399,10 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
       const length = Math.hypot(gx, gy), nx = -gy / length, ny = gx / length
       handle.setAttribute('d', `M${round(-nx * 3)} ${round(-ny * 3)}L${round(gx - nx * 3.5)} ${round(gy - ny * 3.5)}Q${round(gx * 1.035)} ${round(gy * 1.035)} ${round(gx + nx * 3.5)} ${round(gy + ny * 3.5)}L${round(nx * 3)} ${round(ny * 3)}Z`)
       handleGlint.setAttribute('d', `M${round(gx * .16 + nx)} ${round(gy * .16 + ny)}L${round(gx * .96 + nx)} ${round(gy * .96 + ny)}`)
-      spoonCoating.setAttribute('opacity', String(round(smooth((time - 4.95) / .4) * .96)))
+      spoonCoating.setAttribute('opacity', String(round(smooth((time - 5.5) / .4) * .96)))
       const lift = sy - sauceHeight(sx, sz) - 11, neck = 3.6 * (1 - smooth(lift / 34))
       const bottom = sauceY(sx, sz) - screenY(sy, sz)
-      spoonDrip.setAttribute('opacity', lift > 0 && lift < 34 && time > 9.3 ? '.9' : '0')
+      spoonDrip.setAttribute('opacity', lift > 0 && lift < 34 && time > 9.5 ? '.9' : '0')
       spoonDrip.setAttribute('d', `M-3 10Q${round(-neck)} ${round(bottom * .6)} -6 ${round(bottom)}Q0 ${round(bottom + 3)} 6 ${round(bottom)}Q${round(neck)} ${round(bottom * .6)} 3 10Z`)
       const priorTool = spoonAt(time - .04), vx = sx - priorTool.x, vz = sz - priorTool.z, speed = Math.hypot(vx, vz) || 1
       const direction = { x: vx / speed, z: vz / speed }
@@ -340,7 +492,28 @@ export function animateGummyBowl(svg: SVGSVGElement): MixSceneMotion {
 
   return {
     animations,
-    setRunning(value) { running = value; cancelAnimationFrame(request); sortDepth() },
-    dispose() { running = false; cancelAnimationFrame(request); animations.forEach(animation => animation.cancel()) },
+    setRunning(value) {
+      running = value
+      cancelAnimationFrame(request)
+      if (value) {
+        const master = animations[0]
+        if (master) {
+          const currentTime = master.currentTime
+          animations.forEach(a => {
+            if (a !== master) a.currentTime = currentTime
+            a.play()
+          })
+          master.play()
+        }
+        sortDepth()
+      } else {
+        animations.forEach(a => a.pause())
+      }
+    },
+    dispose() {
+      running = false
+      cancelAnimationFrame(request)
+      animations.forEach(animation => animation.cancel())
+    },
   }
 }

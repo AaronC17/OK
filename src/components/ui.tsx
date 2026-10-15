@@ -3,8 +3,8 @@ import type { ImgHTMLAttributes, ReactNode } from 'react'
 import { Icon } from './Icon.tsx'
 import { MAX_QUANTITY } from '../lib/shop.ts'
 
-export function ProductImage(props: ImgHTMLAttributes<HTMLImageElement>) {
-  return <img {...props} onError={event => {
+export function ProductImage({ decoding = 'async', ...props }: ImgHTMLAttributes<HTMLImageElement>) {
+  return <img decoding={decoding} {...props} onError={event => {
     const image = event.currentTarget
     if (!image.src.endsWith('/images/placeholder.svg')) image.src = '/images/placeholder.svg'
   }} />

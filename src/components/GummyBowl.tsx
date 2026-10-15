@@ -32,12 +32,8 @@ export const GummyBowl = memo(function GummyBowl() {
       {GEL_TRIANGLES.map((triangle, index) => {
         const points = triangle.map(vertex => GEL_MESH[vertex])
         const cx = points.reduce((sum, point) => sum + point.x, 0) / 3, cy = points.reduce((sum, point) => sum + point.y, 0) / 3
-        return <clipPath key={index} id={`${id}-gel-triangle-${index}`}><polygon points={points.map(point => `${cx + (point.x - cx) * 1.012},${cy + (point.y - cy) * 1.012}`).join(' ')} /></clipPath>
+        return <clipPath key={index} id={`${id}-gel-triangle-${index}`}><polygon points={points.map(point => `${cx + (point.x - cx) * 1.015},${cy + (point.y - cy) * 1.015}`).join(' ')} /></clipPath>
       })}
-      {mixBears.map((bear, index) => <g key={index} id={`${id}-gel-${index}`}>
-        {GEL_TRIANGLES.map((_, triangle) => <g key={triangle} data-gel-patch={`${index}-${triangle}`}><g clipPath={`url(#${id}-gel-triangle-${triangle})`}><use href={`#${id}-bear-${bear.image}`} /></g></g>)}
-      </g>)}
-      {mixBears.map((_, index) => <clipPath key={index} id={`${id}-wet-${index}`}><rect data-wet-cut={index} x="-45" y="30" width="90" height="90" /></clipPath>)}
     </defs>
     <ellipse cx="180" cy="261" rx="132" ry="15" fill={`url(#${id}-shadow)`} />
     <g className="bowl-vessel">
@@ -78,9 +74,21 @@ export const GummyBowl = memo(function GummyBowl() {
           </g>))}
         </g>
         <g className="mix-contents">
-          {mixBears.map((_, index) => <g className="bowl-gummy" data-bear={index} key={index} opacity="0">
-            <use href={`#${id}-gel-${index}`} />
-            <g clipPath={`url(#${id}-wet-${index})`} opacity=".8"><use href={`#${id}-gel-${index}`} filter={`url(#${id}-wet-coating)`} /></g>
+          {mixBears.map((bear, index) => <g className="bowl-gummy" data-bear={index} key={index} opacity="0">
+            <g className="gummy-body">
+              {GEL_TRIANGLES.map((_, triangle) => (
+                <g key={triangle} data-gel-patch={`${index}-${triangle}`}>
+                  <g clipPath={`url(#${id}-gel-triangle-${triangle})`}>
+                    <image
+                      href={`/images/mix/bear-${bear.image}.webp`}
+                      xlinkHref={`/images/mix/bear-${bear.image}.webp`}
+                      x="-14" y="-20.5" width="28" height="41"
+                      preserveAspectRatio="xMidYMid meet"
+                    />
+                  </g>
+                </g>
+              ))}
+            </g>
             <path className="gummy-meniscus" data-meniscus={index} d="M-10 0Q0 3.5 10 0" stroke="#bd5832" strokeWidth="1.7" strokeLinecap="round" opacity="0" />
           </g>)}
           <g className="mixing-spoon spoon-motion" opacity="0">

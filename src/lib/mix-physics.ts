@@ -52,24 +52,24 @@ export const clamp = (value: number) => Math.max(0, Math.min(1, value))
 export const smooth = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t) }
 const smoother = (value: number) => { const t = clamp(value); return t ** 3 * (10 + t * (-15 + 6 * t)) }
 export const floorHeight = (x: number, z: number) => .0022 * (x * x + z * z)
-export const stirStrength = (time: number) => smooth((time - 4.7) / .5) * (1 - smooth((time - 9.35) / .5))
+export const stirStrength = (time: number) => smooth((time - 5.3) / .4) * (1 - smooth((time - 9.5) / .4))
 
 // Uneven sweeping strokes: around the back, down the side, then fold inward.
 // Height is a separate dip/lift, while the hand stays above the rim as a pivot.
 const spoonStroke = [
-  { time: 4.25, x: 65, z: -30, height: 125 },
-  { time: 4.95, x: 44, z: -26, height: 23 },
-  { time: 5.40, x: 1, z: -44, height: 21 },
-  { time: 5.84, x: -46, z: -11, height: 18 },
-  { time: 6.28, x: -19, z: 29, height: 19 },
-  { time: 6.70, x: 23, z: 6, height: 27 },
-  { time: 7.10, x: 41, z: -28, height: 23 },
-  { time: 7.52, x: -7, z: -37, height: 19 },
-  { time: 7.94, x: -32, z: 8, height: 20 },
-  { time: 8.35, x: 1, z: 30, height: 22 },
-  { time: 8.78, x: 35, z: 0, height: 25 },
-  { time: 9.30, x: 38, z: 16, height: 32 },
-  { time: 10.3, x: 48, z: 28, height: 126 },
+  { time: 5.00, x: 65, z: -30, height: 125 },
+  { time: 5.42, x: 44, z: -26, height: 23 },
+  { time: 5.80, x: 1, z: -44, height: 21 },
+  { time: 6.25, x: -46, z: -11, height: 18 },
+  { time: 6.66, x: -19, z: 29, height: 19 },
+  { time: 7.04, x: 23, z: 6, height: 27 },
+  { time: 7.44, x: 41, z: -28, height: 23 },
+  { time: 7.86, x: -7, z: -37, height: 19 },
+  { time: 8.26, x: -32, z: 8, height: 20 },
+  { time: 8.66, x: 1, z: 30, height: 22 },
+  { time: 9.06, x: 35, z: 0, height: 25 },
+  { time: 9.50, x: 38, z: 16, height: 32 },
+  { time: 10.30, x: 48, z: 28, height: 126 },
 ]
 
 // Clamped cubic splines keep velocity AND acceleration continuous through each
@@ -107,7 +107,7 @@ export function spoonAt(time: number): SpoonPose {
   const gripX = 26 + x * .12, gripZ = -26 + z * .14
   const grip = { x: gripX, z: gripZ, y: y + Math.sqrt(116 ** 2 - (gripX - x) ** 2 - (gripZ - z) ** 2) }
   const screenDX = grip.x - x, screenDY = (grip.z - z) * .34 - (grip.y - y)
-  return { x, y, z, grip, angle: Math.atan2(screenDX, -screenDY) * 180 / Math.PI, headScale: Math.hypot(screenDX, screenDY) / 116, opacity: smooth((time - 4.2) / .3) * (1 - smooth((time - 9.95) / .35)) }
+  return { x, y, z, grip, angle: Math.atan2(screenDX, -screenDY) * 180 / Math.PI, headScale: Math.hypot(screenDX, screenDY) / 116, opacity: smooth((time - 5.0) / .25) * (1 - smooth((time - 9.95) / .35)) }
 }
 
 export const spoonHandleEnd = (spoon: SpoonPose): Point3 => spoon.grip
