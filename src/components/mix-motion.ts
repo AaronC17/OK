@@ -1,4 +1,5 @@
 import { clamp, floorHeight, GEL_MESH, GEL_RADII, GEL_TRIANGLES, GUMMY_RADIUS, LIQUID_LEVEL, MIX_CYCLE, mixBears, SAMPLE_RATE, sampleSurface, simulateMix, smooth, spoonAt, stirStrength, type MixSimulation, type Point2 } from '../lib/mix-physics.ts'
+import { createLemonPour } from './lemon-pour.ts'
 export { MIX_CYCLE } from '../lib/mix-physics.ts'
 
 const seconds = MIX_CYCLE / 1000
@@ -184,23 +185,19 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   envelope('.chamoy-flow', [[0, 0], [.26, 0], [.34, 1], [.78, 1], [.9, 0]])
   animate(svg.querySelector('.chamoy-stream'), [{ offset: 0, strokeDashoffset: '1' }, { offset: .26 / seconds, strokeDashoffset: '1' }, { offset: .45 / seconds, strokeDashoffset: '0' }, { offset: .78 / seconds, strokeDashoffset: '0' }, { offset: .9 / seconds, strokeDashoffset: '-1' }])
   envelope('.tajin-shaker', [[0, 0, 'translate(10px, -20px) rotate(0deg)'], [1.05, 0, 'translate(10px, -20px) rotate(0deg)'], [1.18, 1, 'translate(0px, 0px) rotate(0deg)'], [1.26, 1, 'translate(-3px, 4px) rotate(-8deg)'], [1.34, 1, 'translate(2px, -3px) rotate(6deg)'], [1.42, 1, 'translate(-3px, 4px) rotate(-8deg)'], [1.5, 1, 'translate(2px, -3px) rotate(6deg)'], [1.58, 1, 'translate(-3px, 4px) rotate(-8deg)'], [1.66, 1, 'translate(2px, -3px) rotate(6deg)'], [1.74, 1, 'translate(-2px, 3px) rotate(-6deg)'], [1.82, 1, 'translate(0px, 0px) rotate(0deg)'], [1.95, 0, 'translate(15px, -20px) rotate(10deg)']])
-  envelope('.limon-bottle', [[0, 0, 'translate(0px, -16px) scale(1)'], [2.05, 0, 'translate(0px, -16px) scale(1)'], [2.18, 1, 'translate(0px, 0px) scale(1)'], [2.25, 1, 'translate(0px, 2px) scale(.95, 1.04)'], [2.35, 1, 'translate(0px, 0px) scale(1)'], [2.45, 1, 'translate(0px, 2px) scale(.95, 1.04)'], [2.55, 1, 'translate(0px, 0px) scale(1)'], [2.65, 1, 'translate(0px, 2px) scale(.95, 1.04)'], [2.75, 1, 'translate(0px, 0px) scale(1)'], [2.85, 1, 'translate(0px, 0px) scale(1)'], [3.02, 0, 'translate(8px, -22px) scale(.95)']])
+  envelope('.limon-bottle', [[0, 0, 'translate(8px, -18px) rotate(-9deg)'], [2.05, 0, 'translate(8px, -18px) rotate(-9deg)'], [2.2, 1, 'translate(0px, 0px) rotate(0deg)'], [2.37, 1, 'translate(0px, 0px) rotate(-2.5deg)'], [2.65, 1, 'translate(0px, 0px) rotate(-1deg)'], [2.83, 1, 'translate(0px, 0px) rotate(7deg)'], [3.06, 0, 'translate(8px, -22px) rotate(16deg)']])
 
-  for (const [selector, count, start, spacing] of [['.tajin-grain', 32, 1.22, .016], ['.limon-drop', 8, 2.22, .065]] as const) {
-    for (let index = 0; index < count; index++) {
-      const begin = start + index * spacing
-      const duration = selector === '.limon-drop' ? .22 : .28 + (index % 4) * .02
-      const startX = selector === '.limon-drop' ? 181 + (index % 3) * 4 : 229 + (index % 4) * 2
-      const startY = selector === '.limon-drop' ? 84 : 82
-      const endX = selector === '.limon-drop' ? 178 + (index % 4) * 5 : 133 + ((index * 37) % 106)
-      const endY = 201 + ((index * 7) % 14)
-      const keyframes: Keyframe[] = [{ offset: 0, opacity: 0, transform: transform(startX, startY) }, { offset: (begin - .001) / seconds, opacity: 0, transform: transform(startX, startY) }]
-      for (let step = 0; step <= 12; step++) {
-        const progress = step / 12
-        keyframes.push({ offset: (begin + progress * duration) / seconds, opacity: step === 12 ? 0 : 1, transform: transform(startX + (endX - startX) * progress, startY + (endY - startY) * progress * progress, index * 23, 1, selector === '.limon-drop' ? .75 + progress * .4 : 1) })
-      }
-      animate(svg.querySelectorAll(selector)[index], keyframes)
+  for (let index = 0; index < 32; index++) {
+    const begin = 1.22 + index * .016
+    const duration = .28 + (index % 4) * .02
+    const startX = 229 + (index % 4) * 2, startY = 82
+    const endX = 133 + ((index * 37) % 106), endY = 201 + ((index * 7) % 14)
+    const keyframes: Keyframe[] = [{ offset: 0, opacity: 0, transform: transform(startX, startY) }, { offset: (begin - .001) / seconds, opacity: 0, transform: transform(startX, startY) }]
+    for (let step = 0; step <= 12; step++) {
+      const progress = step / 12
+      keyframes.push({ offset: (begin + progress * duration) / seconds, opacity: step === 12 ? 0 : 1, transform: transform(startX + (endX - startX) * progress, startY + (endY - startY) * progress * progress, index * 23) })
     }
+    animate(svg.querySelectorAll('.tajin-grain')[index], keyframes)
   }
 
   // A real depth order, including the entire spoon, replaces front/back duplicates.
@@ -211,6 +208,7 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     triangle,
   })))
   const menisci = mixBears.map((_, index) => svg.querySelector(`[data-meniscus="${index}"]`)!)
+  const sauceCuts = mixBears.map((_, index) => svg.querySelector(`[data-sauce-cut="${index}"]`)!)
   const surface = svg.querySelector('.liquid-surface')!
   const rings = [...svg.querySelectorAll('.impact-ring')]
   const beads = [...svg.querySelectorAll('.sauce-bead')]
@@ -222,6 +220,7 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   const handle = svg.querySelector('.spoon-handle')!, handleGlint = svg.querySelector('.spoon-handle-glint')!
   const spoonDrip = svg.querySelector('.spoon-drip')!, spoonCoating = svg.querySelector('.spoon-coating')!
   const currentOrder = nodes.map((_, i) => i)
+  const drawLemonPour = createLemonPour(svg)
 
   const SURFACE_ANGLES = Array.from({ length: 64 }, (_, i) => {
     const angle = i / 64 * Math.PI * 2
@@ -294,6 +293,7 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       return a + (b - a) * progress
     }
     const sauceY = (x: number, z: number) => screenY(sauceHeight(x, z), z)
+    drawLemonPour(time, x => sauceY(x - 180, 0))
 
     const poses = frame.bears.map((body, i) => {
       const nextBody = next.bears[i]
@@ -321,6 +321,8 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       }
       const { x, y, z: depth } = body
       const line = y - sauceHeight(x, depth)
+      // Opaque chamoy covers the submerged part of the deformed photograph.
+      sauceCuts[i].setAttribute('y', String(round(line)))
       const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
       menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
       menisci[i].setAttribute('opacity', String(round(body.active ? smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88 : 0)))

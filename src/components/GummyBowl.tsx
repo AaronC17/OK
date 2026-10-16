@@ -24,7 +24,9 @@ export const GummyBowl = memo(function GummyBowl() {
       <radialGradient id={`${id}-shadow`}><stop stopColor="#765284" stopOpacity=".22" /><stop offset="1" stopColor="#765284" stopOpacity="0" /></radialGradient>
       <radialGradient id={`${id}-contact`}><stop stopColor="#5b1e19" /><stop offset="1" stopColor="#5b1e19" stopOpacity="0" /></radialGradient>
       <radialGradient id={`${id}-chamoy`} cx=".36" cy=".24" r=".82"><stop stopColor="#c84529" /><stop offset=".38" stopColor="#a72d22" /><stop offset="1" stopColor="#681c1d" /></radialGradient>
+      <linearGradient id={`${id}-submerged-chamoy`} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ab3023" /><stop offset="1" stopColor="#781e1c" /></linearGradient>
       <linearGradient id={`${id}-stream`}><stop stopColor="#842322" /><stop offset=".45" stopColor="#c94627" /><stop offset=".7" stopColor="#ef8a48" /><stop offset="1" stopColor="#8e2420" /></linearGradient>
+      <linearGradient id={`${id}-limon-stream`} x1="0" y1="0" x2="1" y2="0"><stop stopColor="#c9cf98" stopOpacity=".78" /><stop offset=".38" stopColor="#f7f1c6" stopOpacity=".94" /><stop offset=".72" stopColor="#fffbe2" stopOpacity=".88" /><stop offset="1" stopColor="#d1d89f" stopOpacity=".78" /></linearGradient>
       <linearGradient id={`${id}-fold`} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#df7146" /><stop offset=".3" stopColor="#bd3c27" /><stop offset="1" stopColor="#701b1c" /></linearGradient>
       <filter id={`${id}-wet-coating`} colorInterpolationFilters="sRGB"><feColorMatrix type="matrix" values=".55 .14 0 0 .12  0 .4 0 0 .025  0 0 .3 0 .01  0 0 0 1 0" /></filter>
       <clipPath id={`${id}-interior`}><path d="M0-90H360V146H304C295 221 267 251 180 251S65 221 56 146H0Z" /></clipPath>
@@ -34,6 +36,12 @@ export const GummyBowl = memo(function GummyBowl() {
         const cx = points.reduce((sum, point) => sum + point.x, 0) / 3, cy = points.reduce((sum, point) => sum + point.y, 0) / 3
         return <clipPath key={index} id={`${id}-gel-triangle-${index}`}><polygon points={points.map(point => `${cx + (point.x - cx) * 1.015},${cy + (point.y - cy) * 1.015}`).join(' ')} /></clipPath>
       })}
+      {mixBears.map((_, index) => <g key={`coating-${index}`}>
+        <mask id={`${id}-gummy-silhouette-${index}`} maskUnits="userSpaceOnUse" x="-55" y="-55" width="110" height="110" style={{ maskType: 'alpha' }}>
+          <use href={`#${id}-gummy-body-${index}`} />
+        </mask>
+        <clipPath id={`${id}-submerged-${index}`}><rect data-sauce-cut={index} x="-55" y="55" width="110" height="110" /></clipPath>
+      </g>)}
     </defs>
     <ellipse cx="180" cy="261" rx="132" ry="15" fill={`url(#${id}-shadow)`} />
     <g className="bowl-vessel">
@@ -75,7 +83,7 @@ export const GummyBowl = memo(function GummyBowl() {
         </g>
         <g className="mix-contents">
           {mixBears.map((bear, index) => <g className="bowl-gummy" data-bear={index} key={index} opacity="0">
-            <g className="gummy-body">
+            <g className="gummy-body" id={`${id}-gummy-body-${index}`}>
               {GEL_TRIANGLES.map((_, triangle) => (
                 <g key={triangle} data-gel-patch={`${index}-${triangle}`}>
                   <g clipPath={`url(#${id}-gel-triangle-${triangle})`}>
@@ -88,6 +96,9 @@ export const GummyBowl = memo(function GummyBowl() {
                   </g>
                 </g>
               ))}
+            </g>
+            <g clipPath={`url(#${id}-submerged-${index})`}>
+              <rect className="gummy-sauce-cover" x="-55" y="-55" width="110" height="110" fill={`url(#${id}-submerged-chamoy)`} opacity=".90" mask={`url(#${id}-gummy-silhouette-${index})`} />
             </g>
             <path className="gummy-meniscus" data-meniscus={index} d="M-10 0Q0 3.5 10 0" stroke="#bd5832" strokeWidth="1.7" strokeLinecap="round" opacity="0" />
           </g>)}
@@ -125,7 +136,14 @@ export const GummyBowl = memo(function GummyBowl() {
       <g className="limon-bottle" opacity="0">
         <SeasoningBottle name="limon" x={186} y={92} height={78} rotation={225} />
       </g>
-      <g className="limon-juice">{Array.from({ length: 8 }, (_, index) => <path className="limon-drop" data-drop={index} key={index} d="M0-4C-5 1-3 5 0 5S5 1 0-4Z" fill="#eae5a4" fillOpacity=".85" stroke="#fffbd8" strokeWidth=".7" opacity="0" />)}</g>
+      <g className="limon-juice" opacity="0">
+        <path className="limon-stream" fill={`url(#${id}-limon-stream)`} />
+        <path className="limon-stream-glint" stroke="#fffef0" strokeOpacity=".62" strokeWidth=".85" strokeLinecap="round" strokeDasharray="7 11 4 13" />
+      </g>
+      <g className="limon-contact" opacity="0">
+        <ellipse className="limon-impact" ry="1" fill="#fff4cf" opacity="0" />
+        {[0, 1, 2].map(index => <ellipse key={index} className="limon-ripple" stroke="#f4d6ad" strokeWidth=".7" opacity="0" />)}
+      </g>
     </g>
     <g className="bowl-front">
       <path className="bowl-front-glass" d="M55 146C55 165 111 181 180 181S305 165 305 146C296 223 267 253 180 253S64 223 55 146Z" fill={`url(#${id}-glass)`} />
