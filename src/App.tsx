@@ -66,7 +66,7 @@ export default function App() {
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
         <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
         <div className="how-steps">
-          <article><span className="how-number">01</span><Icon name="heart" size={26} /><h3>Elige</h3><p>Tu tipo de gomita favorito.</p></article>
+          <article><span className="how-number">01</span><Icon name="bear" size={26} /><h3>Elige</h3><p>Tu tipo de gomita favorito.</p></article>
           <article><span className="how-number">02</span><Icon name="sliders" size={26} /><h3>Personaliza</h3><p>Tipos, mezclas y presentaciones en un mismo carrito.</p></article>
           <article><span className="how-number">03</span><Icon name="bank" size={28} /><h3>Paga con SINPE</h3><p>Registra tu pedido, usa su código en el SINPE y adjunta el comprobante para revisión.</p></article>
         </div>
