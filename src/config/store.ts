@@ -16,27 +16,27 @@ export const store: StoreConfig = {
   heroImage: '/images/bolsa-mix.webp',
   heroImageAlt: 'Bolsa transparente de gomitas enchiladas con chamoy y sticker de Onky’s',
   gummies: {
-    weights: [100, 200, 500],
+    weights: [100, 250, 500],
     types: [
       {
         id: 'ositos', name: 'Ositos', coatingLabel: 'enchilados', tag: 'Pequeños, con carácter',
         description: 'El antojo de siempre, con un giro picosito.',
         image: '/images/ositos-bolsa.webp', imageAlt: 'Bolsa de ositos enchilados con chamoy y sticker de Onky’s',
-        available: true, prices: { 100: 120000, 200: 220000, 500: 480000 },
+        available: true, prices: { 100: 120000, 250: 250000, 500: 480000 },
       },
       {
         id: 'tiritas', name: 'Tiritas', coatingLabel: 'enchiladas', tag: 'El lado más dulce',
         description: 'Capas de color y un toque de chile.',
         image: '/images/tiritas.jpg', imageAlt: 'Tiritas y gomitas azucaradas de colores',
         imagePosition: '50% 38%', available: true, visible: false, // Oculto por ahora; reactivar cuando vuelva al catálogo.
-        prices: { 100: 130000, 200: 240000, 500: 520000 },
+        prices: { 100: 120000, 250: 250000, 500: 520000 },
       },
       {
         id: 'gusanitos', name: 'Gusanitos', coatingLabel: 'enchilados', tag: 'Fuera de lo habitual',
         description: 'Dulces, divertidos y con ese toque de picante.',
         image: '/images/gusanitos.jpg', imageAlt: 'Gusanitos de gomita multicolor',
         available: true, visible: false, // Oculto por ahora; reactivar cuando vuelva al catálogo.
-        prices: { 100: 120000, 200: 230000, 500: 500000 },
+        prices: { 100: 120000, 250: 250000, 500: 500000 },
       },
     ],
     mixes: {
@@ -44,10 +44,10 @@ export const store: StoreConfig = {
       note: 'Elige un solo tipo o mezcla dos o tres. El peso es el total de la bolsa; las proporciones se coordinan con la tienda.',
       // Combinaciones explícitas. Precios provisionales, no suplementos calculados.
       combinations: [
-        { typeIds: ['ositos', 'tiritas'], prices: { 100: 140000, 200: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
-        { typeIds: ['ositos', 'gusanitos'], prices: { 100: 140000, 200: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
-        { typeIds: ['tiritas', 'gusanitos'], prices: { 100: 140000, 200: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
-        { typeIds: ['ositos', 'tiritas', 'gusanitos'], prices: { 100: 140000, 200: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['ositos', 'tiritas'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['ositos', 'gusanitos'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['tiritas', 'gusanitos'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['ositos', 'tiritas', 'gusanitos'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
       ],
     },
   },

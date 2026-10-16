@@ -21,7 +21,7 @@ const withAllGummies = (): StoreConfig => {
 const normalize = (text: string) => text.replaceAll('\u00a0', ' ')
 
 test('exactly three weights, independently priced for each type', () => {
-  assert.deepEqual(store.gummies.weights, [100, 200, 500])
+  assert.deepEqual(store.gummies.weights, [100, 250, 500])
   assert.equal(store.gummies.types.length, 3)
   for (const type of store.gummies.types) for (const weight of store.gummies.weights) {
     const line = resolveLine({ selection: { kind: 'gummy', typeIds: [type.id], weight }, quantity: 3 }, store)!
@@ -64,19 +64,19 @@ test('all combinations of two or three gummies work at all three weights', () =>
     assert.ok(line.options.includes('Mixto'))
     assert.ok(line.options.includes(`${weight} g en total por bolsa`))
   }
-  const selection = { kind: 'gummy' as const, typeIds: ['gusanitos', 'ositos'], weight: 200 as const }
+  const selection = { kind: 'gummy' as const, typeIds: ['gusanitos', 'ositos'], weight: 250 as const }
   assert.equal(selectionKey(selection), selectionKey({ ...selection, typeIds: ['ositos', 'gusanitos'] }))
 })
 
 test('mixtures never derive prices or allow unavailable ingredients', () => {
-  const item: CartItem = { selection: { kind: 'gummy', typeIds: ['gusanitos', 'ositos'], weight: 200 }, quantity: 2 }
+  const item: CartItem = { selection: { kind: 'gummy', typeIds: ['gusanitos', 'ositos'], weight: 250 }, quantity: 2 }
   const config = withAllGummies()
   config.gummies.mixes.enabled = false
   assert.equal(resolveLine(item, config), null)
   config.gummies.mixes.enabled = true
   config.gummies.mixes.combinations = []
   assert.equal(resolveLine(item, config), null)
-  config.gummies.mixes.combinations.push({ typeIds: ['ositos', 'gusanitos'], prices: { 100: 142123, 200: 271355, 500: 561223 } })
+  config.gummies.mixes.combinations.push({ typeIds: ['ositos', 'gusanitos'], prices: { 100: 142123, 250: 271355, 500: 561223 } })
   assert.equal(resolveLine(item, config)!.unitPriceMinor, 271355)
   assert.equal(resolveLine(item, config)!.lineTotalMinor, 542710)
   config.gummies.types[0].available = false
@@ -112,7 +112,7 @@ test('corrupt storage and old discontinued categories/weights are handled gracef
   assert.deepEqual(restoreCart(null, store), { items: [], changed: false })
   const restored = restoreCart(JSON.stringify({ version: 1, items: [gummy,
     { selection: { kind: 'poster', productId: 'formas', sizeId: 'small' }, quantity: 1 },
-    { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 250 }, quantity: 1 },
+    { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 200 }, quantity: 1 },
     { ...dessert, quantity: -2 }, null,
   ] }), store)
   assert.deepEqual(restored.items, [gummy])

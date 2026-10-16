@@ -21,7 +21,7 @@ async function main() {
     deliveryId: 'pickup', items: [
       { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 500 }, quantity: 1 },
       { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 },
-      { selection: { kind: 'gummy', typeIds: ['ositos', 'tiritas', 'gusanitos'], weight: 200 }, quantity: 1 },
+      { selection: { kind: 'gummy', typeIds: ['ositos', 'tiritas', 'gusanitos'], weight: 250 }, quantity: 1 },
     ],
   }, `demo-${randomUUID()}`) as DemoOrder
   assert.equal(order.demoOnly, true)

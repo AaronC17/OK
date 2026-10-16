@@ -13,7 +13,7 @@ var store = {
   heroImage: "/images/bolsa-mix.webp",
   heroImageAlt: "Bolsa transparente de gomitas enchiladas con chamoy y sticker de Onky\u2019s",
   gummies: {
-    weights: [100, 200, 500],
+    weights: [100, 250, 500],
     types: [
       {
         id: "ositos",
@@ -24,7 +24,7 @@ var store = {
         image: "/images/ositos-bolsa.webp",
         imageAlt: "Bolsa de ositos enchilados con chamoy y sticker de Onky\u2019s",
         available: true,
-        prices: { 100: 12e4, 200: 22e4, 500: 48e4 }
+        prices: { 100: 12e4, 250: 25e4, 500: 48e4 }
       },
       {
         id: "tiritas",
@@ -38,7 +38,7 @@ var store = {
         available: true,
         visible: false,
         // Oculto por ahora; reactivar cuando vuelva al catálogo.
-        prices: { 100: 13e4, 200: 24e4, 500: 52e4 }
+        prices: { 100: 12e4, 250: 25e4, 500: 52e4 }
       },
       {
         id: "gusanitos",
@@ -51,7 +51,7 @@ var store = {
         available: true,
         visible: false,
         // Oculto por ahora; reactivar cuando vuelva al catálogo.
-        prices: { 100: 12e4, 200: 23e4, 500: 5e5 }
+        prices: { 100: 12e4, 250: 25e4, 500: 5e5 }
       }
     ],
     mixes: {
@@ -59,10 +59,10 @@ var store = {
       note: "Elige un solo tipo o mezcla dos o tres. El peso es el total de la bolsa; las proporciones se coordinan con la tienda.",
       // Combinaciones explícitas. Precios provisionales, no suplementos calculados.
       combinations: [
-        { typeIds: ["ositos", "tiritas"], prices: { 100: 14e4, 200: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
-        { typeIds: ["ositos", "gusanitos"], prices: { 100: 14e4, 200: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
-        { typeIds: ["tiritas", "gusanitos"], prices: { 100: 14e4, 200: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
-        { typeIds: ["ositos", "tiritas", "gusanitos"], prices: { 100: 14e4, 200: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" }
+        { typeIds: ["ositos", "tiritas"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
+        { typeIds: ["ositos", "gusanitos"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
+        { typeIds: ["tiritas", "gusanitos"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
+        { typeIds: ["ositos", "tiritas", "gusanitos"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" }
       ]
     }
   },
@@ -297,7 +297,7 @@ function selection(value) {
   const data = object(value);
   if (data.kind === "gummy") {
     fields(data, ["kind", "typeIds", "weight"]);
-    if (!Array.isArray(data.typeIds) || data.typeIds.length < 1 || data.typeIds.length > 3 || ![100, 200, 500].includes(data.weight)) {
+    if (!Array.isArray(data.typeIds) || data.typeIds.length < 1 || data.typeIds.length > 3 || ![100, 250, 500].includes(data.weight)) {
       throw new PaymentsError(422, "La selecci\xF3n de gomitas es inv\xE1lida.");
     }
     const typeIds = data.typeIds.map((id) => text(id, 64)).sort();

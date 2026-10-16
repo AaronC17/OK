@@ -27,12 +27,12 @@ function selection(value: unknown): Selection {
   const data = object(value)
   if (data.kind === 'gummy') {
     fields(data, ['kind', 'typeIds', 'weight'])
-    if (!Array.isArray(data.typeIds) || data.typeIds.length < 1 || data.typeIds.length > 3 || ![100, 200, 500].includes(data.weight as number)) {
+    if (!Array.isArray(data.typeIds) || data.typeIds.length < 1 || data.typeIds.length > 3 || ![100, 250, 500].includes(data.weight as number)) {
       throw new PaymentsError(422, 'La selección de gomitas es inválida.')
     }
     const typeIds = data.typeIds.map(id => text(id, 64)).sort()
     if (new Set(typeIds).size !== typeIds.length) throw new PaymentsError(422, 'Hay ingredientes repetidos.')
-    return { kind: 'gummy', typeIds, weight: data.weight as 100 | 200 | 500 }
+    return { kind: 'gummy', typeIds, weight: data.weight as 100 | 250 | 500 }
   }
   if (data.kind === 'dessert') {
     fields(data, ['kind', 'productId', 'variantId'])

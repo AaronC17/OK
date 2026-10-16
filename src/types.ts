@@ -1,4 +1,4 @@
-export type Weight = 100 | 200 | 500
+export type Weight = 100 | 250 | 500
 export type Prices = Record<Weight, number | null>
 
 export interface GummyType {

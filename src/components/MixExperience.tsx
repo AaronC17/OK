@@ -47,7 +47,7 @@ export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
     <div className="experience-copy">
       <span className="eyebrow">RECETA ARTESANAL</span>
       <h2 id="experience-title">Ositos enchilados.</h2>
-      <p>Chamoy, Tajín y limón fresco sobre gomitas de osito, en 100, 200 o 500 g.</p>
+      <p>Chamoy, Tajín y limón fresco sobre gomitas de osito, en 100, 250 o 500 g.</p>
       <div className="experience-points">
         <span><span>01</span> Chamoy, Tajín y limón fresco.</span>
         <span><span>02</span> Mezcla suave y cobertura pareja.</span>
