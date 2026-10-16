@@ -114,20 +114,19 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
               <path d="M108 42 H192 A10 10 0 0 1 202 52 V53 H98 V52 A10 10 0 0 1 108 42 Z" fill="#5e3e76" opacity="0.5" />
               <rect x="98" y="89" width="104" height="4" fill="#7c5797" opacity="0.4" />
 
-              {/* Painted brand wordmark directly on truck body */}
+              {/* Painted brand wordmark directly on truck body (same typography as sticker/wordmark) */}
               <text
                 x="150"
-                y="74"
+                y="76"
                 textAnchor="middle"
-                fill="#fbf9fc"
-                fontFamily="'Inter', system-ui, -apple-system, sans-serif"
+                fill="#fbfaf9"
+                fontFamily="'DM Sans', sans-serif"
                 fontWeight="800"
-                fontSize="21"
-                letterSpacing="-1.1"
+                fontSize="22"
+                letterSpacing="-1.55px"
               >
-                Onky’s<tspan fill="#ff4d6d">.</tspan>
+                Onky’s<tspan fill="#b392ca" dx="0.5">.</tspan>
               </text>
-              <line x1="122" y1="81" x2="178" y2="81" stroke="#9e7bb8" strokeWidth="1.5" strokeLinecap="round" opacity="0.55" />
 
               {/* Cab */}
               <path
