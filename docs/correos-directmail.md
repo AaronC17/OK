@@ -51,3 +51,11 @@ Sin estas variables el correo queda **deshabilitado y el flujo de pedidos funcio
 - Pedidos sin correo del cliente (compatibilidad con pedidos previos) simplemente no disparan envío.
 - El remitente solo puede ser la dirección aprobada en DirectMail; para respuestas usa `MAIL_BCC` o el contacto de la tienda del pie del sitio.
 - Las plantillas y textos de los cuatro avisos viven en `server/store/mailer.ts`.
+
+## 5. Diseño y vistas previas
+
+- Los cuatro avisos comparten la identidad de la tienda: blanco cálido, violeta `#382448`, marca tipográfica y fotografía de las gomitas. La confirmación destaca el pago verificado, la preparación, el total y los datos de entrega.
+- HTML con tablas de presentación, estilos inline, ajustes móviles y versión de texto. La información del pedido sigue siendo legible aunque el cliente de correo bloquee las imágenes.
+- La foto optimizada para correo es `public/images/mail-gomitas-v1.png` (PNG, 268 × 358, derivada de `bolsa-mix.webp`). Se publica junto con la aplicación y se muestra a la mitad de su tamaño para pantallas de alta densidad.
+- `npm run mail:preview` regenera los cuatro ejemplos en `docs/mail-previews/`. Abre `3-confirmado.html` para revisar la confirmación de compra; sus imágenes son locales, por lo que puedes revisarla antes de desplegar.
+- El botón lleva a `STORE_PUBLIC_ORIGIN`, o a `https://onkys.shop` cuando no está configurado. El seguimiento se consulta desde el navegador donde se realizó la compra.
