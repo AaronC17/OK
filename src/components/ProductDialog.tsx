@@ -132,11 +132,6 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
     setTypeIds(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
   }
 
-  const weightPrice = (optionWeight: Weight): number | null => {
-    if (mode === 'single') return type?.prices[optionWeight] ?? null
-    const combo = store.gummies.mixes.combinations[0]
-    return combo?.prices[optionWeight] ?? null
-  }
 
   return <Modal open={open} onClose={onClose} titleId="product-title" className="product-dialog">
     <div className={`product-dialog-inner ${mode === 'mixed' ? 'is-mixed-dialog' : ''}`}>
@@ -199,13 +194,18 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
             </legend>
             <div className="weight-options">
               {store.gummies.weights.map(option => {
-                const optionPrice = weightPrice(option)
+                const isSelected = weight === option
                 return (
-                  <label key={option} className="choice-chip">
-                    <input type="radio" name="gummy-weight" value={option} checked={weight === option} onChange={() => setWeight(option)} />
+                  <label key={option} className={`choice-chip ${isSelected ? 'is-selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="gummy-weight"
+                      value={option}
+                      checked={isSelected}
+                      onChange={() => setWeight(option)}
+                    />
                     <span>
                       <strong>{option} g</strong>
-                      {optionPrice !== null && <small className="chip-price">{money(optionPrice, store)}</small>}
                     </span>
                   </label>
                 )

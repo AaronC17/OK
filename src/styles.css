@@ -473,42 +473,64 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .mix-mode { display: grid; grid-template-columns: repeat(2,1fr); gap: 9px; }
 .mode-option { position: relative; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; padding: 11px 8px; border: 1px solid #ddd6e2; border-radius: 6px; font-size: 12px; color: #716078; cursor: pointer; transition: border-color .18s, background .18s; }
 .mode-option:has(input:checked) { border-color: #745985; box-shadow: 0 0 0 1px #745985; background: #f0e9f4; color: var(--purple); }
-.choice-chip { position: relative; cursor: pointer; }
+.choice-chip {
+  position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.choice-chip:focus-within {
+  outline: none;
+}
+.choice-chip:has(input:focus-visible) {
+  outline: 2px solid #75548e;
+  outline-offset: 3px;
+  border-radius: 12px;
+}
 .choice-chip > span {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  border: 1.5px solid #e2dae8;
-  background: #ffffff;
-  min-height: 54px;
+  border: 2px solid #e3dae9;
+  background-color: #ffffff;
+  min-height: 48px;
   border-radius: 12px;
-  padding: 8px 6px;
-  transition: background .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(56, 36, 72, 0.04);
+  backface-visibility: hidden;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .choice-chip > span > strong {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
-  line-height: 1.2;
+  line-height: 1;
+  transition: color 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.choice-chip .chip-price {
-  font-size: 11px;
-  font-weight: 600;
-  color: #736280;
+@media (hover: hover) and (pointer: fine) {
+  .choice-chip:not(.is-selected):not(:has(input:checked)):hover > span {
+    border-color: #baa4cb;
+    background-color: #faf7fc;
+  }
 }
-.choice-chip:hover > span {
-  border-color: #bfa9cf;
+.choice-chip:active > span {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
 }
+.choice-chip.is-selected > span,
 .choice-chip:has(input:checked) > span {
-  background: var(--purple);
+  background-color: var(--purple);
   border-color: var(--purple);
-  color: #fff;
-  box-shadow: 0 6px 14px -4px rgba(56, 36, 72, 0.35);
+  box-shadow: 0 4px 14px -2px rgba(56, 36, 72, 0.36);
 }
-.choice-chip:has(input:checked) > span > strong { color: #fff; }
-.choice-chip:has(input:checked) .chip-price { color: rgba(255, 255, 255, 0.82); }
+.choice-chip.is-selected > span > strong,
+.choice-chip:has(input:checked) > span > strong {
+  color: #ffffff;
+}
 .option-note { display: flex; align-items: flex-start; gap: 7px; color: #706078; font-size: 11px; line-height: 1.65; margin-top: 14px; }
 .option-note svg { margin-top: 1px; }
 .configuration-bottom {
@@ -834,9 +856,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .gummy-type-svg { width: 30px; height: 30px; }
   .type-option-name { font-size: 11.5px; }
   .selection-check { width: 16px; height: 16px; right: 5px; top: 5px; }
-  .choice-chip > span { min-height: 48px; padding: 7px 6px; border-radius: 11px; }
+  .choice-chip > span { min-height: 46px; padding: 8px 6px; border-radius: 11px; }
   .choice-chip > span > strong { font-size: 13px; }
-  .choice-chip .chip-price { font-size: 10.5px; }
   .option-note { font-size: 10px; line-height: 1.5; margin-top: 9px; }
   .configuration-bottom { align-items: center; margin: 12px 0 10px; padding: 10px 12px; }
   .configuration-bottom .field-label { margin-bottom: 4px; }

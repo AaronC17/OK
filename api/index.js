@@ -1460,7 +1460,6 @@ function makeShopHandler(store2, options = {}) {
         const key = request.headers["idempotency-key"];
         if (typeof key !== "string") throw new StoreError(422, "Falta Idempotency-Key.");
         const created = await store2.createOrder(await jsonBody(request), session.hash, key);
-        await options.mailer?.notify("order.created", created);
         json(response, 200, created);
         return;
       }
