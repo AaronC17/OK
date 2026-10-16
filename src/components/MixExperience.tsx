@@ -25,7 +25,7 @@ export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     const preference = () => setReduced(media.matches)
     media.addEventListener('change', preference)
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: .1 })
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.15, rootMargin: '40px 0px' })
     if (root.current) observer.observe(root.current)
     const visibility = () => setTabVisible(!document.hidden)
     document.addEventListener('visibilitychange', visibility)

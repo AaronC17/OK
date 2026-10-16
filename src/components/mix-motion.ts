@@ -39,10 +39,16 @@ export interface MixSceneMotion {
 export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | null): MixSceneMotion {
   const { frames, impacts } = baked ??= simulateMix()
   const animations: Animation[] = []
+  let running = false
+  let hasStarted = false
+
   const animate = (element: Element | null, keyframes: Keyframe[]) => {
     if (!element) return
     const last = keyframes.at(-1)!
-    const animation = element.animate([...keyframes, { ...last, offset: 1 }], { duration: MIX_CYCLE, iterations: Infinity, easing: 'linear', fill: 'both' })
+    const finalFrames = last.offset === 1 ? keyframes : [...keyframes, { ...last, offset: 1 }]
+    const animation = element.animate(finalFrames, { duration: MIX_CYCLE, iterations: Infinity, easing: 'linear', fill: 'both' })
+    animation.pause()
+    animation.currentTime = 0
     animations.push(animation)
   }
   const envelope = (selector: string, entries: [number, number, string?][]) => {
@@ -188,6 +194,10 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
         opacity: body.active ? 1 : 0,
       })
     }
+    const lastBody = frames.at(-1)!.bears[index]
+    const lastTransform = transform(180 + lastBody.x, screenY(lastBody.y, lastBody.z))
+    keyframes.push({ offset: 10.35 / seconds, transform: lastTransform, opacity: 0 })
+    keyframes.push({ offset: 1, transform: initialTransform, opacity: 0 })
     animate(svg.querySelector(`[data-bear="${index}"]`), keyframes)
 
     const shadowKeyframes: Keyframe[] = []
@@ -209,13 +219,34 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
         opacity: Math.max(0, .24 - altitude / 450),
       })
     }
+    const lastFeet = lastBody.lobes[2]
+    const lastAltitude = Math.max(0, lastFeet.y - floorHeight(lastFeet.x, lastFeet.z) - GEL_RADII[2])
+    const lastShadowTransform = transform(180 + lastBody.x, screenY(floorHeight(lastBody.x, lastBody.z), lastBody.z), 0, 1 - Math.min(lastAltitude / 400, .5), .75)
+    shadowKeyframes.push({ offset: 10.35 / seconds, transform: lastShadowTransform, opacity: 0 })
+    shadowKeyframes.push({ offset: 1, transform: initialShadowTransform, opacity: 0 })
     animate(svg.querySelector(`[data-bear-shadow="${index}"]`), shadowKeyframes)
   })
   animate(svg.querySelector('.spoon-motion'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(180 + frame.spoon.x, screenY(frame.spoon.y, frame.spoon.z)), opacity: frame.spoon.opacity })))
   animate(svg.querySelector('.spoon-head'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(0, 0, frame.spoon.angle, 1, frame.spoon.headScale) })))
 
-  envelope('.sauce-pool', [[0, 0, 'scale(.4, .4)'], [.28, 0, 'scale(.4, .4)'], [.55, 1, 'scale(.65, .65)'], [.85, 1, 'scale(.92, .92)'], [1.2, 1, 'scale(1, 1)'], [10.3, 1, 'scale(1, 1)']])
-  envelope('.tajin-sediment', [[0, 0], [1.25, 0], [1.9, 1], [10.3, 1]])
+  envelope('.sauce-pool', [
+    [0, 0, 'scale(.4, .4)'],
+    [.28, 0, 'scale(.4, .4)'],
+    [.55, 1, 'scale(.65, .65)'],
+    [.85, 1, 'scale(.92, .92)'],
+    [1.2, 1, 'scale(1, 1)'],
+    [10.3, 1, 'scale(1, 1)'],
+    [10.35, 0, 'scale(.4, .4)'],
+    [seconds, 0, 'scale(.4, .4)'],
+  ])
+  envelope('.tajin-sediment', [
+    [0, 0],
+    [1.25, 0],
+    [1.9, 1],
+    [10.3, 1],
+    [10.35, 0],
+    [seconds, 0],
+  ])
   envelope('.chamoy-bottle', [[0, 0, 'translate(-12px, -18px) rotate(-8deg)'], [.15, 0, 'translate(-12px, -18px) rotate(-8deg)'], [.28, 1, 'translate(0px, 0px) rotate(0deg)'], [.8, 1, 'translate(0px, 0px) rotate(0deg)'], [.95, 0, 'translate(-10px, -20px) rotate(12deg)']])
   envelope('.chamoy-flow', [[0, 0], [.26, 0], [.34, 1], [.78, 1], [.9, 0]])
   animate(svg.querySelector('.chamoy-stream'), [{ offset: 0, strokeDashoffset: '1' }, { offset: .26 / seconds, strokeDashoffset: '1' }, { offset: .45 / seconds, strokeDashoffset: '0' }, { offset: .78 / seconds, strokeDashoffset: '0' }, { offset: .9 / seconds, strokeDashoffset: '-1' }])
@@ -295,7 +326,6 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   let ringsActive = false
   let spoonActive = false
   let request = 0
-  let running = false
 
   // Pre-allocated reusable structures to eliminate frame GC allocations
   const depths = new Float64Array(nodes.length)
@@ -306,12 +336,32 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   }))
 
   const sortDepth = () => {
-    const time = (Number(animations[0].currentTime) % MIX_CYCLE) / 1000
+    const master = animations[0]
+    if (!master) return
+    const time = (Number(master.currentTime) % MIX_CYCLE) / 1000
 
-    // When the bowl scene has faded out (10.4s to 15s), skip SVG mutations
-    if (time > 10.4) {
-      if (running) request = requestAnimationFrame(sortDepth)
-      return
+    // Before bears enter (< 3.2s) or after mixing finishes (> 10.35s), reset patches and bridges so the bowl stays pristine
+    if (time < 3.2 || time > 10.35) {
+      for (let i = 0; i < mixBears.length; i++) {
+        const bearPatches = patches[i]
+        for (let p = 0; p < bearPatches.length; p++) {
+          const bp = bearPatches[p]
+          if (bp.lastTransform !== '') {
+            bp.lastTransform = ''
+            bp.node.removeAttribute('transform')
+          }
+        }
+      }
+      bridges.forEach(bridge => {
+        if (bridge.lastOpacity !== 0) {
+          bridge.lastOpacity = 0
+          bridge.node.setAttribute('opacity', '0')
+        }
+      })
+      if (time > 10.35) {
+        if (running) request = requestAnimationFrame(sortDepth)
+        return
+      }
     }
 
     const index = Math.min(Math.floor(time * SAMPLE_RATE), frames.length - 1)
@@ -625,17 +675,26 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   return {
     animations,
     setRunning(value) {
+      if (running === value) return
       running = value
       cancelAnimationFrame(request)
       if (value) {
         const master = animations[0]
         if (master) {
-          const currentTime = master.currentTime
-          animations.forEach(a => {
-            if (a !== master) a.currentTime = currentTime
-            a.play()
-          })
-          master.play()
+          if (!hasStarted) {
+            animations.forEach(a => {
+              a.currentTime = 0
+              a.play()
+            })
+            hasStarted = true
+          } else {
+            const currentTime = master.currentTime
+            animations.forEach(a => {
+              if (a !== master) a.currentTime = currentTime
+              a.play()
+            })
+            master.play()
+          }
         }
         sortDepth()
       } else {
