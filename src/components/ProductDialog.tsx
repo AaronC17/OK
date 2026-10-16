@@ -136,8 +136,10 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
   return <Modal open={open} onClose={onClose} titleId="product-title" className="product-dialog">
     <div className={`product-dialog-inner ${mode === 'mixed' ? 'is-mixed-dialog' : ''}`}>
       <button className="icon-button modal-close" onClick={onClose} aria-label="Cerrar configuración"><Icon name="close" /></button>
-      <div className="product-visual">
-        <ProductImage key={image} src={image} alt={imageAlt} />
+      <div className="product-visual" data-weight={isGummy ? String(weight) : undefined}>
+        <div className="product-visual-stage">
+          <ProductImage key={image} src={image} alt={imageAlt} />
+        </div>
       </div>
       <div className="product-options">
         {!isGummy ? (
