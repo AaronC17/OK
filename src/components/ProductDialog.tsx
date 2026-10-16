@@ -7,9 +7,9 @@ import { Modal, ProductImage, Quantity } from './ui.tsx'
 
 export type ProductTarget = { kind: 'gummy'; typeId: string; mixed?: boolean } | { kind: 'dessert'; dessert: Dessert }
 
-export function ProductDialog({ target, open, onClose, onAdd, onZoom }: {
+export function ProductDialog({ target, open, onClose, onAdd }: {
   target: ProductTarget; open: boolean; onClose: () => void; onAdd: (item: CartItem) => void
-  onZoom: (image: { src: string; alt: string; name: string }) => void
+  onZoom?: (image: { src: string; alt: string; name: string }) => void
 }) {
   const initialMix = target.kind === 'gummy' && !!target.mixed && store.gummies.mixes.enabled
   const [mode] = useState<'single' | 'mixed'>(initialMix ? 'mixed' : 'single')
@@ -28,7 +28,6 @@ export function ProductDialog({ target, open, onClose, onAdd, onZoom }: {
   const line = enoughTypes ? resolveLine({ selection, quantity }, store) : null
   const image = line?.image ?? (isGummy ? type?.image : dessert?.image) ?? '/images/placeholder.svg'
   const imageAlt = line?.imageAlt ?? (isGummy ? type?.imageAlt : dessert?.imageAlt) ?? 'Producto por actualizar'
-  const name = isGummy ? 'Tu mezcla. Tus reglas.' : dessert!.name
 
   const lockedSingle = isGummy && !(target.kind === 'gummy' && !!target.mixed)
   // El artículo Mixto siempre combina todos los tipos disponibles: sin
@@ -45,12 +44,17 @@ export function ProductDialog({ target, open, onClose, onAdd, onZoom }: {
       <button className="icon-button modal-close" onClick={onClose} aria-label="Cerrar configuración"><Icon name="close" /></button>
       <div className="product-visual">
         <ProductImage key={image} src={image} alt={imageAlt} />
-        <button className="zoom-button" onClick={() => onZoom({ src: image, alt: imageAlt, name: isGummy ? 'Tus gomitas' : name })}><Icon name="zoom" size={18} /> Ampliar foto</button>
       </div>
       <div className="product-options">
-        <span className="eyebrow">UN PEQUEÑO GUSTO, MUY TUYO</span>
-        <h2 id="product-title" className={isGummy ? 'product-title-brand' : ''}>{name}</h2>
-        <p className="muted">{isGummy ? (lockedMixed ? 'Siempre mixto. Elige los gramos.' : 'Elige tipos y gramos.') : dessert!.description}</p>
+        {!isGummy && <span className="eyebrow">UN PEQUEÑO GUSTO, MUY TUYO</span>}
+        {!isGummy ? (
+          <h2 id="product-title">{dessert!.name}</h2>
+        ) : (
+          <h2 id="product-title" className="sr-only">
+            {lockedMixed ? 'Personalizar gomitas mixtas' : `Personalizar ${type.name}`}
+          </h2>
+        )}
+        {!isGummy && <p className="muted">{dessert!.description}</p>}
         {isGummy ? <>
           {!lockedSingle && !lockedMixed && <fieldset>
             <legend>{store.gummies.mixes.enabled ? '02' : '01'} <span>{mode === 'mixed' ? 'Elige dos o tres favoritos' : 'Elige tu favorito'}</span></legend>
