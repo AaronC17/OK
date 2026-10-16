@@ -28,29 +28,29 @@ var store = {
       },
       {
         id: "tiritas",
-        name: "Tiritas",
-        coatingLabel: "enchiladas",
+        name: "Aros",
+        coatingLabel: "enchilados",
         tag: "El lado m\xE1s dulce",
-        description: "Capas de color y un toque de chile.",
+        description: "Aros frutales con cobertura de chamoy y chile.",
         image: "/images/tiritas.jpg",
-        imageAlt: "Tiritas y gomitas azucaradas de colores",
+        imageAlt: "Aros de gomita enchilados con chamoy",
         imagePosition: "50% 38%",
         available: true,
         visible: false,
-        // Oculto por ahora; reactivar cuando vuelva al catálogo.
+        // Oculto como tarjeta individual; disponible en el mix.
         prices: { 100: 12e4, 250: 25e4, 500: 52e4 }
       },
       {
         id: "gusanitos",
-        name: "Gusanitos",
+        name: "Gusanos",
         coatingLabel: "enchilados",
         tag: "Fuera de lo habitual",
-        description: "Dulces, divertidos y con ese toque de picante.",
+        description: "Gusanos dulces y \xE1cidos con ese toque de picante.",
         image: "/images/gusanitos.jpg",
-        imageAlt: "Gusanitos de gomita multicolor",
+        imageAlt: "Gusanos de gomita multicolor enchilados",
         available: true,
         visible: false,
-        // Oculto por ahora; reactivar cuando vuelva al catálogo.
+        // Oculto como tarjeta individual; disponible en el mix.
         prices: { 100: 12e4, 250: 25e4, 500: 5e5 }
       }
     ],

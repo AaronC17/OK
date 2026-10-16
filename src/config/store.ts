@@ -25,17 +25,17 @@ export const store: StoreConfig = {
         available: true, prices: { 100: 120000, 250: 250000, 500: 480000 },
       },
       {
-        id: 'tiritas', name: 'Tiritas', coatingLabel: 'enchiladas', tag: 'El lado más dulce',
-        description: 'Capas de color y un toque de chile.',
-        image: '/images/tiritas.jpg', imageAlt: 'Tiritas y gomitas azucaradas de colores',
-        imagePosition: '50% 38%', available: true, visible: false, // Oculto por ahora; reactivar cuando vuelva al catálogo.
+        id: 'tiritas', name: 'Aros', coatingLabel: 'enchilados', tag: 'El lado más dulce',
+        description: 'Aros frutales con cobertura de chamoy y chile.',
+        image: '/images/tiritas.jpg', imageAlt: 'Aros de gomita enchilados con chamoy',
+        imagePosition: '50% 38%', available: true, visible: false, // Oculto como tarjeta individual; disponible en el mix.
         prices: { 100: 120000, 250: 250000, 500: 520000 },
       },
       {
-        id: 'gusanitos', name: 'Gusanitos', coatingLabel: 'enchilados', tag: 'Fuera de lo habitual',
-        description: 'Dulces, divertidos y con ese toque de picante.',
-        image: '/images/gusanitos.jpg', imageAlt: 'Gusanitos de gomita multicolor',
-        available: true, visible: false, // Oculto por ahora; reactivar cuando vuelva al catálogo.
+        id: 'gusanitos', name: 'Gusanos', coatingLabel: 'enchilados', tag: 'Fuera de lo habitual',
+        description: 'Gusanos dulces y ácidos con ese toque de picante.',
+        image: '/images/gusanitos.jpg', imageAlt: 'Gusanos de gomita multicolor enchilados',
+        available: true, visible: false, // Oculto como tarjeta individual; disponible en el mix.
         prices: { 100: 120000, 250: 250000, 500: 500000 },
       },
     ],
