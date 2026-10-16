@@ -173,7 +173,7 @@ export class ShopDatabase implements ShopRepository {
       const destination = this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      const code = `ONK-${randomBytes(8).toString('hex').toUpperCase()}`
+      const code = `ONK-${randomBytes(3).toString('hex').toUpperCase()}`
       const now = timestamp()
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
@@ -191,17 +191,19 @@ export class ShopDatabase implements ShopRepository {
   assertCode(order: ShopOrder, supplied: unknown) {
     if (!constantEqual(order.code, orderCode(supplied))) throw new StoreError(422, 'El código no corresponde a este pedido. Copia exactamente el código mostrado.')
   }
-  checkUpload(id: string, owner: string, suppliedCode: unknown): ShopOrder {
+  checkUpload(id: string, owner: string, suppliedCode?: unknown): ShopOrder {
     const order = this.customerOrder(id, owner)
-    this.assertCode(order, suppliedCode)
+    if (suppliedCode !== undefined && suppliedCode !== null && suppliedCode !== '') this.assertCode(order, suppliedCode)
     return order
   }
   addReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt): ShopOrder {
-    const reference = bankReference(suppliedReference)
     const key = text(uploadKey, 16, 128, 'Identificador de carga')
     const expectedVersion = version(suppliedVersion)
     return this.transaction(() => {
       const order = this.checkUpload(id, owner, suppliedCode)
+      const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
+        ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
+        : bankReference(suppliedReference)
       const previous = this.database.prepare('SELECT * FROM receipts WHERE order_id = ? AND upload_key = ?').get(id, key)
       if (previous) {
         if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, 'La carga repetida contiene datos distintos. Actualiza el pedido.')

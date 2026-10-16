@@ -87,14 +87,13 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
       const created = await createOrder(cart.items, deliveryId, customer, privacy, attempt.current.key)
       flushSync(() => { setOrder(created); cart.clear(); setPreparing(false) })
       scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
-      scrollRef.current?.querySelector<HTMLElement>('#assigned-order-code')?.focus({ preventScroll: true })
     } catch (error) { setServerError(errorMessage(error)); setPreparing(false) }
   }
   const newOrder = () => { setOrder(null); setErrors({}); setServerError(''); onClose() }
 
   return <Modal open={open} onClose={onClose} titleId="cart-title" className="cart-drawer">
     <div className="cart-inner">
-      <header className="drawer-header"><div><span className="eyebrow">TUS PEQUEÑOS GUSTOS</span><h2 id="cart-title">{order ? 'Tu pedido' : 'Tu carrito'} {!order && <span>{cart.count}</span>}</h2></div><button className="icon-button" onClick={onClose} aria-label="Cerrar carrito"><Icon name="close" /></button></header>
+      <header className="drawer-header"><div><span className="eyebrow">{order ? 'PASARELA DE PAGO' : 'TUS PEQUEÑOS GUSTOS'}</span><h2 id="cart-title">{order ? 'Tu pedido' : 'Tu carrito'} {!order && <span>{cart.count}</span>}</h2></div><button className="icon-button" onClick={onClose} aria-label="Cerrar carrito"><Icon name="close" /></button></header>
       {cart.notice && !order && <p className="notice cart-notice" role="status"><Icon name="info" size={17} />{cart.notice}</p>}
       {serverError && <div className="checkout-server-error"><p className="field-error" role="alert">{serverError}</p><button type="button" className="text-button" disabled={loading} onClick={() => { void refresh() }}>Reintentar conexión</button></div>}
       {!order && !cart.lines.length ? <div className="empty-cart"><div className="empty-bag"><Icon name="bag" size={48} /></div><span className="eyebrow">AQUÍ CABEN TUS FAVORITOS</span><h3>{loading ? 'Consultando tu último pedido…' : 'Un buen momento por empezar.'}</h3><p>Elige tus favoritos.<br />Ahora puedes pedir y pagar con SINPE Móvil.</p><button className="button button-primary" onClick={() => { onClose(); document.getElementById('catalogo')?.scrollIntoView() }}>Explorar el catálogo <Icon name="arrow" size={18} /></button></div> : <>
@@ -117,12 +116,12 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
             </form>
           </>}
         </div>
-        <footer className="cart-footer"><dl className="order-totals"><div><dt>Subtotal</dt><dd>{money(amounts.subtotal, store)}</dd></div><div><dt>Entrega</dt><dd>{order?.delivery.name ?? method?.name ?? 'Por elegir'}</dd></div><div><dt>Costo de entrega</dt><dd>{amounts.shipping === null ? 'Envío por confirmar' : money(amounts.shipping, store)}</dd></div>{amounts.total !== null && <div className="total-row"><dt>Total</dt><dd>{money(amounts.total, store)}</dd></div>}</dl>
+        {!order && <footer className="cart-footer"><dl className="order-totals"><div><dt>Subtotal</dt><dd>{money(amounts.subtotal, store)}</dd></div><div><dt>Entrega</dt><dd>{method?.name ?? 'Por elegir'}</dd></div><div><dt>Costo de entrega</dt><dd>{amounts.shipping === null ? 'Envío por confirmar' : money(amounts.shipping, store)}</dd></div>{amounts.total !== null && <div className="total-row"><dt>Total</dt><dd>{money(amounts.total, store)}</dd></div>}</dl>
           {amounts.total === null && <p className="shipping-pending">No pagues todavía: falta confirmar el costo de envío.</p>}
           {errors.cart && <p className="field-error" role="alert">{errors.cart}</p>}
-          {!order && <><button form="checkout-form" type="submit" className="button button-primary checkout-button" disabled={preparing || loading || !config}><Icon name="bank" size={21} />{preparing ? 'Registrando tu pedido…' : 'Crear pedido con SINPE'}<Icon name="arrow" size={17} /></button><p className="checkout-footnote">El pedido se guarda aquí. El pago se confirma después de revisar el abono.</p></>}
+          <button form="checkout-form" type="submit" className="button button-primary checkout-button" disabled={preparing || loading || !config}><Icon name="bank" size={21} />{preparing ? 'Registrando tu pedido…' : 'Crear pedido con SINPE'}<Icon name="arrow" size={17} /></button><p className="checkout-footnote">El pedido se guarda aquí. El pago se confirma después de revisar el abono.</p>
           {store.demo && <p className="demo-small">Precios de productos de ejemplo · No envíes dinero real</p>}
-        </footer>
+        </footer>}
       </>}
     </div>
   </Modal>

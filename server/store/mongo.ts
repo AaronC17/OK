@@ -297,7 +297,7 @@ export class MongoShopDatabase implements ShopRepository {
       const destination = await this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      const code = `ONK-${randomBytes(8).toString('hex').toUpperCase()}`
+      const code = `ONK-${randomBytes(3).toString('hex').toUpperCase()}`
       const now = timestamp()
       const newOrder = {
         _id: id,
@@ -336,18 +336,20 @@ export class MongoShopDatabase implements ShopRepository {
     if (!constantEqual(order.code, orderCode(supplied))) throw new StoreError(422, 'El código no corresponde a este pedido. Copia exactamente el código mostrado.')
   }
 
-  async checkUpload(id: string, owner: string, suppliedCode: unknown): Promise<ShopOrder> {
+  async checkUpload(id: string, owner: string, suppliedCode?: unknown): Promise<ShopOrder> {
     const order = await this.customerOrder(id, owner)
-    this.assertCode(order, suppliedCode)
+    if (suppliedCode !== undefined && suppliedCode !== null && suppliedCode !== '') this.assertCode(order, suppliedCode)
     return order
   }
 
   async addReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt): Promise<ShopOrder> {
-    const reference = bankReference(suppliedReference)
     const key = text(uploadKey, 16, 128, 'Identificador de carga')
     const expectedVersion = version(suppliedVersion)
     return this.transaction(async session => {
       const order = await this.checkUpload(id, owner, suppliedCode)
+      const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
+        ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
+        : bankReference(suppliedReference)
       const previous = await this.collection('receipts').findOne({ order_id: id, upload_key: key }, { session })
       if (previous) {
         if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, 'La carga repetida contiene datos distintos. Actualiza el pedido.')

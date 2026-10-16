@@ -354,8 +354,8 @@ function bankReference(value) {
   return reference;
 }
 function orderCode(value) {
-  const code = text2(value, 20, 20, "C\xF3digo de pedido").toUpperCase();
-  if (!/^ONK-[A-F0-9]{16}$/.test(code)) throw new StoreError(422, "El c\xF3digo de pedido no tiene el formato esperado.");
+  const code = text2(value, 8, 20, "C\xF3digo de pedido").toUpperCase();
+  if (!/^ONK-[A-F0-9]{4,16}$/.test(code)) throw new StoreError(422, "El c\xF3digo de pedido no tiene el formato esperado.");
   return code;
 }
 function minorAmount(value, allowZero = false) {
@@ -635,7 +635,7 @@ var ShopDatabase = class {
       const destination = this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID();
-      const code = `ONK-${randomBytes2(8).toString("hex").toUpperCase()}`;
+      const code = `ONK-${randomBytes2(3).toString("hex").toUpperCase()}`;
       const now = timestamp();
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
@@ -670,15 +670,15 @@ var ShopDatabase = class {
   }
   checkUpload(id, owner, suppliedCode) {
     const order = this.customerOrder(id, owner);
-    this.assertCode(order, suppliedCode);
+    if (suppliedCode !== void 0 && suppliedCode !== null && suppliedCode !== "") this.assertCode(order, suppliedCode);
     return order;
   }
   addReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file) {
-    const reference = bankReference(suppliedReference);
     const key = text2(uploadKey, 16, 128, "Identificador de carga");
     const expectedVersion = version(suppliedVersion);
     return this.transaction(() => {
       const order = this.checkUpload(id, owner, suppliedCode);
+      const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
       const previous = this.database.prepare("SELECT * FROM receipts WHERE order_id = ? AND upload_key = ?").get(id, key);
       if (previous) {
         if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, "La carga repetida contiene datos distintos. Actualiza el pedido.");
@@ -1038,7 +1038,7 @@ var MongoShopDatabase = class {
       const destination = await this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID2();
-      const code = `ONK-${randomBytes3(8).toString("hex").toUpperCase()}`;
+      const code = `ONK-${randomBytes3(3).toString("hex").toUpperCase()}`;
       const now = timestamp2();
       const newOrder = {
         _id: id,
@@ -1077,15 +1077,15 @@ var MongoShopDatabase = class {
   }
   async checkUpload(id, owner, suppliedCode) {
     const order = await this.customerOrder(id, owner);
-    this.assertCode(order, suppliedCode);
+    if (suppliedCode !== void 0 && suppliedCode !== null && suppliedCode !== "") this.assertCode(order, suppliedCode);
     return order;
   }
   async addReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file) {
-    const reference = bankReference(suppliedReference);
     const key = text2(uploadKey, 16, 128, "Identificador de carga");
     const expectedVersion = version(suppliedVersion);
     return this.transaction(async (session) => {
       const order = await this.checkUpload(id, owner, suppliedCode);
+      const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
       const previous = await this.collection("receipts").findOne({ order_id: id, upload_key: key }, { session });
       if (previous) {
         if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, "La carga repetida contiene datos distintos. Actualiza el pedido.");
@@ -1429,7 +1429,8 @@ function makeShopHandler(store2, options = {}) {
           throw new StoreError(400, "No se pudo leer el formulario del comprobante.");
         }
         const entries = [...form.entries()];
-        if (entries.length !== 5 || new Set(entries.map(([key]) => key)).size !== 5 || entries.some(([key]) => !["code", "bankReference", "uploadKey", "version", "receipt"].includes(key))) throw new StoreError(422, "El formulario contiene campos ausentes, repetidos o no permitidos.");
+        const keys = entries.map(([key]) => key);
+        if (new Set(keys).size !== entries.length || keys.some((key) => !["code", "bankReference", "uploadKey", "version", "receipt"].includes(key)) || !["uploadKey", "version", "receipt"].every((req) => keys.includes(req))) throw new StoreError(422, "El formulario contiene campos ausentes, repetidos o no permitidos.");
         await store2.checkUpload(uploadPath[1], session.hash, form.get("code"));
         const file = form.get("receipt");
         if (!(file instanceof Blob)) throw new StoreError(422, "Selecciona un comprobante.");

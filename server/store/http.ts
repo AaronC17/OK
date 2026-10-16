@@ -146,7 +146,8 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         try { form = await new Response(new Uint8Array(bytes), { headers: { 'Content-Type': type } }).formData() }
         catch { throw new StoreError(400, 'No se pudo leer el formulario del comprobante.') }
         const entries = [...form.entries()]
-        if (entries.length !== 5 || new Set(entries.map(([key]) => key)).size !== 5 || entries.some(([key]) => !['code', 'bankReference', 'uploadKey', 'version', 'receipt'].includes(key))) throw new StoreError(422, 'El formulario contiene campos ausentes, repetidos o no permitidos.')
+        const keys = entries.map(([key]) => key)
+        if (new Set(keys).size !== entries.length || keys.some(key => !['code', 'bankReference', 'uploadKey', 'version', 'receipt'].includes(key)) || !['uploadKey', 'version', 'receipt'].every(req => keys.includes(req))) throw new StoreError(422, 'El formulario contiene campos ausentes, repetidos o no permitidos.')
         await store.checkUpload(uploadPath[1], session.hash, form.get('code'))
         const file = form.get('receipt')
         if (!(file instanceof Blob)) throw new StoreError(422, 'Selecciona un comprobante.')

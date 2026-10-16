@@ -48,10 +48,10 @@ export async function createOrder(items: CartItem[], deliveryId: string, custome
   return result
 }
 
-export function uploadReceipt(order: ShopOrder, code: string, bankReference: string, file: File, key: string) {
+export function uploadReceipt(order: ShopOrder, file: File, key: string) {
   const form = new FormData()
-  form.set('code', code)
-  form.set('bankReference', bankReference)
+  form.set('code', order.code)
+  form.set('bankReference', `${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
   form.set('version', String(order.version))
   form.set('uploadKey', key)
   form.set('receipt', file)

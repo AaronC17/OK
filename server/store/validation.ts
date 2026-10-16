@@ -30,8 +30,8 @@ export function bankReference(value: unknown): string {
   return reference
 }
 export function orderCode(value: unknown): string {
-  const code = text(value, 20, 20, 'Código de pedido').toUpperCase()
-  if (!/^ONK-[A-F0-9]{16}$/.test(code)) throw new StoreError(422, 'El código de pedido no tiene el formato esperado.')
+  const code = text(value, 8, 20, 'Código de pedido').toUpperCase()
+  if (!/^ONK-[A-F0-9]{4,16}$/.test(code)) throw new StoreError(422, 'El código de pedido no tiene el formato esperado.')
   return code
 }
 export function minorAmount(value: unknown, allowZero = false): number {

@@ -163,7 +163,7 @@ function AdminOrderDialog({ detail, onClose, onChanged }: { detail: OrderDetail;
             <h3>Comprobante adjunto</h3>
             <a className="text-button" href={receiptUrl} target="_blank" rel="noopener noreferrer" download><Icon name="download" size={14} />Descargar</a>
           </div>
-          <p className="small-note">Ref. bancaria: <strong>{order.receipt.bankReference}</strong></p>
+          <p className="small-note">Enviado: <strong>{orderDate(order.receipt.submittedAt)}</strong></p>
           {order.receipt.contentType === 'image/webp' ? (
             <a href={receiptUrl} target="_blank" rel="noopener noreferrer">
               <img className="admin-receipt-image" src={receiptUrl} alt={`Comprobante ${order.code}`} />

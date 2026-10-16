@@ -27,7 +27,7 @@ function setup(t: TestContext, configured = true) {
 test('store: server generates the code and freezes catalog prices, details and destination', t => {
   const { db, create, catalog } = setup(t)
   const order = create()
-  assert.match(order.code, /^ONK-[A-F0-9]{16}$/)
+  assert.match(order.code, /^ONK-[A-F0-9]{6}$/)
   assert.equal(order.totalMinor, 120000)
   assert.equal(order.status, 'awaiting_payment')
   assert.equal(order.demo, true)
