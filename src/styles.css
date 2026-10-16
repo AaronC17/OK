@@ -231,8 +231,9 @@ button, a, input, textarea { outline-offset: 4px; }
 .section-heading p { font-size: 12px; color: var(--muted); margin-top: 11px; }
 .section-side-note { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; font-size: 10px; padding-bottom: 2px; color: #74667d; }
 .product-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 25px; }
+.gummy-grid { grid-template-columns: repeat(2, minmax(0, 440px)); gap: 32px; }
 .product-card { min-width: 0; display: flex; flex-direction: column; }
-.mobile-mix-card { display: none; }
+.mobile-mix-card { display: flex; }
 .card-photo { position: relative; display: block; width: 100%; aspect-ratio: 1.25; padding: 0; border-radius: 8px; overflow: hidden; background: #eadfe7; }
 .card-photo > img { width: 100%; height: 100%; object-fit: cover; transition: transform .45s; filter: saturate(.88); }
 .card-photo.blended-card { background: var(--paper); aspect-ratio: 1 / 1; }
@@ -265,7 +266,7 @@ button, a, input, textarea { outline-offset: 4px; }
 .dessert-photo-wrap { position: relative; }
 .photo-zoom { position: absolute; bottom: 14px; right: 14px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fbfaf9ed; color: #514659; }
 .photo-zoom:hover { background: white; }
-.mix-invitation { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 17px; margin-top: 28px; padding: 18px 22px; border: 1px solid #e4dce9; border-radius: 9px; background: #f2edf4; }
+.mix-invitation { display: none; }
 .mix-invitation-icon { width: 43px; height: 43px; border: 1px solid #d7c7e1; border-radius: 12px; display: grid; place-items: center; color: #6a477f; }
 .mix-invitation strong { font-size: 13px; font-weight: 550; }
 .mix-invitation p { font-size: 11px; color: #72617e; line-height: 1.7; margin-top: 4px; }
@@ -606,7 +607,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .section-kicker { font-size: 8px; }
   .section-heading h2 { font-size: 25px; line-height: 1.18; max-width: 320px; margin-top: 8px; letter-spacing: -.9px; }
   .section-heading p { font-size: 11px; margin-top: 7px; line-height: 1.65; max-width: 310px; }
-  .product-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .product-grid, .gummy-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
   .product-card { border: 1px solid #e7e0ea; border-radius: 12px; background: #fff; overflow: hidden; box-shadow: 0 3px 12px #38244807, inset 0 1px 0 #fff; transition: border-color .18s, box-shadow .18s; }
   .product-card:focus-within { border-color: #a38bad; box-shadow: 0 4px 15px #38244810; }
   .mobile-mix-card { display: flex; }

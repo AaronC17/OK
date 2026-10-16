@@ -23,7 +23,7 @@ export function Catalog({ onProduct, onZoom }: {
           <button className="card-photo blended-card" onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} aria-label="Personalizar gomitas mixtas">
             <ProductImage src={store.heroImage} alt={store.heroImageAlt} width={800} height={800} /><span className="premium-badge">Más vendido</span><span className="photo-action"><Icon name="layers" size={20} /></span>
           </button>
-          <div className="product-card-info"><div className="product-card-title"><h3>Mixto <span>dos o tres tipos</span></h3></div><p>Combina dos o tres favoritos.</p>
+          <div className="product-card-info"><div className="product-card-title"><h3>Mixto <span>dos o tres tipos</span></h3><span className="product-number">01</span></div><p>Combina dos o tres favoritos.</p>
             <div className="product-card-footer"><div><span className="price-from">Desde</span><strong>{startingPrice(store.gummies.mixes.combinations.flatMap(combination => Object.values(combination.prices)))}</strong></div><button className="product-action" onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} aria-label="Elegir presentación de gomitas mixtas">Personalizar <span className="action-icon"><Icon name="plus" size={17} /></span></button></div>
           </div>
         </article>}
@@ -34,7 +34,7 @@ export function Catalog({ onProduct, onZoom }: {
           {!type.available && <span className="unavailable-badge">No disponible</span>}
         </button>
         <div className="product-card-info">
-          <div className="product-card-title"><h3>{type.name} <span>{type.coatingLabel}</span></h3><span className="product-number">0{index + 1}</span></div>
+          <div className="product-card-title"><h3>{type.name} <span>{type.coatingLabel}</span></h3><span className="product-number">0{index + 2}</span></div>
           <p>{type.description}</p>
           <div className="product-card-footer"><div><span className="price-from">Desde</span><strong>{startingPrice(Object.values(type.prices))}</strong></div><button className="product-action" disabled={!type.available} onClick={() => onProduct({ kind: 'gummy', typeId: type.id })} aria-label={`Elegir presentación de ${type.name}`}>Personalizar <span className="action-icon"><Icon name="plus" size={17} /></span></button></div>
         </div>

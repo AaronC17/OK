@@ -81,7 +81,7 @@ test('mobile hero is centered and product cards are compact with two columns', a
   await expect(ositosDialog.getByText('Elige los gramos', { exact: false })).toBeVisible()
 })
 
-test('desktop keeps its original grid and headline font', async ({ page }, testInfo) => {
+test('desktop keeps its headline font and shows both gummy cards', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop layout check.')
   await page.goto('/')
   const layout = await page.evaluate(() => ({
@@ -90,9 +90,9 @@ test('desktop keeps its original grid and headline font', async ({ page }, testI
     cards: document.querySelectorAll('#gomitas .product-card').length,
     border: getComputedStyle(document.querySelector('#gomitas .product-card')!).borderTopWidth,
   }))
-  expect(layout.gridColumns).toBe(3)
+  expect(layout.gridColumns).toBe(2)
   expect(layout.headlineFont).toContain('DM Sans')
   expect(layout.cards).toBe(2)
-  expect(page.locator('.mobile-mix-card')).toBeHidden()
+  await expect(page.locator('.mobile-mix-card')).toBeVisible()
   expect(layout.border).toBe('0px')
 })
