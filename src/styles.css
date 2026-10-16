@@ -341,10 +341,10 @@ summary::-webkit-details-marker { display: none; }
    En 500g alcanza la escala máxima (1.0) respetando el margen de seguridad para que NUNCA se corte.
    En 250g y 100g escala proporcionalmente hacia abajo manteniéndose apoyada en la base. */
 .product-visual[data-weight="100"] .product-visual-stage {
-  transform: scale(0.76);
+  transform: scale(0.88);
 }
 .product-visual[data-weight="250"] .product-visual-stage {
-  transform: scale(0.88);
+  transform: scale(0.94);
 }
 .product-visual[data-weight="500"] .product-visual-stage {
   transform: scale(1);
@@ -872,8 +872,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .product-visual-stage > img, .product-visual > img {
     object-position: center center;
   }
-  .product-visual[data-weight="100"] .product-visual-stage { transform: scale(0.76); }
-  .product-visual[data-weight="250"] .product-visual-stage { transform: scale(0.88); }
+  .product-visual[data-weight="100"] .product-visual-stage { transform: scale(0.88); }
+  .product-visual[data-weight="250"] .product-visual-stage { transform: scale(0.94); }
   .product-visual[data-weight="500"] .product-visual-stage { transform: scale(1); }
   .visual-caption { font-size: 8px; padding: 5px 8px; bottom: 9px; }
   .zoom-button { bottom: auto; top: 10px; left: 10px; transform: none; padding: 10px; font-size: 0; gap: 0; border-radius: 50%; }
