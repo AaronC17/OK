@@ -359,14 +359,226 @@
   border: 1px solid #e6dfec;
   border-radius: 10px;
 }
-.gateway-submit-btn {
+.gateway-confirm-btn {
   width: 100%;
-  margin-top: 12px;
-  min-height: 46px;
-  border-radius: 11px;
-  font-size: 13px;
-  font-weight: 650;
+  min-height: 48px !important;
+  border-radius: 12px !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.1px;
+  gap: 8px;
+  justify-content: center;
+  box-shadow: 0 8px 20px -6px rgba(56, 36, 72, 0.42);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
+.gateway-confirm-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px -6px rgba(56, 36, 72, 0.5);
+}
+.gateway-confirm-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Delivery Transit Loop Card */
+.sinpe-transit-card {
+  border: 1px solid #dfd3ea;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -8px rgba(56, 36, 72, 0.1);
+  animation: transitCardEnter .38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.transit-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 15px;
+  background: #faf7fc;
+  border-bottom: 1px solid #ede5f4;
+}
+.transit-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #382448;
+  letter-spacing: -0.1px;
+}
+.transit-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1d9a5f;
+  box-shadow: 0 0 0 0 rgba(29, 154, 95, 0.55);
+  animation: transitPulseDot 1.8s ease-out infinite;
+}
+.transit-order-code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--purple);
+  background: #efe8f6;
+  border: 1px solid #dfd2ec;
+  padding: 3px 9px;
+  border-radius: 7px;
+  letter-spacing: 0.3px;
+}
+.transit-scene {
+  position: relative;
+  width: 100%;
+  background: #f5effa;
+  line-height: 0;
+  overflow: hidden;
+}
+.transit-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.transit-clouds {
+  animation: transitCloudsDrift 14s linear infinite;
+}
+.transit-horizon {
+  animation: transitHorizonDrift 7.5s linear infinite;
+}
+.transit-road-dashes {
+  animation: transitRoadMove 0.55s linear infinite;
+}
+.transit-truck-chassis {
+  animation: transitTruckBounce 0.65s ease-in-out infinite alternate;
+}
+.transit-truck-shadow {
+  transform-origin: 180px 115px;
+  animation: transitShadowScale 0.65s ease-in-out infinite alternate;
+}
+.transit-wheel {
+  animation: transitWheelSpin 0.55s linear infinite;
+}
+.wind-line {
+  animation: transitWindStreak 0.9s linear infinite;
+}
+.wind-2 { animation-delay: -0.3s; }
+.wind-3 { animation-delay: -0.6s; }
+.puff {
+  animation: transitPuffPop 1.05s ease-out infinite;
+}
+.puff-1 { transform-origin: 92px 101px; }
+.puff-2 { transform-origin: 82px 98px; animation-delay: -0.35s; }
+.puff-3 { transform-origin: 70px 95px; animation-delay: -0.7s; }
+
+.transit-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 13px 15px;
+  background: #ffffff;
+  border-top: 1px solid #eee6f4;
+}
+.transit-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8c7b99;
+  white-space: nowrap;
+}
+.transit-step-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f1ebf6;
+  color: #8c7b99;
+  flex-shrink: 0;
+}
+.transit-step.is-done {
+  color: #1c6b45;
+}
+.transit-step.is-done .transit-step-dot {
+  background: #daf2e5;
+  color: #176640;
+}
+.transit-step.is-active {
+  color: var(--purple);
+  font-weight: 700;
+}
+.transit-step.is-active .transit-step-dot {
+  background: var(--purple);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(56, 36, 72, 0.14);
+}
+.step-inner-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: transitStepBlink 1.1s ease-in-out infinite alternate;
+}
+.transit-step-line {
+  flex: 1;
+  height: 2px;
+  min-width: 10px;
+  border-radius: 2px;
+  background: #e9e0f0;
+  position: relative;
+  overflow: hidden;
+}
+.transit-step-line.is-filled {
+  background: linear-gradient(90deg, #278859, var(--purple));
+}
+
+@keyframes transitCardEnter {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes transitPulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(29, 154, 95, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(29, 154, 95, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(29, 154, 95, 0); }
+}
+@keyframes transitWheelSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes transitRoadMove {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 36; }
+}
+@keyframes transitTruckBounce {
+  0% { transform: translateY(0px) rotate(0deg); }
+  100% { transform: translateY(-2.2px) rotate(-0.35deg); }
+}
+@keyframes transitShadowScale {
+  0% { transform: scaleX(1); opacity: 0.17; }
+  100% { transform: scaleX(0.94); opacity: 0.11; }
+}
+@keyframes transitCloudsDrift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-360px); }
+}
+@keyframes transitHorizonDrift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-360px); }
+}
+@keyframes transitWindStreak {
+  0% { transform: translateX(18px); opacity: 0; }
+  35% { opacity: 0.85; }
+  100% { transform: translateX(-28px); opacity: 0; }
+}
+@keyframes transitPuffPop {
+  0% { transform: translate(6px, 2px) scale(0.45); opacity: 0.75; }
+  100% { transform: translate(-24px, -7px) scale(1.45); opacity: 0; }
+}
+@keyframes transitStepBlink {
+  from { transform: scale(0.75); opacity: 0.65; }
+  to { transform: scale(1.1); opacity: 1; }
+}
+
 .receipt-received {
   display: flex;
   align-items: center;
@@ -413,7 +625,7 @@
 .recorded-lines small { display: block; font-size: 10.5px; color: #6c6073; line-height: 1.55; margin-top: 2px; }
 .recorded-lines > div > span { flex-shrink: 0; font-size: 12px; line-height: 1.5; font-weight: 650; }
 .gateway-summary-totals { margin-top: 12px; padding-top: 4px; }
-.order-panel-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; }
+.order-panel-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 4px; }
 .order-panel-actions > .button { width: 100%; border-radius: 10px; min-height: 44px; font-size: 12px; }
 .payment-message { margin: 0; padding: 12px 14px; border: 1px solid #e6c6ce; border-radius: 11px; background: #fdf0f3; color: #842638; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
 
@@ -883,6 +1095,9 @@
   .sinpe-gateway-header > h3 { font-size: 20px; }
   .sinpe-phone-number { font-size: 20px; }
   .sinpe-code-display { font-size: 16px; }
+  .transit-steps { padding: 11px 12px; gap: 5px; }
+  .transit-step { font-size: 10.5px; gap: 5px; }
+  .transit-step-dot { width: 18px; height: 18px; }
   .privacy-check { font-size: 12px; }
   .payment-method small, .payment-method > p, .sinpe-order-panel .small-note { font-size: 11px; }
 
