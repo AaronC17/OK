@@ -82,10 +82,10 @@
 .ingredient-photo img { width: 100%; height: 100%; border-radius: 8px; object-fit: contain; }
 .film-ingredient > span { font-size: 9px; color: var(--muted); text-align: center; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .ingredient-tick { position: absolute; bottom: -5px; right: -5px; width: 19px; height: 19px; display: grid; place-items: center; background: #765389; border: 2px solid #fff; color: #fff; border-radius: 50%; opacity: 0; }
-.mix-stage { position: relative; isolation: isolate; height: 306px; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, #fff 0%, #faf7fc 63%, #f3edf7 100%); border: 1px solid #eee6f3; border-radius: 14px; margin-top: 17px; contain: paint; }
-.mix-bowl-scene { position: absolute; inset: 0 0 17px; }
-.bowl-illustration { display: block; width: 100%; height: 100%; position: absolute; inset: 0; overflow: visible; }
-.bowl-gummy, .spoon-motion, .spoon-head, .gummy-contact-shadows > ellipse, .tajin-grain { transform-box: view-box; transform-origin: 0 0; }
+.mix-stage { position: relative; isolation: isolate; height: 306px; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, #fff 0%, #faf7fc 63%, #f3edf7 100%); border: 1px solid #eee6f3; border-radius: 14px; margin-top: 17px; contain: layout paint; transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.mix-bowl-scene { position: absolute; inset: 0 0 17px; transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.bowl-illustration { display: block; width: 100%; height: 100%; position: absolute; inset: 0; overflow: visible; transform: translateZ(0); }
+.bowl-gummy, .spoon-motion, .spoon-head, .gummy-contact-shadows > ellipse, .tajin-grain { transform-box: view-box; transform-origin: 0 0; will-change: transform; }
 .sauce-pool { transform-box: view-box; transform-origin: 180px 203px; }
 .chamoy-bottle { transform-box: view-box; transform-origin: 140px 84px; }
 .tajin-shaker { transform-box: view-box; transform-origin: 231px 82px; }

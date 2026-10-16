@@ -8,14 +8,26 @@ const transform = (x: number, y: number, rotation = 0, sx = 1, sy = sx) => `tran
 const screenY = (y: number, z: number) => 227 + z * .34 - y
 let baked: MixSimulation | undefined
 
-const warp = (triangle: readonly number[] | number[], mesh: Point2[]) => {
-  const [a, b, c] = triangle.map(index => GEL_MESH[index]), [p, q, r] = triangle.map(index => mesh[index])
-  const bx = b.x - a.x, by = b.y - a.y, cx = c.x - a.x, cy = c.y - a.y, determinant = bx * cy - cx * by
-  const xx = ((q.x - p.x) * cy - (r.x - p.x) * by) / determinant
-  const xy = ((r.x - p.x) * bx - (q.x - p.x) * cx) / determinant
-  const yx = ((q.y - p.y) * cy - (r.y - p.y) * by) / determinant
-  const yy = ((r.y - p.y) * bx - (q.y - p.y) * cx) / determinant
-  return `matrix(${round(xx)} ${round(yx)} ${round(xy)} ${round(yy)} ${round(p.x - xx * a.x - xy * a.y)} ${round(p.y - yx * a.x - yy * a.y)})`
+const PRECOMPUTED_TRIANGLES = GEL_TRIANGLES.map(triangle => {
+  const a = GEL_MESH[triangle[0]], b = GEL_MESH[triangle[1]], c = GEL_MESH[triangle[2]]
+  const bx = b.x - a.x, by = b.y - a.y, cx = c.x - a.x, cy = c.y - a.y
+  const determinant = bx * cy - cx * by
+  return {
+    i0: triangle[0], i1: triangle[1], i2: triangle[2],
+    ax: a.x, ay: a.y,
+    bx, by, cx, cy, determinant,
+  }
+})
+
+const warpFast = (t: typeof PRECOMPUTED_TRIANGLES[number], mesh: Point2[]) => {
+  const p = mesh[t.i0], q = mesh[t.i1], r = mesh[t.i2]
+  const qpx = q.x - p.x, rpx = r.x - p.x
+  const qpy = q.y - p.y, rpy = r.y - p.y
+  const xx = (qpx * t.cy - rpx * t.by) / t.determinant
+  const xy = (rpx * t.bx - qpx * t.cx) / t.determinant
+  const yx = (qpy * t.cy - rpy * t.by) / t.determinant
+  const yy = (rpy * t.bx - qpy * t.cx) / t.determinant
+  return `matrix(${round(xx)} ${round(yx)} ${round(xy)} ${round(yy)} ${round(p.x - xx * t.ax - xy * t.ay)} ${round(p.y - yx * t.ax - yy * t.ay)})`
 }
 
 export interface MixSceneMotion {
@@ -160,7 +172,15 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
 
   mixBears.forEach((bear, index) => {
     const keyframes: Keyframe[] = []
+    const startOffset = bear.start / seconds
+    const firstBody = frames[0].bears[index]
+    const initialTransform = transform(180 + firstBody.x, screenY(firstBody.y, firstBody.z))
+    keyframes.push({ offset: 0, transform: initialTransform, opacity: 0 })
+    if (startOffset > 0.002) {
+      keyframes.push({ offset: (bear.start - 0.001) / seconds, transform: initialTransform, opacity: 0 })
+    }
     for (const frame of frames) {
+      if (frame.time < bear.start) continue
       const body = frame.bears[index]
       keyframes.push({
         offset: frame.time / seconds,
@@ -169,12 +189,27 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       })
     }
     animate(svg.querySelector(`[data-bear="${index}"]`), keyframes)
-    animate(svg.querySelector(`[data-bear-shadow="${index}"]`), frames.map(frame => {
+
+    const shadowKeyframes: Keyframe[] = []
+    const firstFeet = firstBody.lobes[2]
+    const initialAltitude = Math.max(0, firstFeet.y - floorHeight(firstFeet.x, firstFeet.z) - GEL_RADII[2])
+    const initialShadowTransform = transform(180 + firstBody.x, screenY(floorHeight(firstBody.x, firstBody.z), firstBody.z), 0, 1 - Math.min(initialAltitude / 400, .5), .75)
+    shadowKeyframes.push({ offset: 0, transform: initialShadowTransform, opacity: 0 })
+    if (startOffset > 0.002) {
+      shadowKeyframes.push({ offset: (bear.start - 0.001) / seconds, transform: initialShadowTransform, opacity: 0 })
+    }
+    for (const frame of frames) {
+      if (frame.time < bear.start) continue
       const body = frame.bears[index]
       const feet = body.lobes[2]
       const altitude = Math.max(0, feet.y - floorHeight(feet.x, feet.z) - GEL_RADII[2])
-      return { offset: frame.time / seconds, transform: transform(180 + body.x, screenY(floorHeight(body.x, body.z), body.z), 0, 1 - Math.min(altitude / 400, .5), .75), opacity: frame.time >= bear.start ? Math.max(0, .24 - altitude / 450) : 0 }
-    }))
+      shadowKeyframes.push({
+        offset: frame.time / seconds,
+        transform: transform(180 + body.x, screenY(floorHeight(body.x, body.z), body.z), 0, 1 - Math.min(altitude / 400, .5), .75),
+        opacity: Math.max(0, .24 - altitude / 450),
+      })
+    }
+    animate(svg.querySelector(`[data-bear-shadow="${index}"]`), shadowKeyframes)
   })
   animate(svg.querySelector('.spoon-motion'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(180 + frame.spoon.x, screenY(frame.spoon.y, frame.spoon.z)), opacity: frame.spoon.opacity })))
   animate(svg.querySelector('.spoon-head'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(0, 0, frame.spoon.angle, 1, frame.spoon.headScale) })))
@@ -203,9 +238,10 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   // A real depth order, including the entire spoon, replaces front/back duplicates.
   const contents = svg.querySelector('.mix-contents')!
   const nodes = [...mixBears.map((_, index) => svg.querySelector(`[data-bear="${index}"]`)!), svg.querySelector('.spoon-motion')!]
-  const patches = mixBears.map((_, index) => GEL_TRIANGLES.map((triangle, patch) => ({
+  const patches = mixBears.map((_, index) => PRECOMPUTED_TRIANGLES.map((triangleInfo, patch) => ({
     node: svg.querySelector<SVGGraphicsElement>(`[data-gel-patch="${index}-${patch}"]`)!,
-    triangle,
+    triangleInfo,
+    lastTransform: '',
   })))
   const menisci = mixBears.map((_, index) => svg.querySelector(`[data-meniscus="${index}"]`)!)
   const sauceCuts = mixBears.map((_, index) => svg.querySelector(`[data-sauce-cut="${index}"]`)!)
@@ -219,7 +255,13 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   const contours = [...svg.querySelectorAll('.sauce-contour')]
   const handle = svg.querySelector('.spoon-handle')!, handleGlint = svg.querySelector('.spoon-handle-glint')!
   const spoonDrip = svg.querySelector('.spoon-drip')!, spoonCoating = svg.querySelector('.spoon-coating')!
+
+  // Pre-sort contents by initial z so children start in correct depth order without runtime DOM thrashing
   const currentOrder = nodes.map((_, i) => i)
+  const initialZ = (i: number) => i === mixBears.length ? 0 : mixBears[i].z
+  currentOrder.sort((a, b) => initialZ(a) - initialZ(b))
+  currentOrder.forEach(idx => contents.appendChild(nodes[idx]))
+
   const drawLemonPour = createLemonPour(svg)
 
   const SURFACE_ANGLES = Array.from({ length: 64 }, (_, i) => {
@@ -237,15 +279,31 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     indices: node.getAttribute('data-bridge')!.split('-').map(Number),
     edges: [...node.querySelectorAll('path')],
     lastOpacity: 0,
+    lastD0: '',
+    lastD1: '',
   }))
+
   const path = (points: number[][], close = false) => `${points.map(([x, y], index) => `${index ? 'L' : 'M'}${round(x)} ${round(y)}`).join(' ')}${close ? 'Z' : ''}`
   const grainLastX = new Array<number>(grains.length).fill(-9999)
   const grainLastY = new Array<number>(grains.length).fill(-9999)
   const contourLastOp = new Array<number>(contours.length).fill(-1)
+  const meniscusLastOp = new Array<number>(mixBears.length).fill(-1)
+  const meniscusLastTrans = new Array<string>(mixBears.length).fill('')
+  const cutLastY = new Array<number>(mixBears.length).fill(-9999)
+  const beadLastOp = new Array<number>(beads.length).fill(-1)
+  let lastSurfaceD = ''
   let ringsActive = false
   let spoonActive = false
   let request = 0
   let running = false
+
+  // Pre-allocated reusable structures to eliminate frame GC allocations
+  const depths = new Float64Array(nodes.length)
+  const interpolatedMesh: Point2[] = Array.from({ length: 10 }, () => ({ x: 0, y: 0 }))
+  const poses = mixBears.map(() => ({
+    x: 0, y: 0, z: 0, active: false, wetLine: 0,
+    feet: { x: 0, y: 0, z: 0 },
+  }))
 
   const sortDepth = () => {
     const time = (Number(animations[0].currentTime) % MIX_CYCLE) / 1000
@@ -265,20 +323,52 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       return a + (b - a) * progress
     }
 
-    const depths = nodes.map((_, i) => z(i))
+    for (let i = 0; i < nodes.length; i++) depths[i] = z(i)
+
+    const sauceHeight = (x: number, z: number) => {
+      const a = sampleSurface(frame.surface, x, z), b = sampleSurface(next.surface, x, z)
+      return a + (b - a) * progress
+    }
+    const sauceY = (x: number, z: number) => screenY(sauceHeight(x, z), z)
+    drawLemonPour(time, x => sauceY(x - 180, 0))
+
+    for (let i = 0; i < mixBears.length; i++) {
+      const body = frame.bears[i], nextBody = next.bears[i]
+      const pose = poses[i]
+      pose.x = body.x + (nextBody.x - body.x) * progress
+      pose.y = body.y + (nextBody.y - body.y) * progress
+      pose.z = depths[i]
+      pose.active = body.active
+      pose.wetLine = body.wetLine + (nextBody.wetLine - body.wetLine) * progress
+      pose.feet.x = body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress
+      pose.feet.y = body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress
+      pose.feet.z = body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress
+    }
+
+    // Depth sorting with screen overlap check: avoids DOM thrashing while bears fall
     let orderChanged = false
     for (let i = 1; i < currentOrder.length; i++) {
       let j = i
       while (j > 0) {
         const prev = currentOrder[j - 1], curr = currentOrder[j]
         if (depths[curr] < depths[prev] - 1.5) {
-          currentOrder[j - 1] = curr
-          currentOrder[j] = prev
-          orderChanged = true
-          j--
-        } else {
-          break
+          const actPrev = prev === mixBears.length ? frame.spoon.opacity > 0.05 : poses[prev].active
+          const actCurr = curr === mixBears.length ? frame.spoon.opacity > 0.05 : poses[curr].active
+          if (actPrev && actCurr) {
+            const xPrev = prev === mixBears.length ? frame.spoon.x : poses[prev].x
+            const yPrev = prev === mixBears.length ? frame.spoon.y : poses[prev].y
+            const xCurr = curr === mixBears.length ? frame.spoon.x : poses[curr].x
+            const yCurr = curr === mixBears.length ? frame.spoon.y : poses[curr].y
+            if (Math.abs(xPrev - xCurr) < 32 && Math.abs(yPrev - yCurr) < 40) {
+              currentOrder[j - 1] = curr
+              currentOrder[j] = prev
+              orderChanged = true
+              j--
+              continue
+            }
+          }
         }
+        break
       }
     }
     if (orderChanged) {
@@ -288,46 +378,50 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       })
     }
 
-    const sauceHeight = (x: number, z: number) => {
-      const a = sampleSurface(frame.surface, x, z), b = sampleSurface(next.surface, x, z)
-      return a + (b - a) * progress
-    }
-    const sauceY = (x: number, z: number) => screenY(sauceHeight(x, z), z)
-    drawLemonPour(time, x => sauceY(x - 180, 0))
-
-    const poses = frame.bears.map((body, i) => {
-      const nextBody = next.bears[i]
-      const x = body.x + (nextBody.x - body.x) * progress
-      const depth = depths[i]
-      const y = body.y + (nextBody.y - body.y) * progress
-      return { x, y, z: depth, active: body.active, wetLine: body.wetLine + (nextBody.wetLine - body.wetLine) * progress, feet: {
-        x: body.lobes[2].x + (nextBody.lobes[2].x - body.lobes[2].x) * progress,
-        y: body.lobes[2].y + (nextBody.lobes[2].y - body.lobes[2].y) * progress,
-        z: body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress,
-      } }
-    })
-
-    poses.forEach((body, i) => {
+    // Update bears patches, sauce cuts, and menisci
+    for (let i = 0; i < mixBears.length; i++) {
+      const body = poses[i]
       if (body.active) {
         const fromMesh = frame.bears[i].mesh, toMesh = next.bears[i].mesh
-        const mesh = fromMesh.map((point, j) => ({
-          x: point.x + (toMesh[j].x - point.x) * progress,
-          y: point.y + (toMesh[j].y - point.y) * progress,
-        }))
+        for (let j = 0; j < 10; j++) {
+          interpolatedMesh[j].x = fromMesh[j].x + (toMesh[j].x - fromMesh[j].x) * progress
+          interpolatedMesh[j].y = fromMesh[j].y + (toMesh[j].y - fromMesh[j].y) * progress
+        }
         const bearPatches = patches[i]
         for (let p = 0; p < bearPatches.length; p++) {
-          bearPatches[p].node.setAttribute('transform', warp(bearPatches[p].triangle, mesh))
+          const bp = bearPatches[p]
+          const matrix = warpFast(bp.triangleInfo, interpolatedMesh)
+          if (bp.lastTransform !== matrix) {
+            bp.lastTransform = matrix
+            bp.node.setAttribute('transform', matrix)
+          }
         }
       }
       const { x, y, z: depth } = body
-      const line = y - sauceHeight(x, depth)
-      // Opaque chamoy covers the submerged part of the deformed photograph.
-      sauceCuts[i].setAttribute('y', String(round(line)))
-      const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
-      menisci[i].setAttribute('transform', `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`)
-      menisci[i].setAttribute('opacity', String(round(body.active ? smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88 : 0)))
-    })
+      const sHeight = (time >= 1.0 && time < 4.10) ? LIQUID_LEVEL : sauceHeight(x, depth)
+      const line = y - sHeight
+      const cutY = round(line)
+      if (cutLastY[i] !== cutY) {
+        cutLastY[i] = cutY
+        sauceCuts[i].setAttribute('y', String(cutY))
+      }
+      const activeMeniscus = body.active && line <= GUMMY_RADIUS && line >= -20
+      const op = activeMeniscus ? round(smooth((GUMMY_RADIUS - line) / 6) * smooth((line + 20) / 6) * .88) : 0
+      if (meniscusLastOp[i] !== op) {
+        meniscusLastOp[i] = op
+        menisci[i].setAttribute('opacity', String(op))
+      }
+      if (op > 0) {
+        const width = Math.min(11, Math.sqrt(Math.max(0, GUMMY_RADIUS ** 2 - line * line)) * .7)
+        const trans = `translate(0 ${round(line)}) scale(${round(width / 10)} 1)`
+        if (meniscusLastTrans[i] !== trans) {
+          meniscusLastTrans[i] = trans
+          menisci[i].setAttribute('transform', trans)
+        }
+      }
+    }
 
+    if (time >= 4.10) {
       bridges.forEach(bridge => {
         const [a, b] = bridge.indices
         if (!poses[a]?.active || !poses[b]?.active) {
@@ -355,6 +449,13 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
           return
         }
         const immersed = smooth((sauceHeight(from.x, from.z) - from.y + GEL_RADII[2]) / 8) * smooth((sauceHeight(to.x, to.z) - to.y + GEL_RADII[2]) / 8)
+        if (immersed === 0) {
+          if (bridge.lastOpacity !== 0) {
+            bridge.lastOpacity = 0
+            bridge.node.setAttribute('opacity', '0')
+          }
+          return
+        }
         const proximity = 1 - smooth((distance - 17) / 10)
         const opacity = round(proximity * immersed * .8)
         if (bridge.lastOpacity !== opacity) {
@@ -366,30 +467,45 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
         const ax = from.x + nx * 7.5, az = from.z + nz * 7.5, bx = to.x - nx * 7.5, bz = to.z - nz * 7.5
         const ay = sauceY(ax, az), by = sauceY(bx, bz)
         const middle = round(180 + (ax + bx) / 2), height = (ay + by) / 2, width = 1 + proximity * 3
-        bridge.edges[0].setAttribute('d', `M${round(180 + ax)} ${round(ay - 3)}Q${middle} ${round(height - width)} ${round(180 + bx)} ${round(by - 3)}L${round(180 + bx)} ${round(by + 3)}Q${middle} ${round(height + width)} ${round(180 + ax)} ${round(ay + 3)}Z`)
-        bridge.edges[1].setAttribute('d', `M${round(180 + ax)} ${round(ay - 2)}Q${middle} ${round(height - width + 1)} ${round(180 + bx)} ${round(by - 2)}`)
+        const d0 = `M${round(180 + ax)} ${round(ay - 3)}Q${middle} ${round(height - width)} ${round(180 + bx)} ${round(by - 3)}L${round(180 + bx)} ${round(by + 3)}Q${middle} ${round(height + width)} ${round(180 + ax)} ${round(ay + 3)}Z`
+        const d1 = `M${round(180 + ax)} ${round(ay - 2)}Q${middle} ${round(height - width + 1)} ${round(180 + bx)} ${round(by - 2)}`
+        if (bridge.lastD0 !== d0) { bridge.lastD0 = d0; bridge.edges[0].setAttribute('d', d0) }
+        if (bridge.lastD1 !== d1) { bridge.lastD1 = d1; bridge.edges[1].setAttribute('d', d1) }
       })
+    }
 
     if (time >= 0.28) {
-      surface.setAttribute('d', path(SURFACE_ANGLES.map(({ x, z }) => [180 + x, sauceY(x, z)]), true))
-      contours.forEach((contour, row) => {
-        const { depth, xs } = CONTOUR_ROWS[row]
-        let relief = 0, drawing = false, line = ''
-        for (let i = 0; i < 23; i++) {
-          const x = xs[i]
-          const height = sauceHeight(x, depth) - LIQUID_LEVEL
-          relief = Math.max(relief, height)
-          if (height < .8) { drawing = false; continue }
-          line += `${drawing ? 'L' : 'M'}${round(180 + x)} ${round(sauceY(x, depth) + 1)} `
-          drawing = true
-        }
-        const op = round(smooth(relief / 6) * .22)
-        if (contourLastOp[row] !== op) {
-          contourLastOp[row] = op
-          contour.setAttribute('opacity', String(op))
-        }
-        if (op > 0) contour.setAttribute('d', line)
-      })
+      let surfaceD = ''
+      for (let i = 0; i < 64; i++) {
+        const { x, z } = SURFACE_ANGLES[i]
+        surfaceD += `${i ? ' L' : 'M'}${round(180 + x)} ${round(sauceY(x, z))}`
+      }
+      surfaceD += 'Z'
+      if (surfaceD !== lastSurfaceD) {
+        lastSurfaceD = surfaceD
+        surface.setAttribute('d', surfaceD)
+      }
+
+      if (time < 1.0 || time >= 4.10) {
+        contours.forEach((contour, row) => {
+          const { depth, xs } = CONTOUR_ROWS[row]
+          let relief = 0, drawing = false, line = ''
+          for (let i = 0; i < 23; i++) {
+            const x = xs[i]
+            const height = sauceHeight(x, depth) - LIQUID_LEVEL
+            relief = Math.max(relief, height)
+            if (height < .8) { drawing = false; continue }
+            line += `${drawing ? 'L' : 'M'}${round(180 + x)} ${round(sauceY(x, depth) + 1)} `
+            drawing = true
+          }
+          const op = round(smooth(relief / 6) * .22)
+          if (contourLastOp[row] !== op) {
+            contourLastOp[row] = op
+            contour.setAttribute('opacity', String(op))
+          }
+          if (op > 0) contour.setAttribute('d', line)
+        })
+      }
     }
 
     if (time >= 5.0 && time <= 10.2) {
@@ -446,29 +562,43 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       spoonDrip.setAttribute('opacity', '0')
     }
 
-    const recent = (time >= 3.2 && time <= 8.5) ? impacts.filter(impact => time >= impact.time && time - impact.time < 2.6).slice(-6) : []
+    const recent = (time >= 4.09 && time <= 8.5) ? impacts.filter(impact => time >= impact.time && time - impact.time < 2.6).slice(-6) : []
     if (recent.length > 0 || ringsActive) {
       ringsActive = recent.length > 0
       rings.forEach((ring, i) => {
         const impact = recent[i]
         if (!impact) { ring.setAttribute('opacity', '0'); return }
         const age = time - impact.time, radius = 14 + age * .5
-        ring.setAttribute('d', path(Array.from({ length: 40 }, (_, j) => {
+        let ringD = ''
+        for (let j = 0; j < 40; j++) {
           const angle = j / 39 * Math.PI, x = impact.x + Math.cos(angle) * radius, z = impact.z + Math.sin(angle) * radius
-          return [180 + x, sauceY(x, z)]
-        })))
+          ringD += `${j ? ' L' : 'M'}${round(180 + x)} ${round(sauceY(x, z))}`
+        }
+        ring.setAttribute('d', ringD)
         ring.setAttribute('opacity', String(round(smooth(age / .09) * Math.exp(-age * 1.35) * (1 - smooth((age - 1.8) / .8)) * impact.energy * .38)))
       })
       beads.forEach((bead, i) => {
         const impact = recent[Math.floor(i / 4)]
-        if (!impact) { bead.setAttribute('opacity', '0'); return }
+        if (!impact) {
+          if (beadLastOp[i] !== 0) { beadLastOp[i] = 0; bead.setAttribute('opacity', '0') }
+          return
+        }
         const age = time - impact.time - (i % 4) * .025
-        if (age < 0 || age >= .65) { bead.setAttribute('opacity', '0'); return }
+        if (age < 0 || age >= .65) {
+          if (beadLastOp[i] !== 0) { beadLastOp[i] = 0; bead.setAttribute('opacity', '0') }
+          return
+        }
         const swell = Math.sin(Math.PI * age / .65) * impact.energy
-        const angle = i * 2.39996, distance = 16 + age * 3
-        const x = impact.x + Math.cos(angle) * distance, z = impact.z + Math.sin(angle) * distance
-        bead.setAttribute('transform', `translate(${round(180 + x)} ${round(sauceY(x, z) - swell)}) scale(${round(.65 + swell * .35)})`)
-        bead.setAttribute('opacity', String(round(swell * .5)))
+        const op = round(swell * .5)
+        if (beadLastOp[i] !== op) {
+          beadLastOp[i] = op
+          bead.setAttribute('opacity', String(op))
+        }
+        if (op > 0) {
+          const angle = i * 2.39996, distance = 16 + age * 3
+          const x = impact.x + Math.cos(angle) * distance, z = impact.z + Math.sin(angle) * distance
+          bead.setAttribute('transform', `translate(${round(180 + x)} ${round(sauceY(x, z) - swell)}) scale(${round(.65 + swell * .35)})`)
+        }
       })
     }
 
