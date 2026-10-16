@@ -144,7 +144,7 @@ var store = {
 };
 
 // server/store/database.ts
-import { createHash as createHash2, randomBytes as randomBytes2, randomUUID } from "node:crypto";
+import { createHash as createHash2, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 // server/store/schema.ts
@@ -354,8 +354,8 @@ function bankReference(value) {
   return reference;
 }
 function orderCode(value) {
-  const code = text2(value, 8, 20, "C\xF3digo de pedido").toUpperCase();
-  if (!/^ONK-[A-F0-9]{4,16}$/.test(code)) throw new StoreError(422, "El c\xF3digo de pedido no tiene el formato esperado.");
+  const code = text2(value, 6, 20, "C\xF3digo de pedido").toUpperCase();
+  if (!/^ONK-[A-Z0-9]{3,16}$/.test(code)) throw new StoreError(422, "El c\xF3digo de pedido no tiene el formato esperado.");
   return code;
 }
 function minorAmount(value, allowZero = false) {
@@ -635,7 +635,26 @@ var ShopDatabase = class {
       const destination = this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID();
-      const code = `ONK-${randomBytes2(2).toString("hex").toUpperCase()}`;
+      let nextNum = 1001;
+      const meta = this.database.prepare("SELECT value FROM metadata WHERE key = 'order_number'").get();
+      if (meta?.value) {
+        const parsedNum = Number(meta.value);
+        if (Number.isSafeInteger(parsedNum) && parsedNum >= nextNum) nextNum = parsedNum + 1;
+      } else {
+        const rows = this.database.prepare("SELECT code FROM shop_orders WHERE code LIKE 'ONK-%'").all();
+        for (const r of rows) {
+          const match = /^ONK-(\d+)$/.exec(r.code);
+          if (match) {
+            const n = Number(match[1]);
+            if (n >= nextNum) nextNum = n + 1;
+          }
+        }
+      }
+      while (this.database.prepare("SELECT 1 FROM shop_orders WHERE code = ?").get(`ONK-${nextNum}`)) {
+        nextNum++;
+      }
+      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('order_number', ?) ON CONFLICT(key) DO UPDATE SET value = ?").run(String(nextNum), String(nextNum));
+      const code = `ONK-${nextNum}`;
       const now = timestamp();
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
@@ -776,7 +795,7 @@ var ShopDatabase = class {
 };
 
 // server/store/mongo.ts
-import { createHash as createHash3, randomBytes as randomBytes3, randomUUID as randomUUID2 } from "node:crypto";
+import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
 import { MongoClient } from "mongodb";
 var statuses2 = ["pending_details", "awaiting_payment", "pending_review", "ready", "rejected"];
 var timestamp2 = () => (/* @__PURE__ */ new Date()).toISOString();
@@ -1038,7 +1057,25 @@ var MongoShopDatabase = class {
       const destination = await this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID2();
-      const code = `ONK-${randomBytes3(2).toString("hex").toUpperCase()}`;
+      let nextNum = 1001;
+      const meta = await this.collection("metadata").findOne({ key: "order_number" });
+      if (meta && typeof meta.seq === "number" && meta.seq >= nextNum) {
+        nextNum = meta.seq + 1;
+      } else {
+        const last = await this.collection("shop_orders").find({ code: /^ONK-\d+$/ }, { projection: { code: 1 } }).sort({ created_at: -1 }).limit(50).toArray();
+        for (const doc of last) {
+          const match = /^ONK-(\d+)$/.exec(doc.code);
+          if (match) {
+            const n = Number(match[1]);
+            if (n >= nextNum) nextNum = n + 1;
+          }
+        }
+      }
+      while (await this.collection("shop_orders").findOne({ code: `ONK-${nextNum}` })) {
+        nextNum++;
+      }
+      await this.collection("metadata").updateOne({ key: "order_number" }, { $set: { seq: nextNum } }, { upsert: true });
+      const code = `ONK-${nextNum}`;
       const now = timestamp2();
       const newOrder = {
         _id: id,

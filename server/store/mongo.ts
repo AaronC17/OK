@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { MongoClient } from 'mongodb'
 import type { ClientSession, Db } from 'mongodb'
 import type { StoreConfig } from '../../src/types.ts'
@@ -297,7 +297,25 @@ export class MongoShopDatabase implements ShopRepository {
       const destination = await this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      const code = `ONK-${randomBytes(2).toString('hex').toUpperCase()}`
+      let nextNum = 1001
+      const meta = await this.collection('metadata').findOne({ key: 'order_number' })
+      if (meta && typeof meta.seq === 'number' && meta.seq >= nextNum) {
+        nextNum = meta.seq + 1
+      } else {
+        const last = await this.collection('shop_orders').find({ code: /^ONK-\d+$/ }, { projection: { code: 1 } }).sort({ created_at: -1 }).limit(50).toArray()
+        for (const doc of last) {
+          const match = /^ONK-(\d+)$/.exec(doc.code)
+          if (match) {
+            const n = Number(match[1])
+            if (n >= nextNum) nextNum = n + 1
+          }
+        }
+      }
+      while (await this.collection('shop_orders').findOne({ code: `ONK-${nextNum}` })) {
+        nextNum++
+      }
+      await this.collection('metadata').updateOne({ key: 'order_number' }, { $set: { seq: nextNum } }, { upsert: true })
+      const code = `ONK-${nextNum}`
       const now = timestamp()
       const newOrder = {
         _id: id,

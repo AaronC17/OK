@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import type { SQLInputValue } from 'node:sqlite'
 import type { StoreConfig } from '../../src/types.ts'
@@ -173,7 +173,26 @@ export class ShopDatabase implements ShopRepository {
       const destination = this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      const code = `ONK-${randomBytes(2).toString('hex').toUpperCase()}`
+      let nextNum = 1001
+      const meta = this.database.prepare("SELECT value FROM metadata WHERE key = 'order_number'").get()
+      if (meta?.value) {
+        const parsedNum = Number(meta.value)
+        if (Number.isSafeInteger(parsedNum) && parsedNum >= nextNum) nextNum = parsedNum + 1
+      } else {
+        const rows = this.database.prepare("SELECT code FROM shop_orders WHERE code LIKE 'ONK-%'").all()
+        for (const r of rows) {
+          const match = /^ONK-(\d+)$/.exec(r.code as string)
+          if (match) {
+            const n = Number(match[1])
+            if (n >= nextNum) nextNum = n + 1
+          }
+        }
+      }
+      while (this.database.prepare("SELECT 1 FROM shop_orders WHERE code = ?").get(`ONK-${nextNum}`)) {
+        nextNum++
+      }
+      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('order_number', ?) ON CONFLICT(key) DO UPDATE SET value = ?").run(String(nextNum), String(nextNum))
+      const code = `ONK-${nextNum}`
       const now = timestamp()
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
