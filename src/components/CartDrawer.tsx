@@ -12,6 +12,19 @@ import { Modal, ProductImage, Quantity } from './ui.tsx'
 
 type Errors = Partial<Record<'name' | 'phone' | 'deliveryId' | 'address' | 'notes' | 'privacy' | 'cart', string>>
 
+const DISMISSED_ORDER_KEY = 'onkys.dismissedOrderId'
+
+function getDismissedOrderId(): string | null {
+  try { return window.localStorage.getItem(DISMISSED_ORDER_KEY) } catch { return null }
+}
+
+function setDismissedOrderId(id: string | null) {
+  try {
+    if (id) window.localStorage.setItem(DISMISSED_ORDER_KEY, id)
+    else window.localStorage.removeItem(DISMISSED_ORDER_KEY)
+  } catch { /* Ignore storage quota/privacy errors */ }
+}
+
 export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: () => void; cart: Cart }) {
   const [customer, setCustomer] = useState<OrderCustomer>({ name: '', phone: '', address: '', notes: '' })
   const [deliveryId, setDeliveryId] = useState(store.deliveryMethods.find(method => method.enabled)?.id ?? '')
@@ -30,6 +43,13 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
   const amounts = order ? { subtotal: order.subtotalMinor, shipping: order.shippingMinor, total: order.totalMinor } : calculated
 
   useEffect(() => {
+    if (cart.items.length > 0 && order) {
+      setDismissedOrderId(order.id)
+      setOrder(null)
+    }
+  }, [cart.items.length, order])
+
+  useEffect(() => {
     if (!open) return
     let alive = true
     setLoading(true)
@@ -38,11 +58,14 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
       if (alive) setConfig(settings)
       if (!cart.items.length) {
         const result = await currentOrder()
-        if (alive) setOrder(result.order)
+        if (alive) {
+          const activeOrder = result.order && result.order.id !== getDismissedOrderId() ? result.order : null
+          setOrder(activeOrder)
+        }
       }
     }).catch(error => { if (alive) setServerError(errorMessage(error)) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [open])
+  }, [open, cart.items.length])
 
   useEffect(() => {
     if (!open || !order || order.status === 'ready') return
@@ -63,7 +86,10 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
         const next = await fetchOrder(order.id)
         setOrder(current => current?.id === next.id && current.version > next.version ? current : next)
       }
-      else if (!cart.items.length) setOrder((await currentOrder()).order)
+      else if (!cart.items.length) {
+        const latest = (await currentOrder()).order
+        setOrder(latest && latest.id !== getDismissedOrderId() ? latest : null)
+      }
     } catch (error) { setServerError(errorMessage(error)) }
     finally { setLoading(false) }
   }
@@ -85,11 +111,18 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
     setServerError('')
     try {
       const created = await createOrder(cart.items, deliveryId, customer, privacy, attempt.current.key)
+      setDismissedOrderId(null)
       flushSync(() => { setOrder(created); cart.clear(); setPreparing(false) })
       scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
     } catch (error) { setServerError(errorMessage(error)); setPreparing(false) }
   }
-  const newOrder = () => { setOrder(null); setErrors({}); setServerError(''); onClose() }
+  const newOrder = () => {
+    if (order) setDismissedOrderId(order.id)
+    setOrder(null)
+    setErrors({})
+    setServerError('')
+    onClose()
+  }
 
   return <Modal open={open} onClose={onClose} titleId="cart-title" className="cart-drawer">
     <div className="cart-inner">
