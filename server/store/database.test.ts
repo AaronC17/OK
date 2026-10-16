@@ -134,7 +134,7 @@ test('store: upload redelivery creates one receipt and reused files cannot claim
 })
 
 test('store: one-click confirmation uses saved code, amount and receipt, rejects forged data and stale evidence', t => {
-  const { create, upload, confirm } = setup(t)
+  const { db, create, upload, confirm } = setup(t)
   const order = upload(create())
   for (const patch of [{ amountMinor: 1 }, { bankReference: 'BANK-WRONG-123456' }, { code: 'ONK-0000000000000000' }, { version: order.version - 1 }, { receiptId: randomUUID() }, { status: 'ready' }]) assert.throws(() => confirm(order, patch))
   const ready = confirm(order)
@@ -142,6 +142,11 @@ test('store: one-click confirmation uses saved code, amount and receipt, rejects
   assert.equal(ready.paymentVerification, 'manual')
   assert.ok(ready.paymentConfirmedAt)
   assert.equal(order.receipt!.bankReference, 'BANK-TEST-123456')
+  const pending = create()
+  assert.equal(pending.status, 'awaiting_payment')
+  const paidDirect = db.confirm(pending.id, { version: pending.version }, 'test-admin')
+  assert.equal(paidDirect.status, 'ready')
+  assert.equal(paidDirect.paymentVerification, 'manual')
 })
 
 test('store: one verified bank reference cannot confirm two orders, even with different screenshots', t => {

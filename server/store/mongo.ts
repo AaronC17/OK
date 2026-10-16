@@ -400,16 +400,22 @@ export class MongoShopDatabase implements ShopRepository {
     const data = record(value)
     fields(data, ['version', 'receiptId'])
     const expectedVersion = version(data.version)
-    const receiptId = text(data.receiptId, 36, 36, 'Comprobante revisado')
+    const receiptId = data.receiptId === undefined || data.receiptId === null ? null : text(data.receiptId, 36, 36, 'Comprobante revisado')
     return this.transaction(async session => {
       const order = await this.getOrder(id, session)
       const existing = await this.collection('manual_payments').findOne({ order_id: id }, { session })
-      if (order.status === 'ready' && existing?.receipt_id === receiptId) return order
-      if (order.version !== expectedVersion || order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null) throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
-      const reference = bankReference(order.receipt.bankReference)
-      const amount = minorAmount(order.totalMinor)
-      const note = 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
-      const dup = await this.collection('manual_payments').findOne({ bank_reference: reference }, { session })
+      if (order.status === 'ready' && existing && (receiptId === null || existing.receipt_id === receiptId)) return order
+      if (order.version !== expectedVersion || order.status === 'ready') throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      if (receiptId !== null && (order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
+        throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      }
+      const useReceipt = order.receipt && order.status === 'pending_review' ? order.receipt : null
+      const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor)
+      const note = useReceipt
+        ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
+        : 'Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria automática.'
+      const dup = await this.collection('manual_payments').findOne({ bank_reference: reference, order_id: { $ne: id } }, { session })
       if (dup) throw new StoreError(409, 'Esta referencia bancaria ya fue utilizada para confirmar otro pedido.')
       const now = timestamp()
       await this.collection('manual_payments').insertOne({
@@ -417,7 +423,7 @@ export class MongoShopDatabase implements ShopRepository {
         order_id: id,
         bank_reference: reference,
         amount_minor: amount,
-        receipt_id: order.receipt.id,
+        receipt_id: useReceipt?.id ?? null,
         confirmed_by: actor,
         confirmed_at: now,
         note,
@@ -476,7 +482,7 @@ export class MongoShopDatabase implements ShopRepository {
     const search = (query.get('q') ?? '').trim().slice(0, 80)
     const filterQuery: any = {}
     if (filter === 'pending') {
-      filterQuery.status = { $in: ['pending_details', 'awaiting_payment', 'pending_review'] }
+      filterQuery.status = { $in: ['pending_details', 'awaiting_payment', 'pending_review', 'rejected'] }
     } else if (statuses.includes(filter as ShopOrderStatus)) {
       filterQuery.status = filter
     } else if (filter !== 'all') {

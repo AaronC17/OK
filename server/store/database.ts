@@ -23,6 +23,21 @@ export class ShopDatabase implements ShopRepository {
     this.database = new DatabaseSync(path)
     this.catalog = catalog
     this.database.exec(schema)
+    const receiptCol = this.database.prepare("SELECT \"notnull\" FROM pragma_table_info('manual_payments') WHERE name = 'receipt_id'").get()
+    if (receiptCol?.notnull === 1) {
+      this.transaction(() => {
+        this.database.exec(`
+          ALTER TABLE manual_payments RENAME TO manual_payments_old;
+          CREATE TABLE manual_payments (
+            order_id TEXT PRIMARY KEY REFERENCES shop_orders(id), bank_reference TEXT NOT NULL UNIQUE,
+            amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), receipt_id TEXT REFERENCES receipts(id),
+            confirmed_by TEXT NOT NULL, confirmed_at TEXT NOT NULL, note TEXT NOT NULL
+          );
+          INSERT INTO manual_payments SELECT * FROM manual_payments_old;
+          DROP TABLE manual_payments_old;
+        `)
+      })
+    }
     // Complete only orders that have never received payment instructions.
     // Never change the total/destination of an order already awaiting payment or review.
     this.transaction(() => this.completePendingDetails())
@@ -219,20 +234,26 @@ export class ShopDatabase implements ShopRepository {
     const data = record(value)
     fields(data, ['version', 'receiptId'])
     const expectedVersion = version(data.version)
-    const receiptId = text(data.receiptId, 36, 36, 'Comprobante revisado')
+    const receiptId = data.receiptId === undefined || data.receiptId === null ? null : text(data.receiptId, 36, 36, 'Comprobante revisado')
     return this.transaction(() => {
       const order = this.getOrder(id)
       const existing = this.database.prepare('SELECT receipt_id FROM manual_payments WHERE order_id = ?').get(id)
-      if (order.status === 'ready' && existing?.receipt_id === receiptId) return order
-      if (order.version !== expectedVersion || order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null) throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
-      const reference = bankReference(order.receipt.bankReference)
-      const amount = minorAmount(order.totalMinor)
+      if (order.status === 'ready' && existing && (receiptId === null || existing.receipt_id === receiptId)) return order
+      if (order.version !== expectedVersion || order.status === 'ready') throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      if (receiptId !== null && (order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
+        throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      }
+      const useReceipt = order.receipt && order.status === 'pending_review' ? order.receipt : null
+      const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor)
       // This records the authenticated administrator's manual decision, not bank verification.
-      const note = 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
-      if (this.database.prepare('SELECT order_id FROM manual_payments WHERE bank_reference = ?').get(reference)) throw new StoreError(409, 'Esta referencia bancaria ya fue utilizada para confirmar otro pedido.')
+      const note = useReceipt
+        ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
+        : 'Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria automática.'
+      if (this.database.prepare('SELECT order_id FROM manual_payments WHERE bank_reference = ? AND order_id != ?').get(reference, id)) throw new StoreError(409, 'Esta referencia bancaria ya fue utilizada para confirmar otro pedido.')
       const now = timestamp()
       this.database.prepare('INSERT INTO manual_payments (order_id, bank_reference, amount_minor, receipt_id, confirmed_by, confirmed_at, note) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(id, reference, amount, order.receipt.id, actor, now, note)
+        .run(id, reference, amount, useReceipt?.id ?? null, actor, now, note)
       this.database.prepare("UPDATE shop_orders SET status = 'ready', payment_confirmed_at = ?, customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(now, now, id)
       this.audit(id, 'payment.confirmed_manual', actor, note)
       const updated = this.getOrder(id)
@@ -263,7 +284,7 @@ export class ShopDatabase implements ShopRepository {
     const search = (query.get('q') ?? '').trim().slice(0, 80)
     const conditions: string[] = []
     const parameters: SQLInputValue[] = []
-    if (filter === 'pending') conditions.push("status IN ('pending_details', 'awaiting_payment', 'pending_review')")
+    if (filter === 'pending') conditions.push("status IN ('pending_details', 'awaiting_payment', 'pending_review', 'rejected')")
     else if (statuses.includes(filter as ShopOrderStatus)) { conditions.push('status = ?'); parameters.push(filter) }
     else if (filter !== 'all') throw new StoreError(422, 'Filtro de estado inválido.')
     if (search) {

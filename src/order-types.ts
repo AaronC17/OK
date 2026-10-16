@@ -60,6 +60,6 @@ export interface AdminOrders {
 }
 
 export const orderStatusLabels: Record<ShopOrderStatus, string> = {
-  pending_details: 'Por coordinar', awaiting_payment: 'Pendiente de pago', pending_review: 'Comprobante en revisión',
-  ready: 'Listo para preparar', rejected: 'Comprobante por corregir',
+  pending_details: 'Pendiente', awaiting_payment: 'Pendiente de pago', pending_review: 'En revisión',
+  ready: 'Pagada', rejected: 'Por corregir',
 }

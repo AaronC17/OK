@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS receipts (
 CREATE INDEX IF NOT EXISTS receipt_hash ON receipts(raw_hash);
 CREATE TABLE IF NOT EXISTS manual_payments (
   order_id TEXT PRIMARY KEY REFERENCES shop_orders(id), bank_reference TEXT NOT NULL UNIQUE,
-  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), receipt_id TEXT NOT NULL REFERENCES receipts(id),
+  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), receipt_id TEXT REFERENCES receipts(id),
   confirmed_by TEXT NOT NULL, confirmed_at TEXT NOT NULL, note TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS shop_audit (
@@ -465,6 +465,21 @@ var ShopDatabase = class {
     this.database = new DatabaseSync(path);
     this.catalog = catalog;
     this.database.exec(schema);
+    const receiptCol = this.database.prepare(`SELECT "notnull" FROM pragma_table_info('manual_payments') WHERE name = 'receipt_id'`).get();
+    if (receiptCol?.notnull === 1) {
+      this.transaction(() => {
+        this.database.exec(`
+          ALTER TABLE manual_payments RENAME TO manual_payments_old;
+          CREATE TABLE manual_payments (
+            order_id TEXT PRIMARY KEY REFERENCES shop_orders(id), bank_reference TEXT NOT NULL UNIQUE,
+            amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), receipt_id TEXT REFERENCES receipts(id),
+            confirmed_by TEXT NOT NULL, confirmed_at TEXT NOT NULL, note TEXT NOT NULL
+          );
+          INSERT INTO manual_payments SELECT * FROM manual_payments_old;
+          DROP TABLE manual_payments_old;
+        `);
+      });
+    }
     this.transaction(() => this.completePendingDetails());
   }
   close() {
@@ -695,18 +710,22 @@ var ShopDatabase = class {
     const data = record(value);
     fields2(data, ["version", "receiptId"]);
     const expectedVersion = version(data.version);
-    const receiptId = text2(data.receiptId, 36, 36, "Comprobante revisado");
+    const receiptId = data.receiptId === void 0 || data.receiptId === null ? null : text2(data.receiptId, 36, 36, "Comprobante revisado");
     return this.transaction(() => {
       const order = this.getOrder(id);
       const existing = this.database.prepare("SELECT receipt_id FROM manual_payments WHERE order_id = ?").get(id);
-      if (order.status === "ready" && existing?.receipt_id === receiptId) return order;
-      if (order.version !== expectedVersion || order.status !== "pending_review" || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null) throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
-      const reference = bankReference(order.receipt.bankReference);
-      const amount = minorAmount(order.totalMinor);
-      const note = "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica.";
-      if (this.database.prepare("SELECT order_id FROM manual_payments WHERE bank_reference = ?").get(reference)) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
+      if (order.status === "ready" && existing && (receiptId === null || existing.receipt_id === receiptId)) return order;
+      if (order.version !== expectedVersion || order.status === "ready") throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
+      if (receiptId !== null && (order.status !== "pending_review" || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
+        throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
+      }
+      const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
+      const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor);
+      const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
+      if (this.database.prepare("SELECT order_id FROM manual_payments WHERE bank_reference = ? AND order_id != ?").get(reference, id)) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
       const now = timestamp();
-      this.database.prepare("INSERT INTO manual_payments (order_id, bank_reference, amount_minor, receipt_id, confirmed_by, confirmed_at, note) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, reference, amount, order.receipt.id, actor, now, note);
+      this.database.prepare("INSERT INTO manual_payments (order_id, bank_reference, amount_minor, receipt_id, confirmed_by, confirmed_at, note) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, reference, amount, useReceipt?.id ?? null, actor, now, note);
       this.database.prepare("UPDATE shop_orders SET status = 'ready', payment_confirmed_at = ?, customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(now, now, id);
       this.audit(id, "payment.confirmed_manual", actor, note);
       const updated = this.getOrder(id);
@@ -737,7 +756,7 @@ var ShopDatabase = class {
     const search = (query.get("q") ?? "").trim().slice(0, 80);
     const conditions = [];
     const parameters = [];
-    if (filter === "pending") conditions.push("status IN ('pending_details', 'awaiting_payment', 'pending_review')");
+    if (filter === "pending") conditions.push("status IN ('pending_details', 'awaiting_payment', 'pending_review', 'rejected')");
     else if (statuses.includes(filter)) {
       conditions.push("status = ?");
       parameters.push(filter);
@@ -1117,16 +1136,20 @@ var MongoShopDatabase = class {
     const data = record(value);
     fields2(data, ["version", "receiptId"]);
     const expectedVersion = version(data.version);
-    const receiptId = text2(data.receiptId, 36, 36, "Comprobante revisado");
+    const receiptId = data.receiptId === void 0 || data.receiptId === null ? null : text2(data.receiptId, 36, 36, "Comprobante revisado");
     return this.transaction(async (session) => {
       const order = await this.getOrder(id, session);
       const existing = await this.collection("manual_payments").findOne({ order_id: id }, { session });
-      if (order.status === "ready" && existing?.receipt_id === receiptId) return order;
-      if (order.version !== expectedVersion || order.status !== "pending_review" || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null) throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
-      const reference = bankReference(order.receipt.bankReference);
-      const amount = minorAmount(order.totalMinor);
-      const note = "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica.";
-      const dup = await this.collection("manual_payments").findOne({ bank_reference: reference }, { session });
+      if (order.status === "ready" && existing && (receiptId === null || existing.receipt_id === receiptId)) return order;
+      if (order.version !== expectedVersion || order.status === "ready") throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
+      if (receiptId !== null && (order.status !== "pending_review" || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
+        throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
+      }
+      const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
+      const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor);
+      const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
+      const dup = await this.collection("manual_payments").findOne({ bank_reference: reference, order_id: { $ne: id } }, { session });
       if (dup) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
       const now = timestamp2();
       await this.collection("manual_payments").insertOne({
@@ -1134,7 +1157,7 @@ var MongoShopDatabase = class {
         order_id: id,
         bank_reference: reference,
         amount_minor: amount,
-        receipt_id: order.receipt.id,
+        receipt_id: useReceipt?.id ?? null,
         confirmed_by: actor,
         confirmed_at: now,
         note
@@ -1190,7 +1213,7 @@ var MongoShopDatabase = class {
     const search = (query.get("q") ?? "").trim().slice(0, 80);
     const filterQuery = {};
     if (filter === "pending") {
-      filterQuery.status = { $in: ["pending_details", "awaiting_payment", "pending_review"] };
+      filterQuery.status = { $in: ["pending_details", "awaiting_payment", "pending_review", "rejected"] };
     } else if (statuses2.includes(filter)) {
       filterQuery.status = filter;
     } else if (filter !== "all") {

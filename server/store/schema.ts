@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS receipts (
 CREATE INDEX IF NOT EXISTS receipt_hash ON receipts(raw_hash);
 CREATE TABLE IF NOT EXISTS manual_payments (
   order_id TEXT PRIMARY KEY REFERENCES shop_orders(id), bank_reference TEXT NOT NULL UNIQUE,
-  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), receipt_id TEXT NOT NULL REFERENCES receipts(id),
+  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), receipt_id TEXT REFERENCES receipts(id),
   confirmed_by TEXT NOT NULL, confirmed_at TEXT NOT NULL, note TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS shop_audit (
