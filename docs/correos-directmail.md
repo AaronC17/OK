@@ -59,3 +59,14 @@ Sin estas variables el correo queda **deshabilitado y el flujo de pedidos funcio
 - La foto optimizada para correo es `public/images/mail-gomitas-v1.png` (PNG, 268 × 358, derivada de `bolsa-mix.webp`). Se publica junto con la aplicación y se muestra a la mitad de su tamaño para pantallas de alta densidad.
 - `npm run mail:preview` regenera los cuatro ejemplos en `docs/mail-previews/`. Abre `3-confirmado.html` para revisar la confirmación de compra; sus imágenes son locales, por lo que puedes revisarla antes de desplegar.
 - El botón lleva a `STORE_PUBLIC_ORIGIN`, o a `https://onkys.shop` cuando no está configurado. El seguimiento se consulta desde el navegador donde se realizó la compra.
+
+## 6. Foto del remitente (avatar en Gmail)
+
+DirectMail no permite definir una foto para el remitente: Gmail toma la imagen de la **cuenta de Google** asociada a la dirección. Como `pedidos@onkys.shop` es solo un remitente SMTP sin buzón, la vía gratuita es alta con **Cloud Identity Free** (identidad del dominio, sin Gmail ni buzón):
+
+1. Imagen lista: `public/images/onkys-perfil.png` (1024 × 1024, fondo blanco, wordmark con comilla tipográfica y punto lila). Regenérase con `node --experimental-strip-types scripts/onkys-avatar.ts`; una vez desplegada queda en `https://onkys.shop/images/onkys-perfil.png`.
+2. En `workspace.google.com` → *Comenzar*: negocio «Onky's», dominio propio `onkys.shop`, y como usuario administrador `pedidos@onkys.shop` (edición gratuita, sin Gmail).
+3. Google entrega un registro TXT `google-site-verification=...`: se añade en el DNS de Vercel (raíz) y se pulsa *Verificar*. No es necesario tocar el MX actual de DirectMail.
+4. Con la sesión de `pedidos@onkys.shop`: `accounts.google.com` → foto de perfil → subir la imagen del paso 1.
+5. En la consola de administración (`admin.google.com`) → Directorio → Compartir: permitir que los datos del perfil (incluida la foto) sean visibles fuera de la organización; Gmail decide si muestra el avatar, y con la identidad verificada es lo más cercano al logotipo.
+6. La alternativa con garantía es **BIMI** con certificado de marca (VMC/CMC), de pago anual; no tiene sentido mientras la tienda sea pequeña.
