@@ -59,7 +59,7 @@ function linesTable(order: ShopOrder, paid: boolean): { html: string; text: stri
 
 function noteBox(title: string, content: string): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-    <tr><td bgcolor="#fbfaf9" style="padding:18px 20px;border:1px solid #e5e0e6;border-left:3px solid #9c7bb1;border-radius:0 8px 8px 0;font-size:14px;line-height:23px;color:#5d5664;">
+    <tr><td bgcolor="#fbfaf9" style="padding:18px 20px;border-radius:8px;font-size:14px;line-height:23px;color:#5d5664;">
       <h2 style="margin:0 0 8px;color:#382448;font-size:14px;line-height:20px;font-weight:700;">${esc(title)}</h2>${content}
     </td></tr></table>`
 }
@@ -75,17 +75,6 @@ function sinpeBox(order: ShopOrder): string {
     <p style="margin:0 0 12px;">${esc(destination.beneficiary)}<br><span style="color:#716b76;font-size:12px;">${esc(destination.bank)}</span></p>
     <p style="margin:0 0 8px;">Monto exacto: <strong>${esc(money(order.totalMinor, store))}</strong><br>Descripción: <strong style="word-break:break-word;">${esc(order.code)}</strong></p>
     <p style="margin:0;">Después, sube el comprobante desde tu pedido en la tienda. Nuestro equipo revisará el pago y te enviará la confirmación.</p>`)
-}
-
-function orderProgress(event: OrderMailEvent): string {
-  const paid = event === 'payment.confirmed_manual'
-  const paymentLabel = paid ? 'Pago confirmado' : event === 'receipt.submitted' ? 'En revisión' : event === 'receipt.correction_requested' ? 'Revisar pago' : 'Pago pendiente'
-  const labels = ['Pedido recibido', paymentLabel, paid ? 'En preparación' : 'Preparación']
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
-    <tr>${labels.map((label, index) => `${index ? '<td width="12" style="width:12px;"></td>' : ''}<td valign="top" style="border-top:3px solid ${index === 0 || paid ? '#382448' : index === 1 ? '#9c7bb1' : '#e5e0e6'};padding-top:10px;">
-      <p style="margin:0 0 4px;font-size:10px;line-height:14px;letter-spacing:1px;color:#716b76;">0${index + 1}${index === (paid ? 2 : 1) ? ' · AHORA' : ''}</p>
-      <p style="margin:0;font-size:11px;line-height:16px;font-weight:700;color:${index < 2 || paid ? '#382448' : '#716b76'};">${label}</p>
-    </td>`).join('')}</tr></table>`
 }
 
 /** Contenido del correo por estado. Devuelve null cuando el pedido no tiene correo de contacto. */
@@ -108,7 +97,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   if (event === 'order.created') {
     title = 'Recibimos tu pedido'
     headline = 'Un antojo<br>bien elegido.'
-    status = 'PEDIDO RECIBIDO'
+    status = 'Pedido recibido'
     const awaitingDetails = order.status === 'pending_details' || !order.destination || order.totalMinor === null
     preheader = awaitingDetails ? 'Tu pedido está guardado. Estamos por confirmar los datos de pago.' : 'Tu selección está guardada. Solo falta completar el pago con SINPE Móvil.'
     lead = `¡Hola, ${name}! ${awaitingDetails ? 'Tu pedido quedó registrado. La tienda debe confirmar los datos de pago para continuar.' : 'Recibimos tu pedido. Completa el pago con SINPE Móvil para que podamos preparar tus gomitas.'}`
@@ -118,7 +107,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   } else if (event === 'receipt.submitted') {
     title = 'Tu pedido está en revisión'
     headline = 'Tu pedido,<br>en revisión.'
-    status = 'COMPROBANTE RECIBIDO'
+    status = 'En revisión'
     preheader = 'Revisaremos tu pago. Una vez confirmado, prepararemos tu pedido para la entrega.'
     lead = `¡Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago para confirmar tu pedido.`
     body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. <strong>En cuanto confirmemos el pago, prepararemos tu pedido para la entrega</strong> y te avisaremos por este correo.</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
@@ -126,7 +115,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   } else if (paid) {
     title = '¡Pago confirmado!'
     headline = 'Tu antojo,<br>confirmado.'
-    status = 'PAGO CONFIRMADO'
+    status = 'Pago confirmado'
     preheader = 'Verificamos tu pago. Tu pedido ya está confirmado y entra a preparación.'
     const confirmed = order.paymentConfirmedAt ? totalDate.format(new Date(order.paymentConfirmedAt)) : ''
     lead = `¡Gracias por elegir Onky’s, ${name}! Verificamos tu pago y tu pedido ya entra a preparación.`
@@ -138,7 +127,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   } else {
     title = 'Revisemos tu comprobante'
     headline = 'Un detalle<br>por revisar.'
-    status = 'REVISA TU COMPROBANTE'
+    status = 'Revisa tu comprobante'
     preheader = 'Necesitamos revisar tu comprobante antes de confirmar el pago de tu pedido.'
     const reason = order.customerMessage
     lead = `Hola, ${name}. Aún no pudimos confirmar el pago. Revisemos el comprobante para continuar con tu pedido.`
@@ -163,7 +152,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
       .mail-outer{padding:16px 8px!important;} .mail-pad{padding-left:22px!important;padding-right:22px!important;}
       .mail-hero{padding-top:28px!important;padding-bottom:28px!important;} .hero-title{font-size:34px!important;line-height:37px!important;}
       .hero-art{display:none!important;width:0!important;height:0!important;overflow:hidden!important;}
-      .brand-caption{font-size:9px!important;letter-spacing:1px!important;} .order-meta{display:block!important;width:100%!important;text-align:left!important;}
+      .order-meta{display:block!important;width:100%!important;text-align:left!important;}
       .order-date{padding-top:12px!important;} .order-total{font-size:21px!important;} .mail-button{display:block!important;text-align:center!important;}
     }
   </style>
@@ -174,17 +163,16 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   <tr><td align="center" class="mail-outer" style="padding:36px 16px;">
     <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;border:1px solid #e5e0e6;border-radius:16px;border-spacing:0;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
-      <tr><td height="5" bgcolor="#382448" style="height:5px;font-size:0;line-height:0;border-radius:16px 16px 0 0;">&nbsp;</td></tr>
-      <tr><td class="mail-pad" bgcolor="#fbfaf9" style="padding:26px 36px;border-bottom:1px solid #e5e0e6;">
+      <tr><td class="mail-pad" bgcolor="#fbfaf9" style="padding:26px 36px;border-radius:16px 16px 0 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky’s<span style="color:#9c7bb1;">.</span></td>
-          <td align="right" class="brand-caption" style="color:#716b76;font-size:10px;line-height:17px;letter-spacing:1.5px;">GOMITAS<br>ENCHILADAS</td>
+          <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
         </tr></table>
       </td></tr>
       <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:34px 36px 32px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td valign="middle">
-            <p style="margin:0 0 16px;color:#634479;font-size:10px;line-height:16px;font-weight:700;letter-spacing:1.7px;">${status}</p>
+            <p style="margin:0 0 14px;color:#634479;font-size:12px;line-height:18px;font-weight:400;">${status}</p>
             <h1 class="hero-title" style="margin:0 0 18px;color:#382448;font-size:38px;line-height:41px;letter-spacing:-1.6px;font-weight:800;">${headline}</h1>
             <p style="margin:0;font-size:14px;line-height:23px;color:#5d5664;">${lead}</p>
           </td>
@@ -193,15 +181,14 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
           </td>
         </tr></table>
       </td></tr>
-      <tr><td class="mail-pad" style="padding:26px 36px 30px;">${orderProgress(event)}</td></tr>
       <tr><td class="mail-pad" style="padding:0 36px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e5e0e6;"><tr>
-          <td class="order-meta" style="padding:22px 0 0;">
-            <p style="margin:0 0 6px;color:#716b76;font-size:10px;line-height:15px;letter-spacing:1.3px;">TU PEDIDO</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td class="order-meta" style="padding:30px 0 0;">
+            <p style="margin:0 0 6px;color:#716b76;font-size:12px;line-height:18px;">Tu pedido</p>
             <p style="margin:0;color:#382448;font-family:'Courier New',monospace;font-size:14px;line-height:20px;font-weight:700;word-break:break-word;">${code}</p>
           </td>
-          <td align="right" class="order-meta order-date" style="padding:22px 0 0;">
-            <p style="margin:0 0 6px;color:#716b76;font-size:10px;line-height:15px;letter-spacing:1.3px;">FECHA DEL PEDIDO</p>
+          <td align="right" class="order-meta order-date" style="padding:30px 0 0;">
+            <p style="margin:0 0 6px;color:#716b76;font-size:12px;line-height:18px;">Fecha del pedido</p>
             <p style="margin:0;color:#211d25;font-size:13px;line-height:20px;">${esc(orderDate.format(new Date(order.createdAt)))}</p>
           </td>
         </tr></table>
@@ -209,14 +196,14 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
         ${totals.html}
       </td></tr>
       <tr><td class="mail-pad" style="padding:26px 36px;">
-        <p style="margin:0 0 8px;color:#716b76;font-size:10px;line-height:15px;letter-spacing:1.3px;">${order.delivery.requiresAddress ? 'DATOS DE ENTREGA' : 'DATOS DE RECOGIDA'}</p>
+        <p style="margin:0 0 8px;color:#716b76;font-size:12px;line-height:18px;">${order.delivery.requiresAddress ? 'Datos de entrega' : 'Datos de recogida'}</p>
         <p style="margin:0 0 4px;color:#211d25;font-size:14px;line-height:22px;font-weight:700;">${esc(order.customer.name)}</p>
         <p style="margin:0;color:#5d5664;font-size:13px;line-height:21px;">${esc(order.delivery.name)}${order.delivery.requiresAddress && order.customer.address ? `<br>${esc(order.customer.address).replace(/\r?\n/g, '<br>')}` : ''}</p>
       </td></tr>
       <tr><td class="mail-pad" style="padding:0 36px;">${body}</td></tr>
       ${origin ? `<tr><td align="center" class="mail-pad" style="padding:28px 36px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:16px 32px;">
-          <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:16px 32px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}&nbsp; &#8594;</a>
+          <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:16px 32px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
         </td></tr></table>
         <p style="margin:12px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda y entra a «Pedido y seguimiento»<br>desde el navegador donde hiciste tu compra.</p>
       </td></tr>` : ''}
@@ -224,8 +211,8 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
         <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
         <p style="margin:4px 0 0;color:#716b76;font-size:12px;line-height:19px;">Con cariño, el equipo de Onky’s.</p>
       </td></tr>
-      <tr><td align="center" class="mail-pad" bgcolor="#fbfaf9" style="padding:22px 36px;border-top:1px solid #e5e0e6;border-radius:0 0 16px 16px;">
-        <p style="margin:0;color:#634479;font-size:11px;line-height:18px;font-weight:700;letter-spacing:1px;">Dulce. Ácido. Picosito.</p>
+      <tr><td align="center" class="mail-pad" bgcolor="#fbfaf9" style="padding:22px 36px;border-radius:0 0 16px 16px;">
+        <p style="margin:0;color:#716b76;font-size:11px;line-height:18px;">Dulce. Ácido. Picosito.</p>
       </td></tr>
     </table>
     <!--[if mso]></td></tr></table><![endif]-->
