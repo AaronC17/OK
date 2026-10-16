@@ -1566,11 +1566,11 @@ function esc(value) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 }
 function linesTable(order, paid) {
-  const html = order.lines.map((line) => `<tr><td style="padding:18px 12px 18px 0;border-bottom:1px solid #e5e0e6;vertical-align:top;">
+  const html = order.lines.map((line) => `<tr><td style="padding:12px 12px 12px 0;border-bottom:1px solid #e5e0e6;vertical-align:top;">
       <p style="margin:0 0 5px;font-size:15px;line-height:21px;font-weight:700;color:#211d25;">${esc(line.name)}</p>
       ${line.options.length ? `<p style="margin:0 0 6px;font-size:12px;line-height:18px;color:#716b76;">${esc(line.options.join(" \xB7 "))}</p>` : ""}
       <p style="margin:0;font-size:12px;line-height:18px;color:#716b76;">${line.quantity} \xD7 ${esc(money(line.unitPriceMinor, store))}</p>
-    </td><td align="right" style="padding:18px 0;border-bottom:1px solid #e5e0e6;vertical-align:top;font-size:14px;line-height:21px;font-weight:700;color:#382448;white-space:nowrap;">${esc(money(line.lineTotalMinor, store))}</td></tr>`).join("");
+    </td><td align="right" style="padding:12px 0;border-bottom:1px solid #e5e0e6;vertical-align:top;font-size:14px;line-height:21px;font-weight:700;color:#382448;white-space:nowrap;">${esc(money(line.lineTotalMinor, store))}</td></tr>`).join("");
   const shipping = order.shippingMinor === null ? "Env\xEDo por confirmar" : order.shippingMinor === 0 ? "Sin costo" : money(order.shippingMinor, store);
   const total = order.totalMinor === null ? "Por confirmar" : money(order.totalMinor, store);
   return {
@@ -1580,11 +1580,11 @@ function linesTable(order, paid) {
         <th scope="col" align="right" style="padding:0 0 10px;border-bottom:1px solid #e5e0e6;color:#716b76;font-size:11px;font-weight:400;">Importe</th>
       </tr></thead>
       <tbody>${html}
-        <tr><td style="padding:18px 10px 6px 0;color:#716b76;font-size:13px;">Subtotal</td><td align="right" style="padding:18px 0 6px;color:#211d25;font-size:13px;white-space:nowrap;">${esc(money(order.subtotalMinor, store))}</td></tr>
-        <tr><td style="padding:4px 10px 20px 0;color:#716b76;font-size:13px;line-height:19px;">${esc(order.delivery.name)}</td><td align="right" style="padding:4px 0 20px;color:#211d25;font-size:13px;line-height:19px;">${esc(shipping)}</td></tr>
+        <tr><td style="padding:14px 10px 6px 0;color:#716b76;font-size:13px;">Subtotal</td><td align="right" style="padding:14px 0 6px;color:#211d25;font-size:13px;white-space:nowrap;">${esc(money(order.subtotalMinor, store))}</td></tr>
+        <tr><td style="padding:4px 10px 14px 0;color:#716b76;font-size:13px;line-height:19px;">${esc(order.delivery.name)}</td><td align="right" style="padding:4px 0 14px;color:#211d25;font-size:13px;line-height:19px;">${esc(shipping)}</td></tr>
         <tr>
-          <th scope="row" align="left" bgcolor="#f2edf5" style="padding:18px 16px;border-radius:8px 0 0 8px;color:#382448;font-size:14px;font-weight:700;">${paid ? "Total pagado" : "Total del pedido"}<br><span style="font-size:11px;line-height:20px;font-weight:400;color:#716b76;">Colones costarricenses \xB7 CRC</span></th>
-          <td align="right" bgcolor="#f2edf5" class="order-total" style="padding:18px 16px 18px 0;border-radius:0 8px 8px 0;color:#382448;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-0.8px;">${esc(total)}</td>
+          <th scope="row" align="left" bgcolor="#f2edf5" style="padding:14px 16px;border-radius:8px 0 0 8px;color:#382448;font-size:14px;font-weight:700;">${paid ? "Total pagado" : "Total del pedido"}<br><span style="font-size:11px;line-height:20px;font-weight:400;color:#716b76;">Colones costarricenses \xB7 CRC</span></th>
+          <td align="right" bgcolor="#f2edf5" class="order-total" style="padding:14px 16px 14px 0;border-radius:0 8px 8px 0;color:#382448;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-0.8px;">${esc(total)}</td>
         </tr>
       </tbody></table>`,
     text: order.lines.map((line) => `\u2022 ${line.quantity} \xD7 ${line.name}${line.options.length ? ` (${line.options.join(", ")})` : ""} \u2014 ${money(line.lineTotalMinor, store)}`).join("\n") + `
@@ -1595,8 +1595,8 @@ ${paid ? "Total pagado" : "Total del pedido"}: ${total} (CRC)`
 }
 function noteBox(title, content) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-    <tr><td bgcolor="#fbfaf9" style="padding:18px 20px;border-radius:8px;font-size:14px;line-height:23px;color:#5d5664;">
-      <h2 style="margin:0 0 8px;color:#382448;font-size:14px;line-height:20px;font-weight:700;">${esc(title)}</h2>${content}
+    <tr><td bgcolor="#fbfaf9" style="padding:16px 18px;border-radius:8px;font-size:14px;line-height:22px;color:#5d5664;">
+      <h2 style="margin:0 0 6px;color:#382448;font-size:14px;line-height:20px;font-weight:700;">${esc(title)}</h2>${content}
     </td></tr></table>`;
 }
 function sinpeBox(order) {
@@ -1683,35 +1683,36 @@ Abre tu pedido y adjunta el comprobante corregido, conservando el mismo c\xF3dig
     table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;} img{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
     a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
     @media only screen and (max-width:480px){
-      .mail-outer{padding:16px 8px!important;} .mail-pad{padding-left:22px!important;padding-right:22px!important;}
-      .mail-hero{padding-top:28px!important;padding-bottom:28px!important;} .hero-title{font-size:30px!important;line-height:33px!important;letter-spacing:-1px!important;}
+      .mail-outer{padding:16px 8px!important;} .mail-pad{padding-left:20px!important;padding-right:20px!important;}
+      .mail-hero{padding-top:22px!important;padding-bottom:22px!important;} .hero-title{font-size:30px!important;line-height:33px!important;letter-spacing:-1px!important;}
       .hero-art{width:92px!important;padding-left:14px!important;} .hero-art img{width:92px!important;height:auto!important;}
-      .order-meta{display:block!important;width:100%!important;text-align:left!important;}
-      .order-date{padding-top:12px!important;} .order-total{font-size:21px!important;} .mail-button{display:block!important;text-align:center!important;}
+      .order-total{font-size:21px!important;} .mail-button{display:block!important;text-align:center!important;}
     }
     @media only screen and (max-width:360px){
       .hero-title{font-size:26px!important;line-height:29px!important;}
       .hero-art{width:76px!important;padding-left:10px!important;} .hero-art img{width:76px!important;}
+      .order-meta{display:block!important;width:100%!important;text-align:left!important;}
+      .order-date{padding-top:10px!important;padding-left:0!important;}
     }
   </style>
 </head>
 <body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
   <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}${"&#847; &zwnj; &nbsp; ".repeat(24)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
-  <tr><td align="center" class="mail-outer" style="padding:36px 16px;">
-    <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;border:1px solid #e5e0e6;border-radius:16px;border-spacing:0;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
-      <tr><td class="mail-pad" bgcolor="#fbfaf9" style="padding:26px 36px;border-radius:16px 16px 0 0;">
+  <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
+    <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+    <table role="presentation" class="mail-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:680px;border:1px solid #e5e0e6;border-radius:16px;border-spacing:0;box-shadow:0 12px 32px rgba(56,36,72,0.09),0 2px 6px rgba(56,36,72,0.04);overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+      <tr><td class="mail-pad" bgcolor="#fbfaf9" style="padding:20px 36px;border-radius:16px 16px 0 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky\u2019s<span style="color:#9c7bb1;">.</span></td>
           <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
         </tr></table>
       </td></tr>
-      <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:34px 36px 32px;">
+      <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:24px 36px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
           <td valign="middle">
-            <p style="margin:0 0 14px;color:#634479;font-size:12px;line-height:18px;font-weight:400;">${status}</p>
-            <h1 class="hero-title" style="margin:0 0 18px;color:#382448;font-size:38px;line-height:41px;letter-spacing:-1.6px;font-weight:800;">${headline}</h1>
+            <p style="margin:0 0 12px;color:#634479;font-size:12px;line-height:18px;font-weight:400;">${status}</p>
+            <h1 class="hero-title" style="margin:0 0 12px;color:#382448;font-size:38px;line-height:41px;letter-spacing:-1.6px;font-weight:800;">${headline}</h1>
             <p style="margin:0;font-size:14px;line-height:23px;color:#5d5664;">${lead}</p>
           </td>
           <td class="hero-art" width="154" align="right" valign="middle" style="width:154px;padding-left:20px;">
@@ -1721,40 +1722,40 @@ Abre tu pedido y adjunta el comprobante corregido, conservando el mismo c\xF3dig
       </td></tr>
       <tr><td class="mail-pad" style="padding:0 36px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td class="order-meta" style="padding:30px 0 0;">
+          <td class="order-meta" style="padding:22px 0 0;">
             <p style="margin:0 0 6px;color:#716b76;font-size:12px;line-height:18px;">Tu pedido</p>
             <p style="margin:0;color:#382448;font-family:'Courier New',monospace;font-size:14px;line-height:20px;font-weight:700;word-break:break-word;">${code}</p>
           </td>
-          <td align="right" class="order-meta order-date" style="padding:30px 0 0;">
+          <td align="right" class="order-meta order-date" style="padding:22px 0 0 16px;">
             <p style="margin:0 0 6px;color:#716b76;font-size:12px;line-height:18px;">Fecha del pedido</p>
             <p style="margin:0;color:#211d25;font-size:13px;line-height:20px;">${esc(orderDate.format(new Date(order.createdAt)))}</p>
           </td>
         </tr></table>
-        <h2 style="margin:28px 0 18px;color:#211d25;font-size:20px;line-height:26px;letter-spacing:-0.4px;">Tu selecci\xF3n</h2>
+        <h2 style="margin:22px 0 14px;color:#211d25;font-size:20px;line-height:26px;letter-spacing:-0.4px;">Tu selecci\xF3n</h2>
         ${totals2.html}
       </td></tr>
-      <tr><td class="mail-pad" style="padding:26px 36px;">
+      <tr><td class="mail-pad" style="padding:20px 36px;">
         <p style="margin:0 0 8px;color:#716b76;font-size:12px;line-height:18px;">${order.delivery.requiresAddress ? "Datos de entrega" : "Datos de recogida"}</p>
         <p style="margin:0 0 4px;color:#211d25;font-size:14px;line-height:22px;font-weight:700;">${esc(order.customer.name)}</p>
         <p style="margin:0;color:#5d5664;font-size:13px;line-height:21px;">${esc(order.delivery.name)}${order.delivery.requiresAddress && order.customer.address ? `<br>${esc(order.customer.address).replace(/\r?\n/g, "<br>")}` : ""}</p>
       </td></tr>
       <tr><td class="mail-pad" style="padding:0 36px;">${body2}</td></tr>
-      ${origin ? `<tr><td align="center" class="mail-pad" style="padding:28px 36px 0;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:16px 32px;">
-          <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:16px 32px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
+      ${origin ? `<tr><td align="center" class="mail-pad" style="padding:20px 36px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:14px 28px;">
+          <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
         </td></tr></table>
-        <p style="margin:12px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda y entra a \xABPedido y seguimiento\xBB<br>desde el navegador donde hiciste tu compra.</p>
+        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda y entra a \xABPedido y seguimiento\xBB<br>desde el navegador donde hiciste tu compra.</p>
       </td></tr>` : ""}
-      <tr><td align="center" class="mail-pad" style="padding:28px 36px 32px;">
+      <tr><td align="center" class="mail-pad" style="padding:20px 36px;">
         <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
         <p style="margin:4px 0 0;color:#716b76;font-size:12px;line-height:19px;">Con cari\xF1o, el equipo de Onky\u2019s.</p>
       </td></tr>
-      <tr><td align="center" class="mail-pad" bgcolor="#fbfaf9" style="padding:22px 36px;border-radius:0 0 16px 16px;">
+      <tr><td align="center" class="mail-pad" bgcolor="#fbfaf9" style="padding:14px 36px;border-radius:0 0 16px 16px;">
         <p style="margin:0;color:#716b76;font-size:11px;line-height:18px;">Dulce. \xC1cido. Picosito.</p>
       </td></tr>
     </table>
     <!--[if mso]></td></tr></table><![endif]-->
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;"><tr><td align="center" style="padding:20px 16px 0;color:#716b76;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;"><tr><td align="center" style="padding:16px 16px 0;color:#716b76;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;">
       Recibiste este correo por tu pedido en Onky\u2019s.<br>Conserva el c\xF3digo <span style="word-break:break-word;">${code}</span> para identificarlo.
     </td></tr></table>
   </td></tr></table>
