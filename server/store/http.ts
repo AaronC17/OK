@@ -6,6 +6,7 @@ import { RateLimits, requireCsrf } from './security.ts'
 import { MAX_RECEIPT_BYTES, prepareReceipt } from './receipts.ts'
 import { StoreError, record } from './validation.ts'
 import { PaymentsError } from '../payments/model.ts'
+import type { OrderMailer } from './mailer.ts'
 
 const ID = '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
 const CUSTOMER_COOKIE = 'onkys_customer'
@@ -48,7 +49,7 @@ async function jsonBody(request: IncomingMessage) {
   catch (error) { if (error instanceof StoreError) throw error; throw new StoreError(400, 'JSON inválido.') }
 }
 
-export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string }
+export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string; mailer?: OrderMailer | null }
 
 export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions = {}) {
   const limits = new RateLimits()
@@ -126,7 +127,9 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         limits.check(`order:${session.hash}`, 20, 15 * 60_000)
         const key = request.headers['idempotency-key']
         if (typeof key !== 'string') throw new StoreError(422, 'Falta Idempotency-Key.')
-        json(response, 200, await store.createOrder(await jsonBody(request), session.hash, key))
+        const created = await store.createOrder(await jsonBody(request), session.hash, key)
+        await options.mailer?.notify('order.created', created)
+        json(response, 200, created)
         return
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path)
@@ -155,7 +158,9 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         const version = form.get('version')
         if (typeof version !== 'string' || !/^[1-9]\d{0,8}$/.test(version)) throw new StoreError(422, 'Versión del pedido inválida.')
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type)
-        json(response, 200, await store.addReceipt(uploadPath[1], session.hash, form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared))
+        const received = await store.addReceipt(uploadPath[1], session.hash, form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared)
+        await options.mailer?.notify('receipt.submitted', received)
+        json(response, 200, received)
         return
       }
       const receiptPath = new RegExp(`^/api/(admin/)?orders/(${ID})/receipts/(${ID})$`).exec(path)
@@ -184,8 +189,11 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         if (!adminOrder[2] && method === 'GET') { json(response, 200, { order: await store.getOrder(adminOrder[1]), audit: await store.auditFor(adminOrder[1]) }); return }
         if (method === 'POST' && adminOrder[2]) {
           const data = await jsonBody(request)
-          const operation = adminOrder[2] === 'confirm' ? store.confirm.bind(store) : store.reject.bind(store)
-          json(response, 200, await operation(adminOrder[1], data, (await store.adminName())!))
+          const confirm = adminOrder[2] === 'confirm'
+          const operation = confirm ? store.confirm.bind(store) : store.reject.bind(store)
+          const reviewed = await operation(adminOrder[1], data, (await store.adminName())!)
+          await options.mailer?.notify(confirm ? 'payment.confirmed_manual' : 'receipt.correction_requested', reviewed)
+          json(response, 200, reviewed)
           return
         }
       }

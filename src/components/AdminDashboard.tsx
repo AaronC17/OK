@@ -141,6 +141,7 @@ function AdminOrderDialog({ detail, onClose, onChanged }: { detail: OrderDetail;
         <dl className="admin-facts">
           <div><dt>Cliente</dt><dd>{order.customer.name}</dd></div>
           <div><dt>Teléfono</dt><dd><a href={`tel:+506${order.customer.phone}`}>+506 {order.customer.phone}</a></dd></div>
+          {order.customer.email && <div><dt>Correo</dt><dd><a href={`mailto:${order.customer.email}`}>{order.customer.email}</a></dd></div>}
           <div><dt>Entrega</dt><dd>{order.delivery.name}</dd></div>
           {order.customer.address && <div><dt>Dirección</dt><dd>{order.customer.address}</dd></div>}
           {order.customer.notes && <div><dt>Notas</dt><dd>{order.customer.notes}</dd></div>}

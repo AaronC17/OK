@@ -11,7 +11,7 @@ import { ShopDatabase } from './database.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { createSession, findSession, newToken, passwordMatches, tokenHash } from './security.ts'
 
-const input = () => ({ items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 }], deliveryId: 'pickup', customer: { name: 'Ana Pérez', phone: '61551234', address: '', notes: '' }, privacyAccepted: true })
+const input = () => ({ items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 }], deliveryId: 'pickup', customer: { name: 'Ana Pérez', phone: '61551234', email: 'ana.perez@ejemplo.cr', address: '', notes: '' }, privacyAccepted: true })
 const receipt = (identity = randomUUID()): PreparedReceipt => ({ data: Buffer.from(`private-test-image-${identity}`), rawHash: tokenHash(identity), contentType: 'image/webp' })
 function setup(t: TestContext, configured = true) {
   const catalog = structuredClone(store)
@@ -42,7 +42,7 @@ test('store: server generates the code and freezes catalog prices, details and d
 
 test('store: no browser-supplied code, price or paid state, no invalid customer or consent', t => {
   const { create } = setup(t)
-  for (const patch of [{ code: 'ONK-FORGED' }, { totalMinor: 1 }, { status: 'ready' }, { privacyAccepted: false }, { customer: { ...input().customer, phone: '123' } }, { items: [] }]) assert.throws(() => create('customer-a', randomUUID(), { ...input(), ...patch }))
+  for (const patch of [{ code: 'ONK-FORGED' }, { totalMinor: 1 }, { status: 'ready' }, { privacyAccepted: false }, { customer: { ...input().customer, phone: '123' } }, { customer: { ...input().customer, email: 'no-es-un-correo' } }, { customer: { ...input().customer, email: '' } }, { items: [] }]) assert.throws(() => create('customer-a', randomUUID(), { ...input(), ...patch }))
 })
 
 test('store: order retries are idempotent and scoped to the buyer, with no cross-customer leaks', t => {

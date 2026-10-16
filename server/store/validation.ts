@@ -19,6 +19,11 @@ export function text(value: unknown, min: number, max: number, label: string): s
   if (typeof value !== 'string' || value.trim().length < min || value.length > max) throw new StoreError(422, `${label}: usa entre ${min} y ${max} caracteres.`)
   return value.trim()
 }
+export function email(value: unknown): string {
+  const address = text(value, 6, 254, 'Correo electrónico').toLowerCase()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(address)) throw new StoreError(422, 'Escribe un correo válido, por ejemplo tucorreo@ejemplo.com.')
+  return address
+}
 export function phoneNumber(value: unknown): string {
   const raw = text(value, 8, 24, 'Teléfono').replace(/[\s()-]/g, '').replace(/^\+?506/, '')
   if (!/^[2-9]\d{7}$/.test(raw)) throw new StoreError(422, 'Escribe un teléfono costarricense válido de 8 dígitos.')
@@ -59,9 +64,10 @@ export function parseNewOrder(value: unknown, config: StoreConfig) {
   if (data.privacyAccepted !== true) throw new StoreError(422, 'Debes aceptar el uso de tus datos para gestionar el pedido y revisar el pago.')
   const input = parseOrderInput({ items: data.items, deliveryId: data.deliveryId })
   const rawCustomer = record(data.customer)
-  fields(rawCustomer, ['name', 'phone', 'address', 'notes'])
+  fields(rawCustomer, ['name', 'phone', 'email', 'address', 'notes'])
   const customer: OrderCustomer = {
     name: text(rawCustomer.name, 1, 100, 'Nombre'), phone: phoneNumber(rawCustomer.phone),
+    email: email(rawCustomer.email),
     address: text(rawCustomer.address, 0, 500, 'Dirección'), notes: text(rawCustomer.notes, 0, 1000, 'Observaciones'),
   }
   const resolved = input.items.map(item => {

@@ -201,6 +201,16 @@ CREATE TABLE IF NOT EXISTS shop_events (
 
 // src/lib/shop.ts
 var MAX_QUANTITY = 99;
+function money(amountMinor, config) {
+  const { code, locale, fractionDigits } = config.currency;
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: code,
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: fractionDigits
+  }).format(amountMinor / 10 ** fractionDigits);
+}
 function selectionKey(selection2) {
   return selection2.kind === "gummy" ? `gummy:${[...new Set(selection2.typeIds)].sort().join("+")}:${selection2.weight}` : `dessert:${selection2.productId}:${selection2.variantId}`;
 }
@@ -343,6 +353,11 @@ function text2(value, min, max, label) {
   if (typeof value !== "string" || value.trim().length < min || value.length > max) throw new StoreError(422, `${label}: usa entre ${min} y ${max} caracteres.`);
   return value.trim();
 }
+function email(value) {
+  const address = text2(value, 6, 254, "Correo electr\xF3nico").toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(address)) throw new StoreError(422, "Escribe un correo v\xE1lido, por ejemplo tucorreo@ejemplo.com.");
+  return address;
+}
 function phoneNumber(value) {
   const raw = text2(value, 8, 24, "Tel\xE9fono").replace(/[\s()-]/g, "").replace(/^\+?506/, "");
   if (!/^[2-9]\d{7}$/.test(raw)) throw new StoreError(422, "Escribe un tel\xE9fono costarricense v\xE1lido de 8 d\xEDgitos.");
@@ -382,10 +397,11 @@ function parseNewOrder(value, config) {
   if (data.privacyAccepted !== true) throw new StoreError(422, "Debes aceptar el uso de tus datos para gestionar el pedido y revisar el pago.");
   const input = parseOrderInput({ items: data.items, deliveryId: data.deliveryId });
   const rawCustomer = record(data.customer);
-  fields2(rawCustomer, ["name", "phone", "address", "notes"]);
+  fields2(rawCustomer, ["name", "phone", "email", "address", "notes"]);
   const customer = {
     name: text2(rawCustomer.name, 1, 100, "Nombre"),
     phone: phoneNumber(rawCustomer.phone),
+    email: email(rawCustomer.email),
     address: text2(rawCustomer.address, 0, 500, "Direcci\xF3n"),
     notes: text2(rawCustomer.notes, 0, 1e3, "Observaciones")
   };
@@ -1443,7 +1459,9 @@ function makeShopHandler(store2, options = {}) {
         limits.check(`order:${session.hash}`, 20, 15 * 6e4);
         const key = request.headers["idempotency-key"];
         if (typeof key !== "string") throw new StoreError(422, "Falta Idempotency-Key.");
-        json(response, 200, await store2.createOrder(await jsonBody(request), session.hash, key));
+        const created = await store2.createOrder(await jsonBody(request), session.hash, key);
+        await options.mailer?.notify("order.created", created);
+        json(response, 200, created);
         return;
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path);
@@ -1475,7 +1493,9 @@ function makeShopHandler(store2, options = {}) {
         const version2 = form.get("version");
         if (typeof version2 !== "string" || !/^[1-9]\d{0,8}$/.test(version2)) throw new StoreError(422, "Versi\xF3n del pedido inv\xE1lida.");
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type);
-        json(response, 200, await store2.addReceipt(uploadPath[1], session.hash, form.get("code"), form.get("bankReference"), form.get("uploadKey"), Number(version2), prepared));
+        const received = await store2.addReceipt(uploadPath[1], session.hash, form.get("code"), form.get("bankReference"), form.get("uploadKey"), Number(version2), prepared);
+        await options.mailer?.notify("receipt.submitted", received);
+        json(response, 200, received);
         return;
       }
       const receiptPath = new RegExp(`^/api/(admin/)?orders/(${ID})/receipts/(${ID})$`).exec(path);
@@ -1510,8 +1530,11 @@ function makeShopHandler(store2, options = {}) {
         }
         if (method === "POST" && adminOrder[2]) {
           const data = await jsonBody(request);
-          const operation = adminOrder[2] === "confirm" ? store2.confirm.bind(store2) : store2.reject.bind(store2);
-          json(response, 200, await operation(adminOrder[1], data, await store2.adminName()));
+          const confirm = adminOrder[2] === "confirm";
+          const operation = confirm ? store2.confirm.bind(store2) : store2.reject.bind(store2);
+          const reviewed = await operation(adminOrder[1], data, await store2.adminName());
+          await options.mailer?.notify(confirm ? "payment.confirmed_manual" : "receipt.correction_requested", reviewed);
+          json(response, 200, reviewed);
           return;
         }
       }
@@ -1520,6 +1543,163 @@ function makeShopHandler(store2, options = {}) {
       if (response.destroyed || response.writableEnded) return;
       const known = error instanceof StoreError || error instanceof PaymentsError;
       json(response, known ? error.status : 500, { error: known ? error.message : "No pudimos completar la operaci\xF3n. Actualiza el estado antes de reintentar; no se ha confirmado autom\xE1ticamente ning\xFAn pago." });
+    }
+  };
+}
+
+// server/store/mailer.ts
+import nodemailer from "nodemailer";
+function readSmtpConfig(env = process.env) {
+  const host = env.SMTP_HOST?.trim();
+  const user = env.SMTP_USER?.trim();
+  const pass = env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  const port = Number(env.SMTP_PORT || "465");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("SMTP_PORT debe ser un n\xFAmero de puerto v\xE1lido.");
+  const secure = port === 465 ? true : env.SMTP_SECURE ? env.SMTP_SECURE.toLowerCase() === "true" : false;
+  return { host, port, secure, user, pass, from: env.MAIL_FROM?.trim() || `Onky\u2019s <${user}>`, bcc: env.MAIL_BCC?.trim() || void 0 };
+}
+var totalDate = new Intl.DateTimeFormat("es-CR", { timeZone: "America/Costa_Rica", dateStyle: "long", timeStyle: "short" });
+function esc(value) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+function linesTable(order) {
+  const html = order.lines.map((line) => `<tr><td style="padding:6px 0;color:#3a2b47;">${esc(`${line.quantity} \xD7 ${line.name}${line.options.length ? ` \xB7 ${line.options.join(" \xB7 ")}` : ""}`)}</td><td style="padding:6px 0;text-align:right;color:#3a2b47;white-space:nowrap;">${esc(money(line.lineTotalMinor, store))}</td></tr>`).join("");
+  const shipping = order.shippingMinor === null ? "Env\xEDo por confirmar" : money(order.shippingMinor, store);
+  const total = order.totalMinor === null ? "Por confirmar" : money(order.totalMinor, store);
+  return {
+    html: `<table style="width:100%;border-collapse:collapse;font-size:14px;">${html}<tr><td style="padding:6px 0;color:#6b5a7d;">Env\xEDo (${esc(order.delivery.name)})</td><td style="padding:6px 0;text-align:right;color:#6b5a7d;">${esc(shipping)}</td></tr><tr><td style="padding:10px 0;border-top:2px solid #e6daee;font-weight:700;color:#492f5d;">Total</td><td style="padding:10px 0;border-top:2px solid #e6daee;text-align:right;font-weight:700;color:#492f5d;">${esc(total)}</td></tr></table>`,
+    text: order.lines.map((line) => `\u2022 ${line.quantity} \xD7 ${line.name}${line.options.length ? ` (${line.options.join(", ")})` : ""} \u2014 ${money(line.lineTotalMinor, store)}`).join("\n") + `
+Env\xEDo (${order.delivery.name}): ${shipping}
+Total: ${total}`
+  };
+}
+function sinpeBox(order) {
+  if (!order.destination || order.totalMinor === null) {
+    return '<p style="margin:16px 0;color:#6b5a7d;font-size:14px;">A\xFAn no hay datos de pago para este pedido: la tienda compartir\xE1 el monto exacto y el n\xFAmero SINPE apenas se activen. Te avisaremos por este correo.</p>';
+  }
+  const destination = order.destination;
+  const phone = destination.phone.length === 8 ? `${destination.phone.slice(0, 4)}-${destination.phone.slice(4)}` : destination.phone;
+  return `<div style="margin:16px 0;padding:14px 16px;border:1px solid #e6daee;border-radius:10px;background:#faf8fc;">
+<p style="margin:0 0 6px;font-size:14px;color:#3a2b47;">Haces tu <strong>SINPE M\xF3vil</strong> al <strong>${esc(phone)}</strong> (${esc(destination.bank)}) a nombre de <strong>${esc(destination.beneficiary)}</strong>.</p>
+<p style="margin:0;font-size:14px;color:#3a2b47;">Monto exacto: <strong>${esc(money(order.totalMinor, store))}</strong>. En la descripci\xF3n escribes el c\xF3digo <strong style="color:#492f5d;">${esc(order.code)}</strong>.</p></div>`;
+}
+function stepsList(order) {
+  if (order.status === "pending_details") {
+    return '<li style="margin-bottom:6px;">Tu pedido qued\xF3 registrado y esperar\xE1 a que la tienda active los datos de pago.</li><li>Te avisaremos por este correo cuando puedas pagar.</li>';
+  }
+  return `<li style="margin-bottom:6px;">Haces tu SINPE M\xF3vil con el monto y c\xF3digo exactos.</li><li style="margin-bottom:6px;">Subes la captura del comprobante desde la tienda y confirmas el pago.</li><li>Nuestro equipo lo revisa y confirma tu pedido. Te avisamos por este correo.</li>`;
+}
+function orderEmailMessage(event, order, origin = "") {
+  const recipient = order.customer?.email;
+  if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(recipient)) return null;
+  const totals2 = linesTable(order);
+  const code = esc(order.code);
+  const name = esc(order.customer.name.split(" ")[0] || order.customer.name);
+  let title = "";
+  let eyes = "";
+  let lead = "";
+  let body2 = "";
+  if (event === "order.created") {
+    title = "Recibimos tu pedido";
+    eyes = "PEDIDO REGISTRADO";
+    lead = `\xA1Hola, ${name}! Tu pedido <strong>${code}</strong> qued\xF3 registrado en Onky\u2019s.`;
+    body2 = `<div style="margin:16px 0;color:#3a2b47;font-size:14px;">
+<ol style="margin:0 0 0 18px;padding:0;">${stepsList(order)}</ol></div>${sinpeBox(order)}`;
+  } else if (event === "receipt.submitted") {
+    title = "Tu pedido est\xE1 en revisi\xF3n";
+    eyes = "PAGO EN REVISI\xD3N";
+    lead = `Recibimos el comprobante de tu pedido <strong>${code}</strong>.`;
+    body2 = `<div style="margin:16px 0;color:#3a2b47;font-size:14px;">
+<p style="margin:0 0 10px;">Ahora nuestro equipo revisa que el pago coincida con tu pedido. <strong>En cuanto lo confirmemos, tu pedido se prepara para la entrega</strong> y te avisamos por este correo.</p>
+<ul style="margin:0 0 0 18px;padding:0;">
+<li style="margin-bottom:6px;">Estado actual: <strong>En revisi\xF3n</strong>. No es necesario que hagas nada m\xE1s.</li>
+<li style="margin-bottom:6px;">Referencia del comprobante: <strong>${esc(order.receipt?.bankReference ?? "")}</strong>.</li>
+<li>Si cambio algo, te escribimos con la correcci\xF3n al instante.</li>
+</ul></div>`;
+  } else if (event === "payment.confirmed_manual") {
+    title = "\xA1Pago confirmado!";
+    eyes = "PEDIDO CONFIRMADO";
+    const confirmed = order.paymentConfirmedAt ? totalDate.format(new Date(order.paymentConfirmedAt)) : "";
+    lead = `Verificamos tu pago del pedido <strong>${code}</strong>. \xA1Ya es tuyo!`;
+    body2 = `<div style="margin:16px 0;color:#3a2b47;font-size:14px;">
+<p style="margin:0 0 10px;">Tu pedido qued\xF3 <strong>confirmado${confirmed ? ` el ${esc(confirmed)}` : ""}</strong> y entra a preparaci\xF3n.</p>
+<p style="margin:0 0 10px;">${order.delivery.requiresAddress ? `Vamos a entregarlo por ${esc(order.delivery.name)} a la direcci\xF3n que registraste. Te avisaremos cuando salga en ruta.` : `Puedes retirarlo en el punto de recogida: <strong>${esc(order.delivery.name)}</strong>.`}</p>
+<p style="margin:0;">Cualquier detalle, escr\xEDbenos o revisa el estado desde la tienda.</p></div>`;
+  } else {
+    title = "Revisemos tu comprobante";
+    eyes = "AYUDA CON TU PAGO";
+    const reason = order.customerMessage;
+    lead = `A\xFAn no pudimos confirmar el pago del pedido <strong>${code}</strong>.`;
+    body2 = `<div style="margin:16px 0;color:#3a2b47;font-size:14px;">
+<p style="margin:0 0 10px;">Es muy f\xE1cil de arreglar. Abre la tienda, ingresa con tu carrito y sube un nuevo comprobante:</p>
+${reason ? `<ul style="margin:0 0 10px 18px;padding:0;"><li style="margin-bottom:6px;">Motivo: <strong>${esc(reason)}</strong></li><li>Usa el mismo c\xF3digo <strong style="color:#492f5d;">${code}</strong> en la descripci\xF3n de tu nuevo SINPE.</li></ul>` : ""}
+<p style="margin:0;">Nos confirmas apenas subas el nuevo comprobante.</p></div>`;
+  }
+  const message = `<!doctype html><html lang="es-CR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title></head>
+<body style="margin:0;padding:0;background:#f3ecf8;font-family:Georgia,'Times New Roman',serif;">
+<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6daee;">
+<div style="background:#492f5d;padding:18px 24px;"><div style="color:#fbfaf9;font-size:26px;letter-spacing:-0.5px;font-weight:700;">Onky\u2019s</div>
+<div style="color:#cbb8dc;font-size:11px;letter-spacing:2.4px;font-weight:700;font-family:Cambria,Georgia,serif;">${eyes}</div></div>
+<div style="padding:24px;"><h1 style="margin:0 0 10px;color:#492f5d;font-size:21px;font-family:Cambria,Georgia,serif;">${esc(title)}</h1>
+<p style="margin:0 0 6px;color:#3a2b47;font-size:15px;line-height:1.5;">${lead}</p>
+${body2}
+<div style="margin:20px 0 8px;padding:12px 16px;border-radius:10px;background:#faf8fc;border:1px solid #e6daee;">${totals2.html}</div>
+<div style="margin:14px 0 0;color:#6b5a7d;font-size:13px;">Cliente: ${esc(order.customer.name)} \xB7 ${esc(order.delivery.name)}${order.customer.address ? ` \xB7 ${esc(order.customer.address)}` : ""}</div>
+${origin ? `<a href="${esc(origin)}" style="display:inline-block;margin-top:14px;padding:10px 18px;border-radius:999px;background:#492f5d;color:#fbfaf9;text-decoration:none;font-size:14px;">Ver mi pedido en la tienda</a>` : ""}
+</div>
+<div style="padding:14px 24px;border-top:1px solid #e6daee;color:#8d7da0;font-size:11px;line-height:1.5;">Mensajes autom\xE1ticos de Onky\u2019s para tu pedido ${code}. Nadie te pedir\xE1 contrase\xF1as ni datos extra por correo.</div>
+</div></body></html>`;
+  const text3 = `${title}
+${order.customer.name}, pedido ${order.code}. Entrega: ${order.delivery.name}${order.customer.address ? `, ${order.customer.address}` : ""}.
+
+${totals2.text}
+
+${event === "order.created" ? "Estado: pedido registrado. Realiza tu SINPE y sube el comprobante desde la tienda.\n" : event === "receipt.submitted" ? "Estado: en revisi\xF3n. Una vez confirmado el pago, tu pedido se prepara para la entrega.\n" : event === "payment.confirmed_manual" ? "Estado: pago confirmado. Tu pedido entra a preparaci\xF3n.\n" : `Estado: comprobante por corregir. ${order.customerMessage ?? ""}
+`}
+${origin ? `Consulta tu pedido: ${origin}` : "Consulta tu pedido en la tienda."}`;
+  return { subject: `Onky\u2019s \xB7 ${title} (${order.code})`, html: message, text: text3 };
+}
+var MAX_TRACKED = 400;
+function createOrderMailer(env = process.env, deliver) {
+  const config = readSmtpConfig(env);
+  if (!config) return null;
+  const origin = env.STORE_PUBLIC_ORIGIN?.trim() || "";
+  const transport = deliver ? { sendMail: deliver } : nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: { user: config.user, pass: config.pass },
+    connectionTimeout: 6e3,
+    greetingTimeout: 6e3,
+    socketTimeout: 1e4
+  });
+  const sent = /* @__PURE__ */ new Map();
+  const first = (key) => {
+    if (sent.has(key)) return false;
+    if (sent.size >= MAX_TRACKED) for (const [old, time] of sent) {
+      if (time < Date.now() - 36e5) sent.delete(old);
+    }
+    if (sent.size >= MAX_TRACKED) sent.delete(sent.keys().next().value);
+    sent.set(key, Date.now());
+    return true;
+  };
+  return {
+    notify(event, order) {
+      const key = `${order.id}:${order.version || 0}:${event}`;
+      if (!first(key)) return Promise.resolve();
+      const message = orderEmailMessage(event, order, origin);
+      if (!message) {
+        sent.set(key, Date.now());
+        return Promise.resolve();
+      }
+      const to = order.customer.email;
+      return transport.sendMail({ from: config.from, to, bcc: config.bcc, subject: message.subject, html: message.html, text: message.text }).then(() => {
+        sent.set(key, Date.now());
+      }).catch((error) => {
+        sent.delete(key);
+        console.warn(`Onky\u2019s: el correo ${event} del pedido ${order.code} no sali\xF3: ${error instanceof Error ? error.message : "error desconocido"}`);
+      });
     }
   };
 }
@@ -1566,7 +1746,7 @@ async function createShopRuntime() {
     await database.close();
     throw new Error("Para producci\xF3n se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa tambi\xE9n la gu\xEDa de despliegue y privacidad.");
   }
-  const handler2 = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath });
+  const handler2 = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer() });
   let closed = false;
   return { database, handler: handler2, close: () => {
     if (!closed) {

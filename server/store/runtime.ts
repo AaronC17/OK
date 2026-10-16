@@ -5,6 +5,7 @@ import { ShopDatabase } from './database.ts'
 import { MongoShopDatabase } from './mongo.ts'
 import { makeShopHandler } from './http.ts'
 import { newToken } from './security.ts'
+import { createOrderMailer } from './mailer.ts'
 import type { ShopRepository } from './repository.ts'
 
 export async function createShopRuntime() {
@@ -42,7 +43,7 @@ export async function createShopRuntime() {
     await database.close()
     throw new Error('Para producción se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa también la guía de despliegue y privacidad.')
   }
-  const handler = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath })
+  const handler = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer() })
   let closed = false
   return { database, handler, close: () => { if (!closed) { closed = true; void database.close() } } }
 }

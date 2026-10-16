@@ -43,6 +43,7 @@ export async function checkoutOrder(page: Page, delivery: 'pickup' | 'delivery' 
   await page.getByRole('radio', { name: delivery === 'pickup' ? /Recogida/ : /Envío por Correos/ }).check()
   await page.getByLabel('Tu nombre').fill(`Cliente prueba ${randomUUID().slice(0, 6)}`)
   await page.getByLabel('Teléfono de contacto').fill('61551234')
+  await page.getByLabel('Correo electrónico').fill(`cliente-${randomUUID().slice(0, 6)}@ejemplo.cr`)
   if (delivery === 'delivery') await page.getByLabel('Dirección o punto de entrega').fill('Dirección ficticia para la prueba de envío.')
   await page.getByLabel(/Acepto que la tienda guarde/).check()
   await page.getByRole('button', { name: 'Crear pedido con SINPE' }).click()

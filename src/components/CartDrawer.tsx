@@ -10,7 +10,7 @@ import { Icon } from './Icon.tsx'
 import { OrderPanel } from './OrderPanel.tsx'
 import { Modal, ProductImage, Quantity } from './ui.tsx'
 
-type Errors = Partial<Record<'name' | 'phone' | 'deliveryId' | 'address' | 'notes' | 'privacy' | 'cart', string>>
+type Errors = Partial<Record<'name' | 'phone' | 'email' | 'deliveryId' | 'address' | 'notes' | 'privacy' | 'cart', string>>
 
 const DISMISSED_ORDER_KEY = 'onkys.dismissedOrderId'
 
@@ -26,7 +26,7 @@ function setDismissedOrderId(id: string | null) {
 }
 
 export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: () => void; cart: Cart }) {
-  const [customer, setCustomer] = useState<OrderCustomer>({ name: '', phone: '', address: '', notes: '' })
+  const [customer, setCustomer] = useState<OrderCustomer>({ name: '', phone: '', email: '', address: '', notes: '' })
   const [deliveryId, setDeliveryId] = useState(store.deliveryMethods.find(method => method.enabled)?.id ?? '')
   const [privacy, setPrivacy] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
@@ -102,6 +102,8 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
     if (preparing) return
     const next: Errors = validateCheckout(cart.lines, { ...customer, deliveryId }, store)
     if (!/^(?:\+?506)?[2-9]\d{7}$/.test(customer.phone.replace(/[\s()-]/g, ''))) next.phone = 'Escribe un teléfono costarricense válido de 8 dígitos.'
+    const contact = customer.email.trim()
+    if (!contact || contact.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contact)) next.email = 'Escribe un correo válido: te enviaremos aquí el estado de tu pedido y la confirmación de pago.'
     if (!privacy) next.privacy = 'Acepta el uso de tus datos para gestionar este pedido.'
     flushSync(() => setErrors(next))
     if (Object.keys(next).length) { formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); return }
@@ -141,6 +143,8 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
                 <div className="form-heading"><span className="step-marker">02</span><h3>Tus datos y tu forma de pago.</h3></div>
                 <div className="form-field"><label htmlFor="customer-name">Tu nombre <span aria-hidden="true">*</span></label><input id="customer-name" autoComplete="name" maxLength={100} required value={customer.name} onChange={event => change('name', event.target.value)} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} placeholder="¿Cómo te llamas?" />{errors.name && <p className="field-error" id="name-error">{errors.name}</p>}</div>
                 <div className="form-field"><label htmlFor="customer-phone">Teléfono de contacto <span aria-hidden="true">*</span></label><input id="customer-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} required value={customer.phone} onChange={event => change('phone', event.target.value)} aria-invalid={!!errors.phone} aria-describedby={errors.phone ? 'phone-error' : undefined} placeholder="8 dígitos · Costa Rica" />{errors.phone && <p className="field-error" id="phone-error">{errors.phone}</p>}</div>
+
+                <div className="form-field"><label htmlFor="customer-email">Correo electrónico <span aria-hidden="true">*</span></label><input id="customer-email" type="email" autoComplete="email" inputMode="email" maxLength={254} required value={customer.email} onChange={event => change('email', event.target.value)} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} placeholder="tucorreo@ejemplo.com" /><small>Te enviamos aquí el estado de tu pedido: cuando llega tu pago a revisión y cuando queda confirmado para entregar.</small>{errors.email && <p className="field-error" id="email-error">{errors.email}</p>}</div>
                 {method?.requiresAddress && <div className="form-field"><label htmlFor="customer-address">{method.addressLabel ?? 'Dirección'} <span aria-hidden="true">*</span></label><textarea id="customer-address" autoComplete="street-address" rows={2} maxLength={500} required value={customer.address} onChange={event => change('address', event.target.value)} aria-invalid={!!errors.address} aria-describedby={errors.address ? 'address-error' : undefined} />{errors.address && <p className="field-error" id="address-error">{errors.address}</p>}</div>}
                 <div className="form-field"><label htmlFor="customer-notes">¿Algo que debamos saber? <span className="muted">(opcional)</span></label><textarea id="customer-notes" rows={2} maxLength={1000} value={customer.notes} onChange={event => change('notes', event.target.value)} aria-invalid={!!errors.notes} />{errors.notes && <p className="field-error">{errors.notes}</p>}</div>
                 <fieldset className="payment-method"><legend>Forma de pago</legend><label><input type="radio" name="payment" value="sinpe" checked readOnly /><Icon name="bank" size={23} /><span><strong>SINPE Móvil</strong><small>Código de pedido + comprobante privado</small></span><Icon name="check" size={17} /></label><p>{calculated.total === null ? 'Registraremos tu pedido sin pedirte que pagues. La tienda debe cotizar el envío antes de mostrar el monto definitivo.' : config?.sinpe ? 'Al registrar el pedido recibirás el número SINPE, el monto exacto y tu código.' : 'Registraremos tu pedido. La tienda debe configurar y confirmar el destino SINPE antes de solicitarte un pago.'}</p></fieldset>

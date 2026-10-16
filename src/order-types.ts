@@ -2,7 +2,7 @@ export type ShopOrderStatus = 'pending_details' | 'awaiting_payment' | 'pending_
 
 export interface SinpeDestination { phone: string; beneficiary: string; bank: 'BAC Credomatic' }
 export interface SinpeSettings { enabled: boolean; phone: string; beneficiary: string }
-export interface OrderCustomer { name: string; phone: string; address: string; notes: string }
+export interface OrderCustomer { name: string; phone: string; email: string; address: string; notes: string }
 export interface OrderLine {
   key: string
   name: string

@@ -597,6 +597,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .form-field input, .form-field textarea { width: 100%; min-width: 0; border: 1px solid #e0d9e5; background: #fff; color: var(--ink); padding: 12px 13px; font-size: 12px; border-radius: 5px; min-height: 43px; line-height: 1.5; resize: vertical; }
 .form-field input::placeholder, .form-field textarea::placeholder { color: #776c7e; }
 .form-field [aria-invalid="true"] { border-color: #b95460; }
+.form-field small { display: block; margin-top: 6px; color: #776c7e; font-size: 11px; line-height: 1.45; }
 .field-error { font-size: 10px; line-height: 1.6; color: #a43747; margin-top: 7px; }
 .small-note { font-size: 10px; line-height: 1.8; color: #706078; margin-top: 13px; }
 .cart-footer { padding: 19px 27px max(18px,env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #f7f4f8; flex-shrink: 0; }

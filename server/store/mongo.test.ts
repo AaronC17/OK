@@ -11,7 +11,7 @@ const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://utn:88406844Cr..@clus
 const input = () => ({
   items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 }],
   deliveryId: 'pickup',
-  customer: { name: 'Cliente Mongo', phone: '61551234', address: '', notes: '' },
+  customer: { name: 'Cliente Mongo', phone: '61551234', email: 'cliente.mongo@ejemplo.cr', address: '', notes: '' },
   privacyAccepted: true,
 })
 

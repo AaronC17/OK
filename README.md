@@ -51,6 +51,7 @@ Editar **`src/config/store.ts`** para catálogo, precios y entrega; no es necesa
 | Ocultar tipos de gomita del catálogo | `visible: false` en cada tipo (`tiritas`, `gusanitos`) |
 | Moneda y formato | `currency.code`, `locale`, `fractionDigits` |
 | SINPE receptor y beneficiario | Dashboard `/admin` → Configuración; no usar un teléfono inferido |
+| Avisos por correo al cliente | `SMTP_*`, `MAIL_FROM`, `MAIL_BCC` — guía: [`docs/correos-directmail.md`](docs/correos-directmail.md) |
 | Contactos adicionales | `contact.email`, `instagramUrl` |
 | Portada | `heroImage`, `heroImageAlt` |
 | Tipos de gomita | `gummies.types` |

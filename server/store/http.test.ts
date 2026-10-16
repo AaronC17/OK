@@ -11,7 +11,7 @@ import { ShopDatabase } from './database.ts'
 import { makeShopHandler } from './http.ts'
 import { newToken } from './security.ts'
 
-const input = () => ({ items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 }], deliveryId: 'pickup', customer: { name: 'Cliente de prueba', phone: '61551234', address: '', notes: '' }, privacyAccepted: true })
+const input = () => ({ items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 }], deliveryId: 'pickup', customer: { name: 'Cliente de prueba', phone: '61551234', email: 'cliente.de.prueba@ejemplo.cr', address: '', notes: '' }, privacyAccepted: true })
 
 async function setup(t: TestContext) {
   const db = new ShopDatabase(':memory:', store)
