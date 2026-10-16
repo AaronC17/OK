@@ -635,7 +635,7 @@ var ShopDatabase = class {
       const destination = this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID();
-      const code = `ONK-${randomBytes2(3).toString("hex").toUpperCase()}`;
+      const code = `ONK-${randomBytes2(2).toString("hex").toUpperCase()}`;
       const now = timestamp();
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
@@ -1038,7 +1038,7 @@ var MongoShopDatabase = class {
       const destination = await this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID2();
-      const code = `ONK-${randomBytes3(3).toString("hex").toUpperCase()}`;
+      const code = `ONK-${randomBytes3(2).toString("hex").toUpperCase()}`;
       const now = timestamp2();
       const newOrder = {
         _id: id,

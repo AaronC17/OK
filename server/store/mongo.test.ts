@@ -58,7 +58,7 @@ test('mongo: full store lifecycle on Atlas (orders, receipts, admin, audit, even
   const { session: custSession } = await db.customerSession(undefined)
   const orderKey = randomUUID()
   const order = await db.createOrder(input(), custSession.hash, orderKey)
-  assert.match(order.code, /^ONK-[A-F0-9]{6}$/)
+  assert.match(order.code, /^ONK-[A-F0-9]{4}$/)
   assert.equal(order.status, 'awaiting_payment')
   assert.equal(order.totalMinor, 120000)
 

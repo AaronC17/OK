@@ -297,7 +297,7 @@ export class MongoShopDatabase implements ShopRepository {
       const destination = await this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      const code = `ONK-${randomBytes(3).toString('hex').toUpperCase()}`
+      const code = `ONK-${randomBytes(2).toString('hex').toUpperCase()}`
       const now = timestamp()
       const newOrder = {
         _id: id,

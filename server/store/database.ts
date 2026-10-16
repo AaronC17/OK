@@ -173,7 +173,7 @@ export class ShopDatabase implements ShopRepository {
       const destination = this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      const code = `ONK-${randomBytes(3).toString('hex').toUpperCase()}`
+      const code = `ONK-${randomBytes(2).toString('hex').toUpperCase()}`
       const now = timestamp()
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,

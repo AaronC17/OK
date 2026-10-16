@@ -205,22 +205,26 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   margin-top: 6px;
-  padding: 8px 8px 8px 14px;
+  padding: 8px 10px 8px 14px;
   border-radius: 12px;
   background: #f6f2f9;
   border: 1px solid #e3d8ec;
+  min-width: 0;
 }
 .sinpe-code-display {
-  font-family: 'Inter', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  font-family: 'SF Mono', 'Roboto Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: 0.6px;
   color: var(--purple);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "zero" 0;
   user-select: all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .sinpe-code-hint {
   display: block;
@@ -235,28 +239,21 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 36px;
-  padding: 7px 13px;
-  border-radius: 9px;
+  min-height: 34px;
+  padding: 6px 13px;
+  border-radius: 8px;
   font-size: 11.5px;
   font-weight: 650;
   background: #f2ecf6;
   color: var(--purple);
   border: 1px solid #dfd3e8;
   flex-shrink: 0;
+  white-space: nowrap;
   transition: background 0.16s, border-color 0.16s, color 0.16s, transform 0.12s;
 }
 .gateway-copy-btn:hover {
   background: #e7ddf0;
   border-color: #cbb8da;
-}
-.gateway-copy-btn.gateway-copy-primary {
-  background: var(--purple);
-  color: #ffffff;
-  border-color: var(--purple);
-}
-.gateway-copy-btn.gateway-copy-primary:hover {
-  background: #4c3260;
 }
 .gateway-copy-btn.is-copied {
   background: #1d6b47 !important;

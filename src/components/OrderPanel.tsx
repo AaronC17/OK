@@ -23,6 +23,10 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
   const canSubmit = order.status === 'awaiting_payment' || order.status === 'rejected'
 
   useEffect(() => {
+    document.querySelector('.cart-drawer')?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+
+  useEffect(() => {
     if (!file?.type.startsWith('image/')) { setPreview(''); return }
     const url = URL.createObjectURL(file)
     setPreview(url)
@@ -78,13 +82,6 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
 
   return <section className="sinpe-order-panel" aria-labelledby="sinpe-order-title">
     <div className="sinpe-gateway-header">
-      <div className="sinpe-gateway-topline">
-        <span className={`order-status status-${order.status}`}>
-          <span className="status-dot" />
-          {orderStatusLabels[order.status]}
-        </span>
-        {order.demo && <span className="gateway-demo-chip"><Icon name="info" size={12} />Modo demo</span>}
-      </div>
       <h3 id="sinpe-order-title">{title}</h3>
       <p>{subtitle}</p>
     </div>
@@ -133,12 +130,12 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
               <span id="assigned-order-code" className="sinpe-code-display">{order.code}</span>
               <button
                 type="button"
-                className={`gateway-copy-btn gateway-copy-primary ${copiedField === 'code' ? 'is-copied' : ''}`}
+                className={`gateway-copy-btn ${copiedField === 'code' ? 'is-copied' : ''}`}
                 onClick={() => { void copyText(order.code, 'code') }}
                 aria-label="Copiar código del pedido"
               >
                 <Icon name={copiedField === 'code' ? 'check' : 'copy'} size={14} />
-                <span>{copiedField === 'code' ? 'Código copiado' : 'Copiar código'}</span>
+                <span>{copiedField === 'code' ? 'Copiado' : 'Copiar'}</span>
               </button>
             </div>
             <small className="sinpe-code-hint">Incluye este código en la descripción al hacer el SINPE en tu banco.</small>
