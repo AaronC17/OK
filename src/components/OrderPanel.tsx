@@ -111,23 +111,23 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
 
               {/* Cargo Box */}
               <rect x="98" y="42" width="104" height="60" rx="10" fill="url(#transit-box-grad)" />
-              <path d="M108 42 H192 A10 10 0 0 1 202 52 V55 H98 V52 A10 10 0 0 1 108 42 Z" fill="#5e3e76" opacity="0.55" />
-              <rect x="98" y="88" width="104" height="5" fill="#7c5797" opacity="0.45" />
+              <path d="M108 42 H192 A10 10 0 0 1 202 52 V53 H98 V52 A10 10 0 0 1 108 42 Z" fill="#5e3e76" opacity="0.5" />
+              <rect x="98" y="89" width="104" height="4" fill="#7c5797" opacity="0.4" />
 
-              {/* Brand emblem on truck box */}
-              <circle cx="150" cy="69" r="18" fill="#fbf9fc" />
+              {/* Painted brand wordmark directly on truck body */}
               <text
                 x="150"
-                y="72.5"
+                y="74"
                 textAnchor="middle"
-                fill="#382448"
-                fontFamily="'DM Sans', -apple-system, sans-serif"
+                fill="#fbf9fc"
+                fontFamily="'Inter', system-ui, -apple-system, sans-serif"
                 fontWeight="800"
-                fontSize="10.5"
-                letterSpacing="-0.3"
+                fontSize="21"
+                letterSpacing="-1.1"
               >
-                Onky’s<tspan fill="#b8293d">.</tspan>
+                Onky’s<tspan fill="#ff4d6d">.</tspan>
               </text>
+              <line x1="122" y1="81" x2="178" y2="81" stroke="#9e7bb8" strokeWidth="1.5" strokeLinecap="round" opacity="0.55" />
 
               {/* Cab */}
               <path
