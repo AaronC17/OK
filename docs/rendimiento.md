@@ -1,5 +1,13 @@
 # Rendimiento de la tienda
 
+## Máscaras de contacto y animaciones fuera de pantalla
+
+- Las máscaras del chamoy se ajustan una sola vez a todos los vértices de cada osito, incluyendo el margen de los triángulos y antialiasing. Su superficie total pasa al **19,12 %** de la original; se mantienen las fotos, deformaciones, gradientes y tiempos.
+- La superficie del chamoy se interpola una vez por fotograma. Se evitan conversiones numéricas a texto y escrituras repetidas cuando el reloj está detenido.
+- La cinta de marca y el camión pausan sus bucles fuera del viewport o con la pestaña oculta, retomando el mismo punto. La receta observa la tarjeta animada en lugar de toda la sección.
+- Comparación local en Edge, viewport 390 × 844, DPR 3, CPU ×4, servidor Vite, tramo de 6,5 s desde 3,2 s: script **1.227 → 985 ms**, muestras rAF **164 → 179**, p95 **66,6 → 50,1 ms**. Es una muestra emulada del hilo principal, no una nueva medición del iPhone ni FPS del compositor.
+- Cinco capturas a 3,5 / 4,2 / 4,5 / 7,5 / 9,5 s: diferencia máxima **1/255**, sin canales con diferencia superior a 16/255. Capturas y perfiles en `%LOCALAPPDATA%\Temp\opencode\onkys-animation`.
+
 ## Medición física recibida: Safari en el iPhone
 
 Se recibió una muestra completa de la versión `index-BhUSlhh5.js`, el 19/10/2026 a las 15:34 UTC: viewport 393 × 735, DPR 3, 15.011 ms de observación y 31 eventos de desplazamiento. No hubo errores JavaScript.

@@ -5,7 +5,7 @@ import { meshVerticalBounds, sortMixDepth } from '../lib/mix-render.ts'
 export { MIX_CYCLE } from '../lib/mix-physics.ts'
 
 const seconds = MIX_CYCLE / 1000
-const round = (value: number) => Number(value.toFixed(4))
+const round = (value: number) => Math.round(value * 10000) / 10000
 const transform = (x: number, y: number, rotation = 0, sx = 1, sy = sx) => `translate(${round(x)}px, ${round(y)}px) rotate(${round(rotation)}deg) scale(${round(sx)}, ${round(sy)})`
 const screenY = (y: number, z: number) => 227 + z * .34 - y
 
@@ -200,6 +200,23 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
   // after every effect has been prepared on the same paused playhead.
   await yieldIfNeeded()
   for (const [index, bear] of mixBears.entries()) {
+    // Bound the mask to every possible deformed pose once. The old 110x110
+    // surface rasterized mostly transparent pixels for each immersed gummy.
+    // Interpolated vertices stay inside these bounds; include triangle overlap
+    // and an antialiasing margin without moving the original coating gradient.
+    let minX = -14, maxX = 14, minY = -20.5, maxY = 20.5
+    for (const frame of frames) {
+      for (const point of frame.bears[index].mesh) {
+        minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x)
+        minY = Math.min(minY, point.y); maxY = Math.max(maxY, point.y)
+      }
+    }
+    const pad = Math.max(maxX - minX, maxY - minY) * .015 + 1
+    const mask = svg.querySelector(`[data-gummy-mask="${index}"]`)!
+    mask.setAttribute('x', String(Math.floor(minX - pad)))
+    mask.setAttribute('y', String(Math.floor(minY - pad)))
+    mask.setAttribute('width', String(Math.ceil(maxX + pad) - Math.floor(minX - pad)))
+    mask.setAttribute('height', String(Math.ceil(maxY + pad) - Math.floor(minY - pad)))
     const keyframes: Keyframe[] = []
     const startOffset = bear.start / seconds
     const firstBody = frames[0].bears[index]
@@ -367,16 +384,24 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
 
   // Pre-allocated reusable structures to eliminate frame GC allocations
   const depths = new Float64Array(nodes.length)
+  const interpolatedSurface = new Float64Array(frames[0].surface.length)
   const interpolatedMesh: Point2[] = Array.from({ length: 10 }, () => ({ x: 0, y: 0 }))
   const poses = mixBears.map(() => ({
     x: 0, y: 0, z: 0, active: false, wetLine: 0,
     feet: { x: 0, y: 0, z: 0 },
   }))
 
+  let lastTime = -1
   const sortDepth = () => {
     const master = animations[0]
     if (!master) return
     const time = (Number(master.currentTime) % MIX_CYCLE) / 1000
+    // A paused/seekable timeline needs no repeated DOM writes at the same time.
+    if (time === lastTime) {
+      if (running) request = requestAnimationFrame(sortDepth)
+      return
+    }
+    lastTime = time
 
     // Invisible SVG effects still caused style/paint work. Sample them only
     // around their visible interval, with a full second of pre-roll/post-roll.
@@ -443,10 +468,12 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
 
     for (let i = 0; i < nodes.length; i++) depths[i] = z(i)
 
-    const sauceHeight = (x: number, z: number) => {
-      const a = sampleSurface(frame.surface, x, z), b = sampleSurface(next.surface, x, z)
-      return a + (b - a) * progress
+    // Bilinear sampling commutes with interpolation: blend 289 cells once,
+    // instead of sampling both full fields for every contour, grain and impact.
+    for (let i = 0; i < interpolatedSurface.length; i++) {
+      interpolatedSurface[i] = frame.surface[i] + (next.surface[i] - frame.surface[i]) * progress
     }
+    const sauceHeight = (x: number, z: number) => sampleSurface(interpolatedSurface, x, z)
     const sauceY = (x: number, z: number) => screenY(sauceHeight(x, z), z)
     drawLemonPour(time, x => sauceY(x - 180, 0))
 
@@ -750,6 +777,7 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
       running = value
       cancelAnimationFrame(request)
       if (value) {
+        lastTime = -1
         const master = animations[0]
         timedAnimations.forEach(effect => { effect.playing = false; effect.animation.pause() })
         if (master) {

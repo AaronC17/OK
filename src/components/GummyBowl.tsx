@@ -37,7 +37,7 @@ export const GummyBowl = memo(function GummyBowl({ loadImages = true }: { loadIm
         return <clipPath key={index} id={`${id}-gel-triangle-${index}`}><polygon points={points.map(point => `${cx + (point.x - cx) * 1.015},${cy + (point.y - cy) * 1.015}`).join(' ')} /></clipPath>
       })}
       {mixBears.map((_, index) => <g key={`coating-${index}`}>
-        <mask id={`${id}-gummy-silhouette-${index}`} maskUnits="userSpaceOnUse" x="-55" y="-55" width="110" height="110" style={{ maskType: 'alpha' }}>
+        <mask id={`${id}-gummy-silhouette-${index}`} data-gummy-mask={index} maskUnits="userSpaceOnUse" x="-55" y="-55" width="110" height="110" style={{ maskType: 'alpha' }}>
           <use href={`#${id}-gummy-body-${index}`} />
         </mask>
         <clipPath id={`${id}-submerged-${index}`}><rect data-sauce-cut={index} x="-55" y="55" width="110" height="110" /></clipPath>

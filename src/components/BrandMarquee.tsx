@@ -1,4 +1,5 @@
 import { store } from '../config/store.ts'
+import { useVisibleAnimation } from '../hooks/useVisibleAnimation.ts'
 import './brand-marquee.css'
 
 const phrases = ['Gomitas enchiladas', store.name]
@@ -19,7 +20,8 @@ function GummyBearMark() {
 }
 
 export function BrandMarquee() {
-  return <div className="brand-marquee">
+  const root = useVisibleAnimation<HTMLDivElement>()
+  return <div ref={root} className="brand-marquee">
     <p className="sr-only">Gomitas enchiladas: {store.name}.</p>
     <div className="brand-marquee-track" aria-hidden="true">
       {[0, 1].map(copy => <div className="brand-marquee-group" key={copy}>

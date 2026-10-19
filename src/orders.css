@@ -435,6 +435,8 @@
 .transit-clouds {
   animation: transitCloudsDrift 14s linear infinite;
 }
+.sinpe-transit-card[data-motion-paused="true"],
+.sinpe-transit-card[data-motion-paused="true"] * { animation-play-state: paused; }
 .transit-horizon {
   animation: transitHorizonDrift 7.5s linear infinite;
 }

@@ -5,6 +5,7 @@ import { orderStatusLabels } from '../order-types.ts'
 import type { ShopOrder } from '../order-types.ts'
 import { errorMessage, uploadReceipt } from '../lib/orders-api.ts'
 import { money } from '../lib/shop.ts'
+import { useVisibleAnimation } from '../hooks/useVisibleAnimation.ts'
 import { Icon } from './Icon.tsx'
 
 export function OrderLines({ order }: { order: ShopOrder }) {
@@ -12,11 +13,12 @@ export function OrderLines({ order }: { order: ShopOrder }) {
 }
 
 function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
+  const root = useVisibleAnimation<HTMLDivElement>()
   const isReady = order.status === 'ready'
   const isPickup = !order.delivery.requiresAddress
 
   return (
-    <div className="sinpe-transit-card" role="region" aria-label="Estado del envío en curso">
+    <div ref={root} className="sinpe-transit-card" role="region" aria-label="Estado del envío en curso">
       <div className="transit-card-top">
         <span className="transit-live-badge">
           <span className="transit-pulse-dot" />

@@ -29,6 +29,8 @@
   will-change: transform;
 }
 
+.brand-marquee[data-motion-paused="true"] .brand-marquee-track { animation-play-state: paused; }
+
 .brand-marquee-group { display: flex; align-items: center; flex: none; }
 
 .brand-marquee-item {

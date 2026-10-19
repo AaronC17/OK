@@ -33,7 +33,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize }: { onCu
     const preload = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) { setNear(true); preload.disconnect() }
     }, { rootMargin: '1200px 0px' })
-    if (root.current) observer.observe(root.current)
+    if (film.current) observer.observe(film.current)
     if (root.current) preload.observe(root.current)
     const visibility = () => setTabVisible(!document.hidden)
     document.addEventListener('visibilitychange', visibility)
