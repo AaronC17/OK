@@ -1,12 +1,12 @@
-import { clamp, floorHeight, GEL_MESH, GEL_RADII, GEL_TRIANGLES, GUMMY_RADIUS, LIQUID_LEVEL, MIX_CYCLE, mixBears, SAMPLE_RATE, sampleSurface, simulateMix, smooth, spoonAt, stirStrength, type MixSimulation, type Point2 } from '../lib/mix-physics.ts'
+import { clamp, floorHeight, GEL_MESH, GEL_RADII, GEL_TRIANGLES, GUMMY_RADIUS, LIQUID_LEVEL, MIX_CYCLE, mixBears, SAMPLE_RATE, sampleSurface, smooth, spoonAt, stirStrength, type MixSimulation, type Point2 } from '../lib/mix-physics.ts'
 import { createLemonPour } from './lemon-pour.ts'
+import { affinePhoto, type AffinePhoto } from '../lib/mix-affine.ts'
 export { MIX_CYCLE } from '../lib/mix-physics.ts'
 
 const seconds = MIX_CYCLE / 1000
 const round = (value: number) => Number(value.toFixed(4))
 const transform = (x: number, y: number, rotation = 0, sx = 1, sy = sx) => `translate(${round(x)}px, ${round(y)}px) rotate(${round(rotation)}deg) scale(${round(sx)}, ${round(sy)})`
 const screenY = (y: number, z: number) => 227 + z * .34 - y
-let baked: MixSimulation | undefined
 
 const PRECOMPUTED_TRIANGLES = GEL_TRIANGLES.map(triangle => {
   const a = GEL_MESH[triangle[0]], b = GEL_MESH[triangle[1]], c = GEL_MESH[triangle[2]]
@@ -36,13 +36,25 @@ export interface MixSceneMotion {
   dispose: () => void
 }
 
-export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | null): MixSceneMotion {
-  const { frames, impacts } = baked ??= simulateMix()
+export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimulation, container?: HTMLElement | null, signal?: AbortSignal): Promise<MixSceneMotion> {
+  const { frames, impacts } = simulation
   const animations: Animation[] = []
+  const timelineAnimations: Animation[] = []
+  const timedAnimations: { animation: Animation; start: number; end: number; playing: boolean }[] = []
   let running = false
   let hasStarted = false
+  signal?.throwIfAborted()
+  const abort = () => animations.forEach(animation => animation.cancel())
+  signal?.addEventListener('abort', abort, { once: true })
+  let sliceStarted = performance.now()
+  const yieldIfNeeded = async () => {
+    if (performance.now() - sliceStarted < 8) return
+    await new Promise<void>(resolve => setTimeout(resolve, 0))
+    signal?.throwIfAborted()
+    sliceStarted = performance.now()
+  }
 
-  const animate = (element: Element | null, keyframes: Keyframe[]) => {
+  const animate = (element: Element | null, keyframes: Keyframe[], visible?: [number, number]) => {
     if (!element) return
     const last = keyframes.at(-1)!
     const finalFrames = last.offset === 1 ? keyframes : [...keyframes, { ...last, offset: 1 }]
@@ -50,9 +62,15 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     animation.pause()
     animation.currentTime = 0
     animations.push(animation)
+    if (visible) timedAnimations.push({ animation, start: Math.max(0, visible[0] - 1), end: Math.min(seconds, visible[1] + 1), playing: false })
+    else timelineAnimations.push(animation)
   }
   const envelope = (selector: string, entries: [number, number, string?][]) => {
-    animate(svg.querySelector(selector), entries.map(([time, opacity, motion]) => ({ offset: time / seconds, opacity, ...(motion ? { transform: motion } : {}) })))
+    const first = entries.findIndex(([, opacity]) => opacity > 0)
+    let last = entries.length - 1
+    while (last >= 0 && entries[last][1] === 0) last--
+    const visible: [number, number] = [entries[Math.max(0, first - 1)][0], entries[Math.min(entries.length - 1, last + 1)][0]]
+    animate(svg.querySelector(selector), entries.map(([time, opacity, motion]) => ({ offset: time / seconds, opacity, ...(motion ? { transform: motion } : {}) })), visible)
   }
 
   // Synchronize HTML film timeline, captions, bowl scene and ingredients to the exact same WAAPI timeline
@@ -176,7 +194,11 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     })
   }
 
-  mixBears.forEach((bear, index) => {
+  // Keep all samples and timings; build the large WAAPI keyframe lists in small
+  // tasks so an input/scroll event can run between bears. Playback starts only
+  // after every effect has been prepared on the same paused playhead.
+  await yieldIfNeeded()
+  for (const [index, bear] of mixBears.entries()) {
     const keyframes: Keyframe[] = []
     const startOffset = bear.start / seconds
     const firstBody = frames[0].bears[index]
@@ -198,7 +220,7 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     const lastTransform = transform(180 + lastBody.x, screenY(lastBody.y, lastBody.z))
     keyframes.push({ offset: 10.35 / seconds, transform: lastTransform, opacity: 0 })
     keyframes.push({ offset: 1, transform: initialTransform, opacity: 0 })
-    animate(svg.querySelector(`[data-bear="${index}"]`), keyframes)
+    animate(svg.querySelector(`[data-bear="${index}"]`), keyframes, [bear.start, 10.35])
 
     const shadowKeyframes: Keyframe[] = []
     const firstFeet = firstBody.lobes[2]
@@ -224,10 +246,11 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     const lastShadowTransform = transform(180 + lastBody.x, screenY(floorHeight(lastBody.x, lastBody.z), lastBody.z), 0, 1 - Math.min(lastAltitude / 400, .5), .75)
     shadowKeyframes.push({ offset: 10.35 / seconds, transform: lastShadowTransform, opacity: 0 })
     shadowKeyframes.push({ offset: 1, transform: initialShadowTransform, opacity: 0 })
-    animate(svg.querySelector(`[data-bear-shadow="${index}"]`), shadowKeyframes)
-  })
-  animate(svg.querySelector('.spoon-motion'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(180 + frame.spoon.x, screenY(frame.spoon.y, frame.spoon.z)), opacity: frame.spoon.opacity })))
-  animate(svg.querySelector('.spoon-head'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(0, 0, frame.spoon.angle, 1, frame.spoon.headScale) })))
+    animate(svg.querySelector(`[data-bear-shadow="${index}"]`), shadowKeyframes, [bear.start, 10.35])
+    await yieldIfNeeded()
+  }
+  animate(svg.querySelector('.spoon-motion'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(180 + frame.spoon.x, screenY(frame.spoon.y, frame.spoon.z)), opacity: frame.spoon.opacity })), [5, 10.3])
+  animate(svg.querySelector('.spoon-head'), frames.map(frame => ({ offset: frame.time / seconds, transform: transform(0, 0, frame.spoon.angle, 1, frame.spoon.headScale) })), [5, 10.3])
 
   envelope('.sauce-pool', [
     [0, 0, 'scale(.4, .4)'],
@@ -249,7 +272,7 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   ])
   envelope('.chamoy-bottle', [[0, 0, 'translate(-12px, -18px) rotate(-8deg)'], [.15, 0, 'translate(-12px, -18px) rotate(-8deg)'], [.28, 1, 'translate(0px, 0px) rotate(0deg)'], [.8, 1, 'translate(0px, 0px) rotate(0deg)'], [.95, 0, 'translate(-10px, -20px) rotate(12deg)']])
   envelope('.chamoy-flow', [[0, 0], [.26, 0], [.34, 1], [.78, 1], [.9, 0]])
-  animate(svg.querySelector('.chamoy-stream'), [{ offset: 0, strokeDashoffset: '1' }, { offset: .26 / seconds, strokeDashoffset: '1' }, { offset: .45 / seconds, strokeDashoffset: '0' }, { offset: .78 / seconds, strokeDashoffset: '0' }, { offset: .9 / seconds, strokeDashoffset: '-1' }])
+  animate(svg.querySelector('.chamoy-stream'), [{ offset: 0, strokeDashoffset: '1' }, { offset: .26 / seconds, strokeDashoffset: '1' }, { offset: .45 / seconds, strokeDashoffset: '0' }, { offset: .78 / seconds, strokeDashoffset: '0' }, { offset: .9 / seconds, strokeDashoffset: '-1' }], [.26, .9])
   envelope('.tajin-shaker', [[0, 0, 'translate(10px, -20px) rotate(0deg)'], [1.05, 0, 'translate(10px, -20px) rotate(0deg)'], [1.18, 1, 'translate(0px, 0px) rotate(0deg)'], [1.26, 1, 'translate(-3px, 4px) rotate(-8deg)'], [1.34, 1, 'translate(2px, -3px) rotate(6deg)'], [1.42, 1, 'translate(-3px, 4px) rotate(-8deg)'], [1.5, 1, 'translate(2px, -3px) rotate(6deg)'], [1.58, 1, 'translate(-3px, 4px) rotate(-8deg)'], [1.66, 1, 'translate(2px, -3px) rotate(6deg)'], [1.74, 1, 'translate(-2px, 3px) rotate(-6deg)'], [1.82, 1, 'translate(0px, 0px) rotate(0deg)'], [1.95, 0, 'translate(15px, -20px) rotate(10deg)']])
   envelope('.limon-bottle', [[0, 0, 'translate(8px, -18px) rotate(-9deg)'], [2.05, 0, 'translate(8px, -18px) rotate(-9deg)'], [2.2, 1, 'translate(0px, 0px) rotate(0deg)'], [2.37, 1, 'translate(0px, 0px) rotate(-2.5deg)'], [2.65, 1, 'translate(0px, 0px) rotate(-1deg)'], [2.83, 1, 'translate(0px, 0px) rotate(7deg)'], [3.06, 0, 'translate(8px, -22px) rotate(16deg)']])
 
@@ -263,7 +286,8 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       const progress = step / 12
       keyframes.push({ offset: (begin + progress * duration) / seconds, opacity: step === 12 ? 0 : 1, transform: transform(startX + (endX - startX) * progress, startY + (endY - startY) * progress * progress, index * 23) })
     }
-    animate(svg.querySelectorAll('.tajin-grain')[index], keyframes)
+    animate(svg.querySelectorAll('.tajin-grain')[index], keyframes, [begin, begin + duration])
+    await yieldIfNeeded()
   }
 
   // A real depth order, including the entire spoon, replaces front/back duplicates.
@@ -274,6 +298,14 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     triangleInfo,
     lastTransform: '',
   })))
+  const photoLayers = mixBears.map((_, index) => ({
+    rigid: svg.querySelector<SVGElement>(`[data-gel-rigid="${index}"]`)!,
+    mesh: svg.querySelector<SVGElement>(`[data-gel-mesh="${index}"]`)!,
+    affine: false,
+    lastTransform: '',
+  }))
+  const noPatches: typeof patches[number] = []
+  const affine: AffinePhoto = { xx: 0, xy: 0, yx: 0, yy: 0, x: 0, y: 0 }
   const menisci = mixBears.map((_, index) => svg.querySelector(`[data-meniscus="${index}"]`)!)
   const sauceCuts = mixBears.map((_, index) => svg.querySelector(`[data-sauce-cut="${index}"]`)!)
   const surface = svg.querySelector('.liquid-surface')!
@@ -322,6 +354,8 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
   const meniscusLastTrans = new Array<string>(mixBears.length).fill('')
   const cutLastY = new Array<number>(mixBears.length).fill(-9999)
   const beadLastOp = new Array<number>(beads.length).fill(-1)
+  const sauceCovers = [...svg.querySelectorAll<SVGElement>('.gummy-sauce-cover')]
+  const sauceCoverVisible = mixBears.map(() => true)
   let lastSurfaceD = ''
   let ringsActive = false
   let spoonActive = false
@@ -340,9 +374,39 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     if (!master) return
     const time = (Number(master.currentTime) % MIX_CYCLE) / 1000
 
+    // Invisible SVG effects still caused style/paint work. Sample them only
+    // around their visible interval, with a full second of pre-roll/post-roll.
+    // The master epoch (not a new local clock) preserves every visible timing.
+    // A manually paused master remains seekable for deterministic inspection.
+    if (master.playState === 'running') {
+      for (const effect of timedAnimations) {
+        const playing = time >= effect.start && time <= effect.end
+        if (playing === effect.playing) continue
+        effect.playing = playing
+        if (playing) {
+          if (master.startTime === null) {
+            effect.animation.currentTime = master.currentTime
+            effect.animation.play()
+          } else {
+            effect.animation.play()
+            effect.animation.startTime = master.startTime
+          }
+        } else {
+          effect.animation.currentTime = master.currentTime
+          effect.animation.pause()
+        }
+      }
+    }
+
     // Before bears enter (< 3.2s) or after mixing finishes (> 10.35s), reset patches and bridges so the bowl stays pristine
     if (time < 3.2 || time > 10.35) {
       for (let i = 0; i < mixBears.length; i++) {
+        const layer = photoLayers[i]
+        if (layer.affine) {
+          layer.affine = false
+          layer.rigid.style.display = 'none'
+          layer.mesh.style.display = ''
+        }
         const bearPatches = patches[i]
         for (let p = 0; p < bearPatches.length; p++) {
           const bp = bearPatches[p]
@@ -437,7 +501,18 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
           interpolatedMesh[j].x = fromMesh[j].x + (toMesh[j].x - fromMesh[j].x) * progress
           interpolatedMesh[j].y = fromMesh[j].y + (toMesh[j].y - fromMesh[j].y) * progress
         }
-        const bearPatches = patches[i]
+        const layer = photoLayers[i]
+        const isAffine = affinePhoto(interpolatedMesh, affine)
+        if (layer.affine !== isAffine) {
+          layer.affine = isAffine
+          layer.rigid.style.display = isAffine ? '' : 'none'
+          layer.mesh.style.display = isAffine ? 'none' : ''
+        }
+        if (isAffine) {
+          const matrix = `matrix(${round(affine.xx)} ${round(affine.yx)} ${round(affine.xy)} ${round(affine.yy)} ${round(affine.x)} ${round(affine.y)})`
+          if (layer.lastTransform !== matrix) { layer.lastTransform = matrix; layer.rigid.setAttribute('transform', matrix) }
+        }
+        const bearPatches = isAffine ? noPatches : patches[i]
         for (let p = 0; p < bearPatches.length; p++) {
           const bp = bearPatches[p]
           const matrix = warpFast(bp.triangleInfo, interpolatedMesh)
@@ -451,7 +526,17 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       const sHeight = (time >= 1.0 && time < 4.10) ? LIQUID_LEVEL : sauceHeight(x, depth)
       const line = y - sHeight
       const cutY = round(line)
-      if (cutLastY[i] !== cutY) {
+      // The alpha mask re-renders all eight photographic triangles. While a
+      // bear is above the sauce its clipped coating is empty: skip that paint
+      // entirely, rather than asking Safari to build an invisible mask.
+      let maxMeshY = -Infinity
+      if (body.active) for (let vertex = 0; vertex < 10; vertex++) maxMeshY = Math.max(maxMeshY, interpolatedMesh[vertex].y)
+      const coverVisible = body.active && cutY <= maxMeshY + 1
+      if (sauceCoverVisible[i] !== coverVisible) {
+        sauceCoverVisible[i] = coverVisible
+        sauceCovers[i].style.display = coverVisible ? '' : 'none'
+      }
+      if (coverVisible && cutLastY[i] !== cutY) {
         cutLastY[i] = cutY
         sauceCuts[i].setAttribute('y', String(cutY))
       }
@@ -672,6 +757,7 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
     if (running) request = requestAnimationFrame(sortDepth)
   }
 
+  if (container) { container.dataset.sceneReady = 'true'; container.dataset.renderer = 'svg' }
   return {
     animations,
     setRunning(value) {
@@ -680,16 +766,17 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       cancelAnimationFrame(request)
       if (value) {
         const master = animations[0]
+        timedAnimations.forEach(effect => { effect.playing = false; effect.animation.pause() })
         if (master) {
           if (!hasStarted) {
-            animations.forEach(a => {
+            timelineAnimations.forEach(a => {
               a.currentTime = 0
               a.play()
             })
             hasStarted = true
           } else {
             const currentTime = master.currentTime
-            animations.forEach(a => {
+            timelineAnimations.forEach(a => {
               if (a !== master) a.currentTime = currentTime
               a.play()
             })
@@ -705,6 +792,9 @@ export function animateGummyBowl(svg: SVGSVGElement, container?: HTMLElement | n
       running = false
       cancelAnimationFrame(request)
       animations.forEach(animation => animation.cancel())
+      sauceCovers.forEach(cover => { cover.style.display = '' })
+      photoLayers.forEach(layer => { layer.rigid.style.display = 'none'; layer.mesh.style.display = '' })
+      signal?.removeEventListener('abort', abort)
     },
   }
 }

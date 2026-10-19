@@ -4,10 +4,10 @@ import { SeasoningBottle } from './SeasoningBottle.tsx'
 import { GEL_MESH, GEL_TRIANGLES, mixBears, SAUCE_GRAINS } from '../lib/mix-physics.ts'
 
 // Its contents are depth-sorted by the motion controller, independently of React.
-export const GummyBowl = memo(function GummyBowl() {
+export const GummyBowl = memo(function GummyBowl({ loadImages = true }: { loadImages?: boolean }) {
   const id = useId().replaceAll(':', '')
   return <svg className="bowl-illustration" viewBox="0 0 360 290" fill="none" focusable="false">
-    <GummyDefinitions id={id} />
+    <GummyDefinitions id={id} loadImages={loadImages} />
     <defs>
       <linearGradient id={`${id}-back`} x1="180" y1="110" x2="180" y2="252" gradientUnits="userSpaceOnUse">
         <stop stopColor="#fff" stopOpacity=".95" /><stop offset="1" stopColor="#e6dce9" stopOpacity=".45" />
@@ -84,18 +84,22 @@ export const GummyBowl = memo(function GummyBowl() {
         <g className="mix-contents">
           {mixBears.map((bear, index) => <g className="bowl-gummy" data-bear={index} key={index} opacity="0">
             <g className="gummy-body" id={`${id}-gummy-body-${index}`}>
-              {GEL_TRIANGLES.map((_, triangle) => (
+              <image data-gel-rigid={index}
+                href={loadImages ? `/images/mix/bear-${bear.image}.webp` : undefined}
+                xlinkHref={loadImages ? `/images/mix/bear-${bear.image}.webp` : undefined}
+                x="-14" y="-20.5" width="28" height="41" preserveAspectRatio="xMidYMid meet"
+                style={{ display: 'none' }} />
+              <g data-gel-mesh={index}>{GEL_TRIANGLES.map((_, triangle) => (
                 <g key={triangle} data-gel-patch={`${index}-${triangle}`}>
-                  <g clipPath={`url(#${id}-gel-triangle-${triangle})`}>
-                    <image
-                      href={`/images/mix/bear-${bear.image}.webp`}
-                      xlinkHref={`/images/mix/bear-${bear.image}.webp`}
-                      x="-14" y="-20.5" width="28" height="41"
-                      preserveAspectRatio="xMidYMid meet"
-                    />
-                  </g>
+                  <image
+                    href={loadImages ? `/images/mix/bear-${bear.image}.webp` : undefined}
+                    xlinkHref={loadImages ? `/images/mix/bear-${bear.image}.webp` : undefined}
+                    x="-14" y="-20.5" width="28" height="41"
+                    preserveAspectRatio="xMidYMid meet"
+                    clipPath={`url(#${id}-gel-triangle-${triangle})`}
+                  />
                 </g>
-              ))}
+              ))}</g>
             </g>
             <g clipPath={`url(#${id}-submerged-${index})`}>
               <rect className="gummy-sauce-cover" x="-55" y="-55" width="110" height="110" fill={`url(#${id}-submerged-chamoy)`} opacity=".90" mask={`url(#${id}-gummy-silhouette-${index})`} />

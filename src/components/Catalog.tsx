@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { store } from '../config/store.ts'
 import { money, visibleGummyTypes } from '../lib/shop.ts'
 import type { ProductTarget } from './ProductDialog.tsx'
@@ -9,7 +10,7 @@ function startingPrice(prices: (number | null)[]) {
   return valid.length ? money(Math.min(...valid), store) : 'Por definir'
 }
 
-export function Catalog({ onProduct, onZoom }: {
+export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
   onProduct: (target: ProductTarget) => void
   onZoom: (image: { src: string; alt: string; name: string }) => void
 }) {
@@ -64,4 +65,4 @@ export function Catalog({ onProduct, onZoom }: {
       {store.demo && <p className="catalog-footnote"><span>Postres y presentaciones de ejemplo. Recetas por confirmar.</span></p>}
     </section>}
   </div>
-}
+})

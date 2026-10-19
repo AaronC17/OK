@@ -1,9 +1,4 @@
 /* SINPE checkout and private administration share the storefront's paper/purple palette. */
-.announcement.shipping-announcement { height: auto; min-height: 38px; padding: 7px 16px; gap: 10px; text-align: center; line-height: 1.6; }
-.shipping-announcement > p { margin: 0; }
-@media (max-width: 600px) {
-  .announcement.shipping-announcement { min-height: 32px; font-size: 9px; padding: 7px 12px; }
-}
 .checkout-server-error { padding: 12px 25px; background: #fff0ed; }
 .checkout-server-error .field-error { font-size: 12px; }
 .checkout-fields:disabled { opacity: .7; }
@@ -1132,4 +1127,3 @@
     border-radius: 14px;
   }
 }
-

@@ -1,22 +1,26 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { store } from './config/store.ts'
 import { MAX_QUANTITY, selectionKey } from './lib/shop.ts'
 import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
 import { Icon } from './components/Icon.tsx'
 import { Lightbox, Modal } from './components/ui.tsx'
-import { ProductDialog } from './components/ProductDialog.tsx'
 import type { ProductTarget } from './components/ProductDialog.tsx'
-import { CartDrawer } from './components/CartDrawer.tsx'
 import { Header } from './components/Header.tsx'
 import { Catalog } from './components/Catalog.tsx'
 import { MixExperience } from './components/MixExperience.tsx'
 import { HeroMedia } from './components/HeroMedia.tsx'
 import { BrandMarquee } from './components/BrandMarquee.tsx'
+import { SectionLink } from './components/SectionLink.tsx'
+
+const ProductDialog = lazy(() => import('./components/ProductDialog.tsx').then(module => ({ default: module.ProductDialog })))
+const CartDrawer = lazy(() => import('./components/CartDrawer.tsx').then(module => ({ default: module.CartDrawer })))
+const weightList = new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))
 
 export default function App() {
   const cart = useCart()
   const [cartOpen, setCartOpen] = useState(false)
+  const [cartRequested, setCartRequested] = useState(false)
   const [product, setProduct] = useState<{ target: ProductTarget; instance: number } | null>(null)
   const [productOpen, setProductOpen] = useState(false)
   const [zoom, setZoom] = useState<{ src: string; alt: string; name: string } | null>(null)
@@ -31,10 +35,12 @@ export default function App() {
     return () => window.clearTimeout(timeout)
   }, [toast])
 
-  const openProduct = (target: ProductTarget) => {
+  const openCart = useCallback(() => { setCartRequested(true); setCartOpen(true) }, [])
+  const openProduct = useCallback((target: ProductTarget) => {
     setProduct({ target, instance: Date.now() })
     setProductOpen(true)
-  }
+  }, [])
+  const customizeMix = useCallback(() => openProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true }), [openProduct])
 
   const addProduct = (item: CartItem) => {
     const previous = cart.items.find(entry => selectionKey(entry.selection) === selectionKey(item.selection))?.quantity ?? 0
@@ -45,15 +51,15 @@ export default function App() {
   }
 
   return <>
-    <a href="#catalogo" className="skip-link">Saltar al catálogo</a>
-    <Header count={cart.count} onCart={() => setCartOpen(true)} />
+    <SectionLink section="catalogo" className="skip-link">Saltar al catálogo</SectionLink>
+    <Header count={cart.count} onCart={openCart} />
     <main>
       <section id="inicio" className="hero container" aria-labelledby="hero-title">
         <div className="hero-copy">
           <span className="eyebrow"><span className="eyebrow-line" />GOMITAS ENCHILADAS</span>
           <h1 id="hero-title">Tu mezcla.<br /><span>Tus reglas.</span></h1>
           <p>Elige tus favoritas y encuentra tu combinación ideal.</p>
-          <a href="#catalogo" className="button hero-catalog-cta">Ver productos <Icon name="arrow" size={19} /></a>
+          <SectionLink section="catalogo" className="button hero-catalog-cta">Ver productos <Icon name="arrow" size={19} /></SectionLink>
         </div>
         <div className={`hero-visual ${store.heroVideo ? 'has-video' : ''}`}>
           <HeroMedia image={store.heroImage} alt={store.heroImageAlt} video={store.heroVideo} />
@@ -62,7 +68,7 @@ export default function App() {
       </section>
       <BrandMarquee />
       <Catalog onProduct={openProduct} onZoom={setZoom} />
-      <MixExperience onCustomize={() => openProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} />
+      <MixExperience onCustomize={customizeMix} />
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
         <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
         <div className="how-steps">
@@ -75,17 +81,17 @@ export default function App() {
         <div><span className="eyebrow">PREGUNTAS FRECUENTES</span><h2 id="questions-title">Preguntas frecuentes</h2></div>
         <div className="questions-list">
           <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Registra el pedido desde el carrito. Cuando estén confirmados el total y el destino SINPE, recibirás instrucciones y un código para el detalle de tu transferencia. Adjunta el comprobante y la referencia bancaria. La tienda comprobará el abono antes de marcarlo como listo para preparar; subir una imagen no confirma el pago.</p></details>
-          <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
+          <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {weightList}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
           <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos de Costa Rica por ₡2.800. En compras de productos mayores a ₡15.000, el envío es gratis. El carrito calcula el costo automáticamente antes de pagar. También puedes elegir recogida y consultar el estado del pedido desde este navegador.{store.demo ? ' Los precios de productos siguen siendo de demostración; no envíes dinero real todavía.' : ''}</p></details>
         </div>
       </section>
     </main>
     <footer className="site-footer"><div className="container">
       <div className="footer-main">
-        <div><a href="#inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></a></div>
-        <div className="footer-links"><span className="eyebrow">EXPLORA</span><a href="#gomitas">Gomitas enchiladas</a>{store.categories.dessertsEnabled && <a href="#postres">Postres</a>}<a href="#como-pedir">Cómo pedir</a></div>
+        <div><SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink></div>
+        <div className="footer-links"><span className="eyebrow">EXPLORA</span><SectionLink section="gomitas">Gomitas enchiladas</SectionLink>{store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}<SectionLink section="como-pedir">Cómo pedir</SectionLink></div>
         <div className="footer-contact"><span className="eyebrow">TU PEDIDO, AQUÍ</span>
-          <button className="text-button" onClick={() => setCartOpen(true)}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
+          <button className="text-button" onClick={openCart}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
           <p>Pago con SINPE Móvil · Revisión del abono</p>
           {store.contact.email && <a href={`mailto:${store.contact.email}`}>{store.contact.email}</a>}
           {store.contact.instagramUrl && <a href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram <Icon name="arrow-up" size={14} /></a>}
@@ -93,8 +99,12 @@ export default function App() {
       </div>
       <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span><a href="/admin">Administración</a>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
     </div></footer>
-    {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
-    <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} />
+    <Suspense fallback={null}>
+      {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
+    </Suspense>
+    <Suspense fallback={null}>
+      {cartRequested && <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} />}
+    </Suspense>
     <Lightbox image={zoom} onClose={() => setZoom(null)} />
     <Modal open={infoOpen} onClose={() => setInfoOpen(false)} titleId="info-title" className="info-dialog">
       <div className="info-dialog-inner">
@@ -108,7 +118,7 @@ export default function App() {
     </Modal>
     <div className="toast-region" aria-live="polite" aria-atomic="true">{toast && <div className="toast" key={toast.id}>
       <span className="toast-check"><Icon name="check" size={16} /></span><span>{toast.text}</span>
-      <button onClick={() => { setToast(null); setCartOpen(true) }}>Ver carrito <Icon name="arrow" size={16} /></button>
+      <button onClick={() => { setToast(null); openCart() }}>Ver carrito <Icon name="arrow" size={16} /></button>
       <button className="toast-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button>
     </div>}</div>
   </>

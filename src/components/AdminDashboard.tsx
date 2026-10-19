@@ -7,6 +7,7 @@ import { money } from '../lib/shop.ts'
 import { Icon } from './Icon.tsx'
 import { Modal } from './ui.tsx'
 import { OrderLines } from './OrderPanel.tsx'
+import '../orders.css'
 
 type OrderDetail = { order: ShopOrder; audit: OrderAudit[] }
 

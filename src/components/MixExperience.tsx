@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { memo, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Icon } from './Icon.tsx'
 import { ProductImage } from './ui.tsx'
 import { GummyBowl } from './GummyBowl.tsx'
-import { animateGummyBowl, MIX_CYCLE, type MixSceneMotion } from './mix-motion.ts'
+import { MIX_CYCLE } from '../lib/mix-physics.ts'
+import type { MixSceneMotion } from './mix-motion.ts'
 import './mix-experience.css'
 
 const MIX_INGREDIENTS = [
@@ -13,34 +14,54 @@ const MIX_INGREDIENTS = [
 ] as const
 
 /** Decorative, repeatable process illustration. Never connected to order status. */
-export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
+export const MixExperience = memo(function MixExperience({ onCustomize }: { onCustomize: () => void }) {
   const root = useRef<HTMLElement>(null)
   const film = useRef<HTMLDivElement>(null)
   const scene = useRef<MixSceneMotion | null>(null)
+  const shouldRun = useRef(false)
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [motionRequested, setMotionRequested] = useState(!reduced)
   const [visible, setVisible] = useState(false)
   const [tabVisible, setTabVisible] = useState(!document.hidden)
+  const [near, setNear] = useState(false)
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const preference = () => setReduced(media.matches)
+    const preference = () => { setReduced(media.matches); if (!media.matches) setMotionRequested(true) }
     media.addEventListener('change', preference)
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.15, rootMargin: '40px 0px' })
+    const preload = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setNear(true); preload.disconnect() }
+    }, { rootMargin: '1200px 0px' })
     if (root.current) observer.observe(root.current)
+    if (root.current) preload.observe(root.current)
     const visibility = () => setTabVisible(!document.hidden)
     document.addEventListener('visibilitychange', visibility)
-    return () => { observer.disconnect(); media.removeEventListener('change', preference); document.removeEventListener('visibilitychange', visibility) }
+    return () => { observer.disconnect(); preload.disconnect(); media.removeEventListener('change', preference); document.removeEventListener('visibilitychange', visibility) }
   }, [])
 
   useEffect(() => {
+    if (!near || !motionRequested) return
     const svg = film.current?.querySelector<SVGSVGElement>('.bowl-illustration')
     if (!svg) return
-    scene.current = animateGummyBowl(svg, film.current)
-    return () => scene.current?.dispose()
-  }, [])
+    let disposed = false
+    const controller = new AbortController()
+    void Promise.all([import('./mix-motion.ts'), import('./mix-simulation.ts').then(module => module.prepareMixSimulation())]).then(async ([motion, simulation]) => {
+      if (disposed) return
+      performance.mark('mix:effects-start')
+      const prepared = await motion.animateGummyBowl(svg, simulation, film.current, controller.signal)
+      if (disposed) { prepared.dispose(); return }
+      scene.current = prepared
+      performance.mark('mix:effects-ready')
+      performance.measure('mix:effects', 'mix:effects-start', 'mix:effects-ready')
+      prepared.setRunning(shouldRun.current)
+    }).catch(error => { if (!controller.signal.aborted) console.error('Mix animation could not be prepared:', error) })
+    return () => { disposed = true; controller.abort(); scene.current?.dispose(); scene.current = null }
+  }, [near, motionRequested])
 
   useEffect(() => {
-    scene.current?.setRunning(visible && tabVisible && !reduced)
+    shouldRun.current = visible && tabVisible && !reduced
+    scene.current?.setRunning(shouldRun.current)
   }, [visible, tabVisible, reduced])
 
   return <section ref={root} className="experience-section container" aria-labelledby="experience-title">
@@ -55,7 +76,7 @@ export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
       </div>
       <button className="button experience-cta" onClick={onCustomize}>Crear mi combinación <Icon name="arrow" size={19} /></button>
     </div>
-    <div ref={film} className="mix-film" style={{ '--cycle': `${MIX_CYCLE}ms` } as CSSProperties} data-static={reduced}>
+    <div ref={film} className="mix-film" style={{ '--cycle': `${MIX_CYCLE}ms` } as CSSProperties} data-static={reduced} data-scene-ready="false">
       <div className="film-top"><div><span>Preparación<small>Vista previa</small></span></div><span className="film-loop-label">EN BUCLE</span></div>
       <p className="sr-only">Animación ilustrativa: se vierte chamoy, se espolvorea Tajín y se añade jugo de limón de una jarrita. Los ositos caen, se comprimen y se doblan suavemente al contacto. La cuchara barre los lados y pliega la mezcla hacia dentro; el chamoy espeso se adhiere y escurre lentamente. Al final aparece la bolsa terminada. No representa la preparación de un pedido real.</p>
       <div className="film-scene" aria-hidden="true">
@@ -65,7 +86,7 @@ export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
         </div>)}</div>
         <div className="mix-stage">
           <div className="mix-bowl-scene">
-            <GummyBowl />
+            <GummyBowl loadImages={near && motionRequested} />
           </div>
           <div className="finished-mix">
             <span className="finish-sparkle sparkle-one">✦</span><span className="finish-sparkle sparkle-two">✦</span><span className="finish-sparkle sparkle-three">✧</span>
@@ -74,7 +95,7 @@ export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
                 src="/images/ositos-bolsa.webp"
                 alt="Bolsa de ositos enchilados Onky's"
                 className="finished-package-img"
-                loading="eager"
+                loading="lazy"
               />
             </div>
             <span className="finished-tick"><Icon name="check" size={19} /></span>
@@ -85,4 +106,4 @@ export function MixExperience({ onCustomize }: { onCustomize: () => void }) {
       </div>
     </div>
   </section>
-}
+})

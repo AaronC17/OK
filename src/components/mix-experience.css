@@ -86,6 +86,7 @@
 .mix-bowl-scene { position: absolute; inset: 0 0 17px; transform: translateZ(0); -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 .bowl-illustration { display: block; width: 100%; height: 100%; position: absolute; inset: 0; overflow: visible; transform: translateZ(0); }
 .bowl-gummy { opacity: 0; }
+/* Keep these compositor hints: removing them regressed the mobile paint profile. */
 .bowl-gummy, .spoon-motion, .spoon-head, .gummy-contact-shadows > ellipse, .tajin-grain { transform-box: view-box; transform-origin: 0 0; will-change: transform; }
 .sauce-pool { transform-box: view-box; transform-origin: 180px 203px; }
 .chamoy-bottle { transform-box: view-box; transform-origin: 140px 84px; }
@@ -108,8 +109,12 @@
 .film-step i { position: absolute; inset: 0 0 auto; height: 2px; background: #9276a4; transform-origin: left; transform: scaleX(0); }
 
 .mix-film[data-static="true"] *, .mix-film[data-static="true"] *::after { animation: none !important; }
-.mix-film[data-static="true"] .mix-bowl-scene, .mix-film[data-static="true"] .caption-season, .mix-film[data-static="true"] .caption-select, .mix-film[data-static="true"] .caption-mix { opacity: 0; }
-.mix-film[data-static="true"] .finished-mix, .mix-film[data-static="true"] .caption-ready { opacity: 1; }
+/* Same still frame that the previous paused WAAPI playhead displayed at 0ms,
+   without calculating a simulation for a visitor who requested no motion. */
+.mix-film[data-static="true"] .mix-bowl-scene, .mix-film[data-static="true"] .caption-season { opacity: 1; }
+.mix-film[data-static="true"] .finished-mix, .mix-film[data-static="true"] .caption-select, .mix-film[data-static="true"] .caption-mix, .mix-film[data-static="true"] .caption-ready { opacity: 0; }
+.mix-film[data-static="true"] .finished-mix { transform: translateY(22px) rotate(-6deg) scale(.9); }
+.mix-film[data-static="true"] .caption-select, .mix-film[data-static="true"] .caption-mix, .mix-film[data-static="true"] .caption-ready { transform: translateY(3px); }
 .mix-film[data-static="true"] .ingredient-tick { opacity: 1 !important; transform: scale(1) !important; }
 .mix-film[data-static="true"] .ingredient-photo { border-color: #9276a4 !important; }
 

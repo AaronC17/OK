@@ -1,0 +1,23 @@
+import type { AnchorHTMLAttributes, MouseEvent } from 'react'
+
+/** Keep section navigation inside the current document, including LAN preview
+ * query parameters. Modified clicks retain the anchor's normal browser behavior. */
+function navigate(event: MouseEvent<HTMLAnchorElement>) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  const link = event.currentTarget
+  if (link.target && link.target !== '_self') return
+  const section = document.getElementById(decodeURIComponent(link.hash.slice(1)))
+  if (!section) return
+  event.preventDefault()
+  const url = new URL(window.location.href)
+  if (url.hash !== link.hash) {
+    url.hash = link.hash
+    window.history.pushState(window.history.state, '', url)
+  }
+  // CSS already defines smooth scrolling and the reduced-motion override.
+  section.scrollIntoView({ block: 'start', behavior: 'auto' })
+}
+
+export function SectionLink({ section, ...props }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'onClick'> & { section: string }) {
+  return <a {...props} href={`#${section}`} onClick={navigate} />
+}

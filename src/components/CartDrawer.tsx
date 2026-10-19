@@ -9,6 +9,7 @@ import type { Cart } from '../hooks/useCart.ts'
 import { Icon } from './Icon.tsx'
 import { OrderPanel } from './OrderPanel.tsx'
 import { Modal, ProductImage, Quantity } from './ui.tsx'
+import '../orders.css'
 
 type Errors = Partial<Record<'name' | 'phone' | 'email' | 'deliveryId' | 'address' | 'notes' | 'privacy' | 'cart', string>>
 

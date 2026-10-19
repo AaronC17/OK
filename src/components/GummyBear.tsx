@@ -3,11 +3,11 @@ import { useId } from 'react'
 export const gummyImages = ['amber', 'ruby', 'citrus', 'gold'] as const
 
 /** Actual supplied photos, trimmed and optimized locally with alpha preserved. */
-export function GummyDefinitions({ id }: { id: string }) {
+export function GummyDefinitions({ id, loadImages = true }: { id: string; loadImages?: boolean }) {
   return <defs>{gummyImages.map(image => <image
     key={image} id={`${id}-bear-${image}`}
-    href={`/images/mix/bear-${image}.webp`}
-    xlinkHref={`/images/mix/bear-${image}.webp`}
+    href={loadImages ? `/images/mix/bear-${image}.webp` : undefined}
+    xlinkHref={loadImages ? `/images/mix/bear-${image}.webp` : undefined}
     x="-14" y="-20.5" width="28" height="41" preserveAspectRatio="xMidYMid meet"
   />)}</defs>
 }

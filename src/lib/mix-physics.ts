@@ -197,6 +197,10 @@ function softContact(node: GelNode, other: Point3, velocity: Point3, radius: num
 
 function separate(a: Point3, b: Point3, minimum: number, share: number) {
   const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z
+  // Most candidate lobes do not touch. The profile's main hot path was taking
+  // their square root ten times per simulation step just to apply zero force.
+  // Leave borderline contacts to Math.hypot, preserving its floating-point path.
+  if (dx * dx + dy * dy + dz * dz > minimum * minimum + 1e-8) return
   const length = Math.hypot(dx, dy, dz) || .001
   const correction = Math.max(0, minimum - length) / length
   a.x += dx * correction * share; a.y += dy * correction * share; a.z += dz * correction * share
