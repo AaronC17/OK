@@ -1,6 +1,7 @@
 import { clamp, floorHeight, GEL_MESH, GEL_RADII, GEL_TRIANGLES, GUMMY_RADIUS, LIQUID_LEVEL, MIX_CYCLE, mixBears, SAMPLE_RATE, sampleSurface, smooth, spoonAt, stirStrength, type MixSimulation, type Point2 } from '../lib/mix-physics.ts'
 import { createLemonPour } from './lemon-pour.ts'
 import { affinePhoto, type AffinePhoto } from '../lib/mix-affine.ts'
+import { meshVerticalBounds, sortMixDepth } from '../lib/mix-render.ts'
 export { MIX_CYCLE } from '../lib/mix-physics.ts'
 
 const seconds = MIX_CYCLE / 1000
@@ -305,6 +306,7 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
     lastTransform: '',
   }))
   const noPatches: typeof patches[number] = []
+  const meshBounds = { min: 0, max: 0 }
   const affine: AffinePhoto = { xx: 0, xy: 0, yx: 0, yy: 0, x: 0, y: 0 }
   const menisci = mixBears.map((_, index) => svg.querySelector(`[data-meniscus="${index}"]`)!)
   const sauceCuts = mixBears.map((_, index) => svg.querySelector(`[data-sauce-cut="${index}"]`)!)
@@ -354,7 +356,9 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
   const meniscusLastTrans = new Array<string>(mixBears.length).fill('')
   const cutLastY = new Array<number>(mixBears.length).fill(-9999)
   const beadLastOp = new Array<number>(beads.length).fill(-1)
-  const sauceCovers = [...svg.querySelectorAll<SVGElement>('.gummy-sauce-cover')]
+  // The DOM has already been depth-sorted. Never index a document-order list
+  // with simulation indices, or one gummy toggles another gummy's coating.
+  const sauceCovers = mixBears.map((_, index) => svg.querySelector<SVGElement>(`[data-sauce-cover="${index}"]`)!)
   const sauceCoverVisible = mixBears.map(() => true)
   let lastSurfaceD = ''
   let ringsActive = false
@@ -459,32 +463,7 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
       pose.feet.z = body.lobes[2].z + (nextBody.lobes[2].z - body.lobes[2].z) * progress
     }
 
-    // Depth sorting with screen overlap check: avoids DOM thrashing while bears fall
-    let orderChanged = false
-    for (let i = 1; i < currentOrder.length; i++) {
-      let j = i
-      while (j > 0) {
-        const prev = currentOrder[j - 1], curr = currentOrder[j]
-        if (depths[curr] < depths[prev] - 1.5) {
-          const actPrev = prev === mixBears.length ? frame.spoon.opacity > 0.05 : poses[prev].active
-          const actCurr = curr === mixBears.length ? frame.spoon.opacity > 0.05 : poses[curr].active
-          if (actPrev && actCurr) {
-            const xPrev = prev === mixBears.length ? frame.spoon.x : poses[prev].x
-            const yPrev = prev === mixBears.length ? frame.spoon.y : poses[prev].y
-            const xCurr = curr === mixBears.length ? frame.spoon.x : poses[curr].x
-            const yCurr = curr === mixBears.length ? frame.spoon.y : poses[curr].y
-            if (Math.abs(xPrev - xCurr) < 32 && Math.abs(yPrev - yCurr) < 40) {
-              currentOrder[j - 1] = curr
-              currentOrder[j] = prev
-              orderChanged = true
-              j--
-              continue
-            }
-          }
-        }
-        break
-      }
-    }
+    const orderChanged = sortMixDepth(currentOrder, depths)
     if (orderChanged) {
       currentOrder.forEach((idx, i) => {
         const node = nodes[idx]
@@ -495,6 +474,13 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
     // Update bears patches, sauce cuts, and menisci
     for (let i = 0; i < mixBears.length; i++) {
       const body = poses[i]
+      // Inactive gummies have no visible texture, meniscus or coating. Reset
+      // once, then leave their SVG resources alone until their original start.
+      if (!body.active) {
+        if (sauceCoverVisible[i]) { sauceCoverVisible[i] = false; sauceCovers[i].style.display = 'none' }
+        if (meniscusLastOp[i] !== 0) { meniscusLastOp[i] = 0; menisci[i].setAttribute('opacity', '0') }
+        continue
+      }
       if (body.active) {
         const fromMesh = frame.bears[i].mesh, toMesh = next.bears[i].mesh
         for (let j = 0; j < 10; j++) {
@@ -523,15 +509,14 @@ export async function animateGummyBowl(svg: SVGSVGElement, simulation: MixSimula
         }
       }
       const { x, y, z: depth } = body
-      const sHeight = (time >= 1.0 && time < 4.10) ? LIQUID_LEVEL : sauceHeight(x, depth)
+      const sHeight = sauceHeight(x, depth)
       const line = y - sHeight
       const cutY = round(line)
       // The alpha mask re-renders all eight photographic triangles. While a
       // bear is above the sauce its clipped coating is empty: skip that paint
       // entirely, rather than asking Safari to build an invisible mask.
-      let maxMeshY = -Infinity
-      if (body.active) for (let vertex = 0; vertex < 10; vertex++) maxMeshY = Math.max(maxMeshY, interpolatedMesh[vertex].y)
-      const coverVisible = body.active && cutY <= maxMeshY + 1
+      meshVerticalBounds(interpolatedMesh, meshBounds)
+      const coverVisible = cutY <= meshBounds.max + 1
       if (sauceCoverVisible[i] !== coverVisible) {
         sauceCoverVisible[i] = coverVisible
         sauceCovers[i].style.display = coverVisible ? '' : 'none'

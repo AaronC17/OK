@@ -16,6 +16,7 @@ if (!process.env.ONKYS_E2E_PORT) {
 }
 const port = process.env.ONKYS_E2E_PORT
 const baseURL = `http://127.0.0.1:${port}`
+const webkit = process.env.PW_BROWSER === 'webkit'
 
 export default defineConfig({
   testDir: './tests',
@@ -26,13 +27,14 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL,
-    channel: process.env.PW_CHANNEL || 'msedge',
+    browserName: webkit ? 'webkit' : 'chromium',
+    channel: webkit ? undefined : process.env.PW_CHANNEL || 'msedge',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 1000 } } },
-    { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
+    { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: webkit ? 3 : 1 } },
   ],
   webServer: {
     command: 'node --experimental-strip-types scripts/testing/store-preview.ts',

@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFile, mkdir, writeFile, stat } from 'node:fs/promises'
 import { resolve, join, extname } from 'node:path'
-import { chromium } from 'playwright'
+import { chromium, webkit } from 'playwright'
 
 // Benchmark a production build, without touching the shop API or real orders.
 // node scripts/testing/performance.mjs --site=<build> --output=<directory> --runs=3
@@ -22,8 +22,9 @@ const server = createServer(async (request, response) => {
 })
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const url = `http://127.0.0.1:${server.address().port}`
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'msedge', headless: true })
-const results = { browser: browser.version(), conditions: { mobile: '390x844, DPR 1, touch, CPU 4x, 1.6 Mbps / 750 Kbps, RTT 150 ms', desktop: '1440x1000, DPR 1, CPU 1x, unthrottled' }, runs: [] }
+if (args.engine === 'webkit' && !args.captureOnly) throw new Error('WebKit supports --captureOnly here; CDP throttled timings require Chromium.')
+const browser = args.engine === 'webkit' ? await webkit.launch({ headless: true }) : await chromium.launch({ channel: process.env.PW_CHANNEL || 'msedge', headless: true })
+const results = { browser: browser.version(), engine: args.engine || 'chromium', conditions: { mobile: `390x844, DPR ${args.dpr || 1}, touch, CPU 4x, 1.6 Mbps / 750 Kbps, RTT 150 ms`, desktop: `1440x1000, DPR ${args.dpr || 1}, CPU 1x, unthrottled` }, runs: [] }
 
 async function instrument(page) {
   await page.addInitScript(() => {
@@ -45,7 +46,7 @@ const metricDelta = (a, b) => Object.fromEntries(['TaskDuration', 'ScriptDuratio
 const metrics = async cdp => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(item => [item.name, item.value]))
 
 async function captureVisuals(page, cdp, device) {
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+  await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 })
   // Start a fresh scene: hidden SVG paths can retain a previous cycle's state.
   await page.reload({ waitUntil: 'load' })
   await page.evaluate(() => document.fonts.ready)
@@ -125,10 +126,10 @@ try {
       page.setDefaultTimeout(120_000)
       page.setDefaultNavigationTimeout(120_000)
       await instrument(page)
-      const cdp = await context.newCDPSession(page)
-      await cdp.send('Performance.enable')
-      await cdp.send('Network.enable')
-      await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
+      const cdp = args.engine === 'webkit' ? null : await context.newCDPSession(page)
+      await cdp?.send('Performance.enable')
+      await cdp?.send('Network.enable')
+      await cdp?.send('Network.setCacheDisabled', { cacheDisabled: true })
       const errors = []
       page.on('pageerror', error => errors.push(error.message))
       if (args.captureOnly) {

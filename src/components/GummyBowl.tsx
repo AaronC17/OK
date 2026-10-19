@@ -102,7 +102,7 @@ export const GummyBowl = memo(function GummyBowl({ loadImages = true }: { loadIm
               ))}</g>
             </g>
             <g clipPath={`url(#${id}-submerged-${index})`}>
-              <rect className="gummy-sauce-cover" x="-55" y="-55" width="110" height="110" fill={`url(#${id}-submerged-chamoy)`} opacity=".90" mask={`url(#${id}-gummy-silhouette-${index})`} />
+              <rect className="gummy-sauce-cover" data-sauce-cover={index} x="-55" y="-55" width="110" height="110" fill={`url(#${id}-submerged-chamoy)`} opacity=".90" mask={`url(#${id}-gummy-silhouette-${index})`} />
             </g>
             <path className="gummy-meniscus" data-meniscus={index} d="M-10 0Q0 3.5 10 0" stroke="#bd5832" strokeWidth="1.7" strokeLinecap="round" opacity="0" />
           </g>)}
