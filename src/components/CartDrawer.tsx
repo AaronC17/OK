@@ -15,6 +15,17 @@ import '../orders.css'
 type Errors = Partial<Record<'name' | 'phone' | 'email' | 'deliveryId' | 'address' | 'notes' | 'privacy' | 'cart', string>>
 
 const DISMISSED_ORDER_KEY = 'onkys.dismissedOrderId'
+const DELIVERY_PREF_KEY = 'onkys.delivery'
+
+function getInitialDeliveryId(): string {
+  try {
+    const saved = window.localStorage.getItem(DELIVERY_PREF_KEY)
+    if (saved && store.deliveryMethods.some(method => method.id === saved && method.enabled)) {
+      return saved
+    }
+  } catch { /* ignore */ }
+  return store.deliveryMethods.find(method => method.enabled)?.id ?? 'delivery'
+}
 
 function getDismissedOrderId(): string | null {
   try { return window.localStorage.getItem(DISMISSED_ORDER_KEY) } catch { return null }
@@ -29,7 +40,7 @@ function setDismissedOrderId(id: string | null) {
 
 export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: () => void; cart: Cart }) {
   const [customer, setCustomer] = useState<OrderCustomer>({ name: '', phone: '', email: '', address: '', notes: '' })
-  const [deliveryId, setDeliveryId] = useState(store.deliveryMethods.find(method => method.enabled)?.id ?? '')
+  const [deliveryId, setDeliveryId] = useState(getInitialDeliveryId)
   const [privacy, setPrivacy] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
   const [config, setConfig] = useState<CheckoutConfig | null>(null)
@@ -136,13 +147,13 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
       {!order && !cart.lines.length ? <div className="empty-cart"><div className="empty-bag"><Icon name="bag" size={48} /></div><span className="eyebrow">AQUÍ CABEN TUS FAVORITOS</span><h3>Un buen momento por empezar.</h3><p>Elige tus favoritos.<br />Ahora puedes pedir y pagar con SINPE Móvil.</p><button className="button button-primary" onClick={() => { onClose(); document.getElementById('catalogo')?.scrollIntoView() }}>Explorar el catálogo <Icon name="arrow" size={18} /></button></div> : <>
         <div className="drawer-scroll" ref={scrollRef}>
           {order ? <OrderPanel key={order.id} order={order} onChange={setOrder} onRefresh={() => { void refresh() }} onNew={newOrder} busy={loading} /> : <>
-            <FreeShippingBar subtotal={amounts.subtotal} />
+            {deliveryId === 'delivery' && <FreeShippingBar subtotal={amounts.subtotal} />}
             <div className="cart-lines">{cart.lines.map(line => <article key={line.key} className="cart-line"><ProductImage src={line.image} alt={line.imageAlt} /><div className="cart-line-details"><div className="cart-line-heading"><h3>{line.name}</h3><button className="icon-button remove-button" disabled={preparing} onClick={() => cart.remove(line.key)} aria-label={`Eliminar ${line.name}, ${line.options.join(', ')}`}><Icon name="trash" size={16} /></button></div><p>{line.options.join(' · ')}</p><span className="unit-price">{money(line.unitPriceMinor, store)} / unidad</span><div className="cart-line-bottom"><Quantity value={line.quantity} onChange={value => { if (!preparing) cart.update(line.key, value) }} label={`Cantidad de ${line.name}, ${line.options.join(', ')}`} /><strong>{money(line.lineTotalMinor, store)}</strong></div></div></article>)}</div>
             <button className="continue-shopping" disabled={preparing} onClick={onClose}><Icon name="plus" size={16} />Seguir explorando</button>
             <form ref={formRef} id="checkout-form" className="checkout-form" noValidate onSubmit={event => { void submit(event) }}>
               <fieldset disabled={preparing} className="checkout-fields">
                 <div className="form-heading"><span className="step-marker">01</span><h3>¿Cómo lo quieres recibir?</h3></div>
-                <fieldset className="delivery-fieldset"><legend className="sr-only">Método de entrega</legend><div className="delivery-options">{store.deliveryMethods.filter(method => method.enabled).map(option => <label className="delivery-option" key={option.id}><input type="radio" name="delivery" value={option.id} checked={deliveryId === option.id} onChange={() => { setDeliveryId(option.id); setErrors(current => ({ ...current, deliveryId: undefined, address: undefined })) }} aria-invalid={!!errors.deliveryId} /><Icon name={option.requiresAddress ? 'truck' : 'pin'} size={23} /><strong>{option.name}</strong><small>{option.description}</small></label>)}</div>{errors.deliveryId && <p className="field-error">{errors.deliveryId}</p>}{method && <p className="delivery-note">{method.conditions}{method.pickupPoint ? ` Punto: ${method.pickupPoint}.` : ''}</p>}</fieldset>
+                <fieldset className="delivery-fieldset"><legend className="sr-only">Método de entrega</legend><div className="delivery-options">{store.deliveryMethods.filter(method => method.enabled).map(option => <label className="delivery-option" key={option.id}><input type="radio" name="delivery" value={option.id} checked={deliveryId === option.id} onChange={() => { setDeliveryId(option.id); try { window.localStorage.setItem(DELIVERY_PREF_KEY, option.id) } catch {}; setErrors(current => ({ ...current, deliveryId: undefined, address: undefined })) }} aria-invalid={!!errors.deliveryId} /><Icon name={option.requiresAddress ? 'truck' : 'pin'} size={23} /><strong>{option.name}</strong><small>{option.description}</small></label>)}</div>{errors.deliveryId && <p className="field-error">{errors.deliveryId}</p>}{method && <p className="delivery-note">{method.conditions}{method.pickupPoint ? ` Punto: ${method.pickupPoint}.` : ''}</p>}</fieldset>
                 <div className="form-heading"><span className="step-marker">02</span><h3>Tus datos y tu forma de pago.</h3></div>
                 <div className="form-field"><label htmlFor="customer-name">Tu nombre <span aria-hidden="true">*</span></label><input id="customer-name" autoComplete="name" maxLength={100} required value={customer.name} onChange={event => change('name', event.target.value)} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} placeholder="¿Cómo te llamas?" />{errors.name && <p className="field-error" id="name-error">{errors.name}</p>}</div>
                 <div className="form-field"><label htmlFor="customer-phone">Teléfono de contacto <span aria-hidden="true">*</span></label><input id="customer-phone" type="tel" autoComplete="tel" inputMode="tel" maxLength={24} required value={customer.phone} onChange={event => change('phone', event.target.value)} aria-invalid={!!errors.phone} aria-describedby={errors.phone ? 'phone-error' : undefined} placeholder="8 dígitos · Costa Rica" />{errors.phone && <p className="field-error" id="phone-error">{errors.phone}</p>}</div>

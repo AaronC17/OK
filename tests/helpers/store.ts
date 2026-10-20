@@ -40,7 +40,7 @@ export async function checkoutOrder(page: Page, delivery: 'pickup' | 'delivery' 
   await page.evaluate(quantity => localStorage.setItem('onkys.cart.v1', JSON.stringify({ version: 1, items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity }] })), quantity)
   await page.reload()
   await page.getByRole('button', { name: `Abrir carrito, ${quantity} artículos` }).click()
-  await page.getByRole('radio', { name: delivery === 'pickup' ? /Recogida/ : /Envío por Correos/ }).check()
+  await page.getByRole('radio', { name: delivery === 'pickup' ? /Recogida|Recoger Orotina Centro/ : /Envío por Correos/ }).check()
   await page.getByLabel('Tu nombre').fill(`Cliente prueba ${randomUUID().slice(0, 6)}`)
   await page.getByLabel('Teléfono de contacto').fill('61551234')
   await page.getByLabel('Correo electrónico').fill(`cliente-${randomUUID().slice(0, 6)}@ejemplo.cr`)

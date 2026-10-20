@@ -52,11 +52,15 @@ export default function App() {
     const line = resolveLine(item, store)
     const addedMinor = line ? line.unitPriceMinor * added : 0
     const newSubtotal = prevSubtotal + addedMinor
+    let isPickup = false
+    try {
+      isPickup = window.localStorage.getItem('onkys.delivery') === 'pickup'
+    } catch {}
     setToast({
       text: added > 0 ? added < item.quantity ? `Añadimos ${added}. Límite de ${MAX_QUANTITY} por variante.` : 'Un gusto más en tu carrito.' : `Ya tienes el máximo de ${MAX_QUANTITY} de esta variante.`,
       id: Date.now(),
       initialSubtotal: prevSubtotal,
-      subtotal: newSubtotal,
+      subtotal: isPickup ? undefined : newSubtotal,
     })
   }
 
@@ -92,7 +96,7 @@ export default function App() {
         <div className="questions-list">
           <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Registra el pedido desde el carrito. Cuando estén confirmados el total y el destino SINPE, recibirás instrucciones y un código para el detalle de tu transferencia. Adjunta el comprobante y la referencia bancaria. La tienda comprobará el abono antes de marcarlo como listo para preparar; subir una imagen no confirma el pago.</p></details>
           <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {weightList}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
-          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos de Costa Rica por ₡2.800. En compras de productos mayores a ₡15.000, el envío es gratis. El carrito calcula el costo automáticamente antes de pagar. También puedes elegir recogida y consultar el estado del pedido desde este navegador.{store.demo ? ' Los precios de productos siguen siendo de demostración; no envíes dinero real todavía.' : ''}</p></details>
+          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos de Costa Rica por ₡2.800. En compras de productos mayores a ₡15.000, el envío es gratis. El carrito calcula el costo automáticamente antes de pagar. También puedes elegir Recoger Orotina Centro y consultar el estado del pedido desde este navegador.{store.demo ? ' Los precios de productos siguen siendo de demostración; no envíes dinero real todavía.' : ''}</p></details>
         </div>
       </section>
     </main>
