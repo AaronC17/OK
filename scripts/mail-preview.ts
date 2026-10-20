@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { orderEmailMessage } from '../server/store/mailer.ts'
+import { orderEmailMessage, welcomeEmailMessage } from '../server/store/mailer.ts'
 import type { ShopOrder } from '../src/order-types.ts'
 
 const order: ShopOrder = {
@@ -39,4 +39,11 @@ for (const [event, label, status] of events) {
   const html = message.html.replace(/src="[^"]*\/images\/mail-gomitas-v1\.png"/g, 'src="../../public/images/mail-gomitas-v1.png"')
   writeFileSync(join(outDir, `${label}.html`), html)
   console.info(`Previsualización generada: docs/mail-previews/${label}.html`)
+}
+
+const welcomeMsg = welcomeEmailMessage({ name: 'Ana Pérez Vargas', email: 'ana@ejemplo.cr' }, process.env.STORE_PUBLIC_ORIGIN?.trim() || 'https://onkys.shop')
+if (welcomeMsg) {
+  const html = welcomeMsg.html.replace(/src="[^"]*\/images\/mail-gomitas-v1\.png"/g, 'src="../../public/images/mail-gomitas-v1.png"')
+  writeFileSync(join(outDir, '5-bienvenida.html'), html)
+  console.info('Previsualización generada: docs/mail-previews/5-bienvenida.html')
 }

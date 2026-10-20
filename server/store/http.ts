@@ -103,7 +103,11 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         if (!register && typeof data.email === 'string') limits.check(`account-email:${tokenHash(data.email.trim().toLowerCase().slice(0, 254))}`, 10, 15 * 60_000)
         const result = await (register ? store.registerCustomer(data, previous) : store.loginCustomer(data, previous))
         setCookie(response, CUSTOMER_COOKIE, result.token, 7 * 86400, secureCookies)
-        json(response, 200, { user: await store.account(result.session), csrfToken: result.session.csrf })
+        const user = await store.account(result.session)
+        if (register && user) {
+          await options.mailer?.notifyWelcome(user)
+        }
+        json(response, 200, { user, csrfToken: result.session.csrf })
         return
       }
       if (path === '/api/account/logout' && method === 'POST') {
@@ -154,6 +158,7 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         const key = request.headers['idempotency-key']
         if (typeof key !== 'string') throw new StoreError(422, 'Falta Idempotency-Key.')
         const created = await store.createOrder(await jsonBody(request), orderOwner(session), key)
+        await options.mailer?.notify('order.created', created)
         json(response, 200, created)
         return
       }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ShopOrder } from '../../src/order-types.ts'
-import { createOrderMailer, orderEmailMessage, readSmtpConfig } from './mailer.ts'
+import { createOrderMailer, orderEmailMessage, readSmtpConfig, welcomeEmailMessage } from './mailer.ts'
 
 const order = (overrides: Partial<ShopOrder> = {}): ShopOrder => ({
   id: '6a2d8ddfa2f14d2ebc9d94a75b3bc9a0', code: 'ONK-0123456789ABCDEF', version: 2, status: 'pending_review', demo: false,
@@ -77,4 +77,33 @@ test('mailer: sends one email per order-state version, with bcc copy and brand s
   await mailer!.notify('order.created', { ...order(), code: 'ONK-FFFF3333FFFF3333', version: 1 })
   assert.equal(outbox.length, 3)
   assert.match(outbox[2]!.html, /SINPE Móvil/)
+})
+
+test('mailer: welcome email highlights the 10% discount and validates email', () => {
+  const message = welcomeEmailMessage({ name: 'Ana Pérez', email: 'ana@ejemplo.cr' }, 'https://onkys.example')!
+  assert.ok(message)
+  assert.match(message.subject, /10% de descuento/)
+  assert.match(message.html, /10% de descuento en tu primer pedido/)
+  assert.match(message.html, /DESCUENTO/)
+  assert.match(message.html, /Ana/)
+  assert.match(message.html, /ana@ejemplo.cr/)
+  assert.ok(message.html.includes('href="https://onkys.example"'))
+  assert.match(message.text, /10% DE DESCUENTO/)
+  assert.match(message.text, /https:\/\/onkys\.example/)
+
+  assert.equal(welcomeEmailMessage({ name: 'Ana', email: '' }), null)
+  assert.equal(welcomeEmailMessage({ name: 'Ana', email: 'no-es-correo' }), null)
+})
+
+test('mailer: sends welcome email upon account registration with deduplication', async () => {
+  const outbox: Array<{ from: string; to: string; bcc?: string; subject: string; html: string }> = []
+  const mailer = createOrderMailer({
+    SMTP_HOST: 'smtpdm.aliyuncs.com', SMTP_USER: 'pedidos@onkys.com', SMTP_PASS: 'secret', MAIL_BCC: 'duena@onkys.com', STORE_PUBLIC_ORIGIN: 'https://onkys.example',
+  }, message => { outbox.push(message); return Promise.resolve({ messageId: 'test-welcome' }) })
+  await mailer!.notifyWelcome({ name: 'Carlos Mora', email: 'carlos@ejemplo.cr' })
+  await mailer!.notifyWelcome({ name: 'Carlos Mora', email: 'carlos@ejemplo.cr' })
+  assert.equal(outbox.length, 1)
+  assert.equal(outbox[0]!.to, 'carlos@ejemplo.cr')
+  assert.match(outbox[0]!.subject, /10% de descuento/)
+  assert.match(outbox[0]!.html, /Carlos/)
 })

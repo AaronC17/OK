@@ -245,7 +245,158 @@ El equipo de Onky’s · Dulce. Ácido. Picosito.`
   return { subject: `${title} (${order.code})`, html: message, text }
 }
 
-export interface OrderMailer { notify(event: OrderMailEvent, order: ShopOrder): Promise<void> }
+/** Contenido del correo de bienvenida con 10% de descuento al crear una cuenta. Devuelve null si el correo es inválido. */
+export function welcomeEmailMessage(account: { name: string; email: string }, origin = storeOrigin): { subject: string; html: string; text: string } | null {
+  const recipient = account.email?.trim()
+  if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(recipient)) return null
+  const name = esc(account.name.trim().split(/\s+/)[0] || account.name.trim() || 'cliente')
+  const email = esc(recipient)
+  const image = `${(origin || storeOrigin).replace(/\/+$/, '')}/images/mail-gomitas-v1.png`
+  const title = '¡Te damos la bienvenida!'
+  const headline = 'Tu primer antojo,<br>con 10% menos.'
+  const status = 'Cuenta creada · Beneficio de bienvenida'
+  const preheader = 'Tu cuenta en Onky’s está lista. Tienes un 10% de descuento automático en los productos de tu primer pedido.'
+  const lead = `¡Qué gusto tenerte aquí, ${name}! Tu cuenta en Onky’s ya está lista. Para celebrar que formas parte de nuestra comunidad, tienes un <strong>10% de descuento automático</strong> en los productos de tu primer pedido.`
+  const action = 'Explorar gomitas y armar pedido'
+
+  const message = `<!doctype html>
+<html lang="es-CR" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+  <title>${esc(title)} · Onky’s</title>
+  <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+  <style>
+    body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
+    table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;} img{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
+    a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;}
+    @media only screen and (max-width:480px){
+      .mail-outer{padding:16px 8px!important;} .mail-pad{padding-left:20px!important;padding-right:20px!important;}
+      .mail-hero{padding-top:22px!important;padding-bottom:22px!important;} .hero-title{font-size:30px!important;line-height:33px!important;letter-spacing:-1px!important;}
+      .hero-art{width:92px!important;padding-left:14px!important;} .hero-art img{width:92px!important;height:auto!important;}
+      .discount-card-inner{padding:18px 16px!important;} .discount-badge{width:70px!important;padding-right:12px!important;}
+      .discount-num{font-size:30px!important;line-height:32px!important;}
+      .mail-button{display:block!important;text-align:center!important;}
+    }
+    @media only screen and (max-width:360px){
+      .hero-title{font-size:26px!important;line-height:29px!important;}
+      .hero-art{width:76px!important;padding-left:10px!important;} .hero-art img{width:76px!important;}
+    }
+  </style>
+</head>
+<body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
+  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>
+  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${'&zwnj;&nbsp;'.repeat(80)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
+  <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
+    <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+    <table role="presentation" class="mail-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:680px;border:1px solid #e5e0e6;border-radius:16px;border-spacing:0;box-shadow:0 12px 32px rgba(56,36,72,0.09),0 2px 6px rgba(56,36,72,0.04);overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+      <tr><td class="mail-pad" bgcolor="#fbfaf9" style="padding:20px 36px;border-radius:16px 16px 0 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky’s<span style="color:#9c7bb1;">.</span></td>
+          <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
+        </tr></table>
+      </td></tr>
+      <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:24px 36px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td valign="middle">
+            <p style="margin:0 0 12px;color:#634479;font-size:12px;line-height:18px;font-weight:400;">${status}</p>
+            <h1 class="hero-title" style="margin:0 0 12px;color:#382448;font-size:38px;line-height:41px;letter-spacing:-1.6px;font-weight:800;">${headline}</h1>
+            <p style="margin:0;font-size:14px;line-height:23px;color:#5d5664;">${lead}</p>
+          </td>
+          <td class="hero-art" width="154" align="right" valign="middle" style="width:154px;padding-left:20px;">
+            <img src="${esc(image)}" width="134" height="179" alt="Gomitas Onky’s" style="display:block;width:134px;height:179px;color:#382448;font-size:12px;">
+          </td>
+        </tr></table>
+      </td></tr>
+      <tr><td class="mail-pad" style="padding:24px 36px 0;">
+        <!-- Tarjeta de beneficio 10% -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
+          <tr><td class="discount-card-inner" bgcolor="#f8f4fa" style="padding:22px 24px;border:1px solid #e7ddeb;border-radius:12px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td class="discount-badge" valign="middle" style="width:90px;padding-right:18px;border-right:1px dashed #cfb9dc;">
+                <span class="discount-num" style="display:block;font-size:38px;line-height:40px;font-weight:800;color:#382448;letter-spacing:-1.8px;">10<span style="font-size:22px;letter-spacing:-0.5px;">%</span></span>
+                <span style="display:block;font-size:10px;line-height:14px;font-weight:700;color:#65447a;text-transform:uppercase;letter-spacing:0.8px;">DESCUENTO</span>
+              </td>
+              <td valign="middle" style="padding-left:18px;">
+                <h3 style="margin:0 0 5px;color:#382448;font-size:16px;line-height:22px;font-weight:700;">10% de descuento en tu primer pedido</h3>
+                <p style="margin:0;font-size:13px;line-height:20px;color:#5d5664;">Se aplica de forma automática al subtotal de productos en tu carrito. Sin cupones ni códigos que recordar.</p>
+              </td>
+            </tr></table>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td class="mail-pad" style="padding:16px 36px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
+          <tr><td bgcolor="#fbfaf9" style="padding:20px 22px;border-radius:10px;font-size:13px;line-height:21px;color:#5d5664;">
+            <h2 style="margin:0 0 10px;color:#382448;font-size:14px;line-height:20px;font-weight:700;">¿Cómo funciona tu beneficio?</h2>
+            <p style="margin:0 0 8px;"><strong>1. Elige tus favoritas:</strong> Explora nuestras gomitas enchiladas, uvarindas o personaliza tu mezcla ideal.</p>
+            <p style="margin:0 0 8px;"><strong>2. Tu descuento se aplica solo:</strong> Inicia sesión con este correo (<strong>${email}</strong>) y verás reflejado el 10% menos de inmediato en los productos de tu carrito.</p>
+            <p style="margin:0 0 8px;"><strong>3. Paga fácil con SINPE Móvil:</strong> Registra tu pedido, usa el código asignado en la transferencia y sube tu comprobante para prepararlo.</p>
+            <p style="margin:0;color:#716b76;font-size:12px;line-height:18px;">* El beneficio aplica exclusivamente a los productos de tu primer pedido; el costo de envío no está incluido.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td class="mail-pad" style="padding:20px 36px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
+          <tr><td style="padding:16px 0;border-top:1px solid #e5e0e6;border-bottom:1px solid #e5e0e6;">
+            <p style="margin:0 0 4px;color:#716b76;font-size:12px;line-height:18px;">Datos de tu cuenta</p>
+            <p style="margin:0;color:#211d25;font-size:14px;line-height:22px;"><strong>Nombre:</strong> ${esc(account.name)}<br><strong>Correo electrónico:</strong> ${email}</p>
+          </td></tr>
+        </table>
+      </td></tr>
+      ${origin ? `<tr><td align="center" class="mail-pad" style="padding:24px 36px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:14px 28px;">
+          <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
+        </td></tr></table>
+        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda desde tu navegador para comenzar.</p>
+      </td></tr>` : ''}
+      <tr><td align="center" class="mail-pad" style="padding:24px 36px;">
+        <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
+        <p style="margin:4px 0 0;color:#716b76;font-size:12px;line-height:19px;">Con cariño, el equipo de Onky’s.</p>
+      </td></tr>
+      <tr><td align="center" class="mail-pad" bgcolor="#fbfaf9" style="padding:14px 36px;border-radius:0 0 16px 16px;">
+        <p style="margin:0;color:#716b76;font-size:11px;line-height:18px;">Dulce. Ácido. Picosito.</p>
+      </td></tr>
+    </table>
+    <!--[if mso]></td></tr></table><![endif]-->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;"><tr><td align="center" style="padding:16px 16px 0;color:#716b76;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;">
+      Recibiste este correo porque creaste una cuenta en Onky’s.<br>Tu correo registrado es <span style="word-break:break-word;">${email}</span>.
+    </td></tr></table>
+  </td></tr></table>
+</body></html>`
+
+  const text = `Onky’s · ${title}
+Hola, ${account.name}.
+
+¡Qué gusto tenerte aquí! Tu cuenta en Onky’s ya está lista.
+
+TU BENEFICIO DE BIENVENIDA: 10% DE DESCUENTO
+Tu primer pedido tiene un 10% de descuento automático en el subtotal de productos. Sin cupones ni códigos: solo añade tus gomitas favoritas al carrito con tu sesión iniciada y el descuento se aplicará de inmediato.
+
+¿Cómo funciona tu beneficio?
+1. Elige tus favoritas: Explora nuestras gomitas enchiladas, uvarindas o personaliza tu mezcla ideal.
+2. Tu descuento se aplica solo: Inicia sesión con este correo (${account.email}) y verás reflejado el 10% menos de inmediato en los productos de tu carrito.
+3. Paga fácil con SINPE Móvil: Registra tu pedido, usa el código asignado en la transferencia y sube tu comprobante para prepararlo.
+
+* El beneficio aplica exclusivamente a los productos de tu primer pedido; el costo de envío no está incluido.
+
+${origin ? `Ir a la tienda: ${origin}\nAbre la tienda desde tu navegador para comenzar.` : 'Visita la tienda desde tu navegador.'}
+
+Datos de tu cuenta:
+Nombre: ${account.name}
+Correo: ${account.email}
+
+Gracias por dejarnos ser parte de tu antojo.
+El equipo de Onky’s · Dulce. Ácido. Picosito.`
+
+  return { subject: '¡Te damos la bienvenida a Onky’s! · 10% de descuento en tu primer pedido', html: message, text }
+}
+
+export interface OrderMailer {
+  notify(event: OrderMailEvent, order: ShopOrder): Promise<void>
+  notifyWelcome(account: { id?: string; name: string; email: string }): Promise<void>
+}
 
 const MAX_TRACKED = 400
 
@@ -277,6 +428,19 @@ export function createOrderMailer(env: NodeJS.ProcessEnv = process.env, deliver?
         .catch(error => {
           sent.delete(key)
           console.warn(`Onky’s: el correo ${event} del pedido ${order.code} no salió: ${error instanceof Error ? error.message : 'error desconocido'}`)
+        })
+    },
+    notifyWelcome(account) {
+      const key = `welcome:${account.email.trim().toLowerCase()}`
+      if (!first(key)) return Promise.resolve()
+      const message = welcomeEmailMessage(account, origin)
+      if (!message) return Promise.resolve()
+      const to = account.email.trim()
+      return transport.sendMail({ from: config.from, to, bcc: config.bcc, subject: message.subject, html: message.html, text: message.text })
+        .then(() => { sent.set(key, Date.now()) })
+        .catch(error => {
+          sent.delete(key)
+          console.warn(`Onky’s: el correo de bienvenida para ${account.email} no salió: ${error instanceof Error ? error.message : 'error desconocido'}`)
         })
     },
   }
