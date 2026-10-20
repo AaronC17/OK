@@ -93,9 +93,13 @@ export const store: StoreConfig = {
       imageAlt: 'Domo de Uvarindas Onky’s: uvas cubiertas con tamarindo y chamoy',
       available: true,
       priceMinor: 200000,
-      unitLabel: 'Domo individual',
+      unitLabel: 'Domo',
       ingredients: 'Uvas frescas, pulpa de tamarindo, chamoy artesanal, Tajín y chilito',
       allergenInfo: null,
+      variants: [
+        { id: 'mediano', label: 'Mediano', description: 'Domo mediano', priceMinor: 200000, available: true },
+        { id: 'grande', label: 'Grande', description: 'Domo grande', priceMinor: 250000, available: true },
+      ],
     },
   ],
   deliveryMethods: [

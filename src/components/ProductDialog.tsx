@@ -118,7 +118,10 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
     : [])
   const [weight, setWeight] = useState<Weight>(store.gummies.weights[0])
   const [variantId, setVariantId] = useState(target.kind === 'dessert'
-    ? target.dessert.variants.find(variant => variant.available && variant.priceMinor !== null)?.id ?? '' : '')
+    ? target.dessert.variants.find(variant => variant.available && variant.priceMinor !== null)?.id ?? ''
+    : target.kind === 'product' && target.product.variants && target.product.variants.length > 0
+      ? target.product.variants.find(variant => variant.available)?.id ?? target.product.variants[0].id
+      : '')
   const [quantity, setQuantity] = useState(1)
   const isGummy = target.kind === 'gummy'
   const isProduct = target.kind === 'product'
@@ -128,7 +131,7 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
   const selection: Selection = isGummy
     ? { kind: 'gummy', typeIds, weight }
     : isProduct
-      ? { kind: 'product', productId: product!.id }
+      ? { kind: 'product', productId: product!.id, variantId: variantId || undefined }
       : { kind: 'dessert', productId: dessert!.id, variantId }
   const enoughTypes = !isGummy || mode === 'single' || typeIds.length >= 2
   const line = enoughTypes ? resolveLine({ selection, quantity }, store) : null
@@ -236,11 +239,31 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
               <span>Presentación</span>
             </legend>
             <div className="size-options">
-              <label className="size-option" style={{ cursor: 'default' }}>
-                <input type="radio" name="product-variant" checked readOnly />
-                <span><strong>{product!.unitLabel ?? 'Domo individual'}</strong><small>{product!.tag}</small></span>
-                <span>{money(product!.priceMinor, store)}</span>
-              </label>
+              {product!.variants && product!.variants.length > 0 ? (
+                product!.variants.map(variant => (
+                  <label key={variant.id} className={`size-option ${!variant.available ? 'unavailable' : ''}`}>
+                    <input
+                      type="radio"
+                      name="product-variant"
+                      value={variant.id}
+                      checked={variantId === variant.id}
+                      disabled={!variant.available}
+                      onChange={() => setVariantId(variant.id)}
+                    />
+                    <span>
+                      <strong>{variant.label}</strong>
+                      <small>{variant.description ?? product!.tag}</small>
+                    </span>
+                    <span>{money(variant.priceMinor, store)}</span>
+                  </label>
+                ))
+              ) : (
+                <label className="size-option" style={{ cursor: 'default' }}>
+                  <input type="radio" name="product-variant" checked readOnly />
+                  <span><strong>{product!.unitLabel ?? 'Domo individual'}</strong><small>{product!.tag}</small></span>
+                  <span>{money(product!.priceMinor ?? 0, store)}</span>
+                </label>
+              )}
             </div>
           </fieldset>
           {product!.ingredients && (

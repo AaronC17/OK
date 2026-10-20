@@ -39,8 +39,12 @@ function selection(value: unknown): Selection {
     return { kind: 'dessert', productId: text(data.productId, 64), variantId: text(data.variantId, 64) }
   }
   if (data.kind === 'product') {
-    fields(data, ['kind', 'productId'])
-    return { kind: 'product', productId: text(data.productId, 64) }
+    fields(data, ['kind', 'productId', 'variantId'])
+    return {
+      kind: 'product',
+      productId: text(data.productId, 64),
+      variantId: typeof data.variantId === 'string' && data.variantId.trim() ? text(data.variantId, 64) : undefined,
+    }
   }
   throw new PaymentsError(422, 'El producto no es válido.')
 }

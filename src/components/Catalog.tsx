@@ -60,7 +60,7 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
           <div className="product-card-info">
             <div className="product-card-title"><h3>{product.name}</h3><span className="product-number">03</span></div>
             <p>{product.description}</p>
-            <div className="product-card-footer"><div><span className="price-from">Precio</span><strong>{money(product.priceMinor, store)}</strong></div><button className="product-action" onClick={() => onProduct({ kind: 'product', product })} aria-label={`Elegir ${product.name}`}>Pedir <span className="action-icon"><Icon name="plus" size={17} /></span></button></div>
+            <div className="product-card-footer"><div><span className="price-from">{product.variants && product.variants.length > 1 ? 'Desde' : 'Precio'}</span><strong>{money(product.variants?.[0]?.priceMinor ?? product.priceMinor ?? 0, store)}</strong></div><button className="product-action" onClick={() => onProduct({ kind: 'product', product })} aria-label={`Elegir ${product.name}`}>Pedir <span className="action-icon"><Icon name="plus" size={17} /></span></button></div>
           </div>
         </article>)}
       </div>

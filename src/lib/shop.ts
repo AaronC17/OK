@@ -19,7 +19,7 @@ export function selectionKey(selection: Selection): string {
     return `gummy:${[...new Set(selection.typeIds)].sort().join('+')}:${selection.weight}`
   }
   if (selection.kind === 'product') {
-    return `product:${selection.productId}`
+    return `product:${selection.productId}${selection.variantId ? `:${selection.variantId}` : ''}`
   }
   return `dessert:${selection.productId}:${selection.variantId}`
 }
@@ -59,7 +59,23 @@ export function resolveLine(item: CartItem, config: StoreConfig): CartLine | nul
   }
   if (selection.kind === 'product') {
     const product = config.products?.find(p => p.id === selection.productId)
-    if (!product?.available || !validPrice(product.priceMinor)) return null
+    if (!product?.available) return null
+    if (product.variants && product.variants.length > 0) {
+      const variant = product.variants.find(v => v.id === selection.variantId) ?? product.variants[0]
+      if (!variant.available || !validPrice(variant.priceMinor)) return null
+      return {
+        selection: { kind: 'product', productId: product.id, variantId: variant.id },
+        quantity,
+        key,
+        name: product.name,
+        options: [product.tag, variant.label],
+        image: variant.image ?? product.image,
+        imageAlt: product.imageAlt,
+        unitPriceMinor: variant.priceMinor,
+        lineTotalMinor: variant.priceMinor * quantity,
+      }
+    }
+    if (!validPrice(product.priceMinor)) return null
     return {
       selection, quantity, key, name: product.name,
       options: [product.tag, product.unitLabel ?? 'Presentación individual'],
@@ -98,7 +114,7 @@ function parseSelection(value: unknown): Selection | null {
     return { kind: 'dessert', productId: data.productId, variantId: data.variantId }
   }
   if (data.kind === 'product' && typeof data.productId === 'string') {
-    return { kind: 'product', productId: data.productId }
+    return { kind: 'product', productId: data.productId, variantId: typeof data.variantId === 'string' ? data.variantId : undefined }
   }
   return null
 }

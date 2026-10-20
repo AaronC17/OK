@@ -126,9 +126,13 @@ var store = {
       imageAlt: "Domo de Uvarindas Onky\u2019s: uvas cubiertas con tamarindo y chamoy",
       available: true,
       priceMinor: 2e5,
-      unitLabel: "Domo individual",
+      unitLabel: "Domo",
       ingredients: "Uvas frescas, pulpa de tamarindo, chamoy artesanal, Taj\xEDn y chilito",
-      allergenInfo: null
+      allergenInfo: null,
+      variants: [
+        { id: "mediano", label: "Mediano", description: "Domo mediano", priceMinor: 2e5, available: true },
+        { id: "grande", label: "Grande", description: "Domo grande", priceMinor: 25e4, available: true }
+      ]
     }
   ],
   deliveryMethods: [
@@ -231,7 +235,7 @@ function selectionKey(selection2) {
     return `gummy:${[...new Set(selection2.typeIds)].sort().join("+")}:${selection2.weight}`;
   }
   if (selection2.kind === "product") {
-    return `product:${selection2.productId}`;
+    return `product:${selection2.productId}${selection2.variantId ? `:${selection2.variantId}` : ""}`;
   }
   return `dessert:${selection2.productId}:${selection2.variantId}`;
 }
@@ -266,7 +270,23 @@ function resolveLine(item, config) {
   }
   if (selection2.kind === "product") {
     const product = config.products?.find((p) => p.id === selection2.productId);
-    if (!product?.available || !validPrice(product.priceMinor)) return null;
+    if (!product?.available) return null;
+    if (product.variants && product.variants.length > 0) {
+      const variant2 = product.variants.find((v) => v.id === selection2.variantId) ?? product.variants[0];
+      if (!variant2.available || !validPrice(variant2.priceMinor)) return null;
+      return {
+        selection: { kind: "product", productId: product.id, variantId: variant2.id },
+        quantity,
+        key,
+        name: product.name,
+        options: [product.tag, variant2.label],
+        image: variant2.image ?? product.image,
+        imageAlt: product.imageAlt,
+        unitPriceMinor: variant2.priceMinor,
+        lineTotalMinor: variant2.priceMinor * quantity
+      };
+    }
+    if (!validPrice(product.priceMinor)) return null;
     return {
       selection: selection2,
       quantity,
@@ -355,8 +375,12 @@ function selection(value) {
     return { kind: "dessert", productId: text(data.productId, 64), variantId: text(data.variantId, 64) };
   }
   if (data.kind === "product") {
-    fields(data, ["kind", "productId"]);
-    return { kind: "product", productId: text(data.productId, 64) };
+    fields(data, ["kind", "productId", "variantId"]);
+    return {
+      kind: "product",
+      productId: text(data.productId, 64),
+      variantId: typeof data.variantId === "string" && data.variantId.trim() ? text(data.variantId, 64) : void 0
+    };
   }
   throw new PaymentsError(422, "El producto no es v\xE1lido.");
 }

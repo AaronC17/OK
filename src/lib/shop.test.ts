@@ -160,6 +160,18 @@ test('uvarindas product resolves with price of 2000 colones', () => {
   assert.equal(line.unitPriceMinor, 200000)
 })
 
+test('uvarindas resolves mediano at 2000 and grande at 2500 colones', () => {
+  const mediano = resolveLine({ selection: { kind: 'product', productId: 'uvarindas', variantId: 'mediano' }, quantity: 1 }, store)!
+  assert.equal(mediano.name, 'Uvarindas')
+  assert.equal(mediano.unitPriceMinor, 200000)
+  assert.ok(mediano.options.includes('Mediano'))
+
+  const grande = resolveLine({ selection: { kind: 'product', productId: 'uvarindas', variantId: 'grande' }, quantity: 1 }, store)!
+  assert.equal(grande.name, 'Uvarindas')
+  assert.equal(grande.unitPriceMinor, 250000)
+  assert.ok(grande.options.includes('Grande'))
+})
+
 test('freeShippingStatus calculates remaining amount and percentage correctly', () => {
   assert.deepEqual(freeShippingStatus(0, store), { threshold: 1500000, isFree: false, remainingMinor: 1500000, percent: 0 })
   assert.deepEqual(freeShippingStatus(750000, store), { threshold: 1500000, isFree: false, remainingMinor: 750000, percent: 50 })
