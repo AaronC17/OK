@@ -1840,7 +1840,7 @@ Abre \xABPedido y seguimiento\xBB desde el navegador donde hiciste tu compra.` :
 
 Gracias por dejarnos ser parte de tu antojo.
 El equipo de Onky\u2019s \xB7 Dulce. \xC1cido. Picosito.`;
-  return { subject: `Onky\u2019s \xB7 ${title} (${order.code})`, html: message, text: text3 };
+  return { subject: `${title} (${order.code})`, html: message, text: text3 };
 }
 var MAX_TRACKED = 400;
 function createOrderMailer(env = process.env, deliver) {

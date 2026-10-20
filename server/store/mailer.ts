@@ -241,7 +241,7 @@ ${origin ? `Consulta tu pedido: ${origin}\nAbre «Pedido y seguimiento» desde e
 
 Gracias por dejarnos ser parte de tu antojo.
 El equipo de Onky’s · Dulce. Ácido. Picosito.`
-  return { subject: `Onky’s · ${title} (${order.code})`, html: message, text }
+  return { subject: `${title} (${order.code})`, html: message, text }
 }
 
 export interface OrderMailer { notify(event: OrderMailEvent, order: ShopOrder): Promise<void> }
