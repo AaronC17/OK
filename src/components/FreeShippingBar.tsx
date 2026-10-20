@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { store } from '../config/store.ts'
 import { freeShippingStatus, money } from '../lib/shop.ts'
 import { Icon } from './Icon.tsx'
+import { MiniDeliveryTruck } from './MiniDeliveryTruck.tsx'
 import { useVisibleAnimation } from '../hooks/useVisibleAnimation.ts'
 
 export interface FreeShippingBarProps {
@@ -39,7 +40,7 @@ export function FreeShippingBar({ subtotal, initialSubtotal, className = '', com
     >
       <div className="shipping-card-header">
         <span className="shipping-icon-wrap" aria-hidden="true">
-          <Icon name={status.isFree ? 'check' : 'truck'} size={compact ? 15 : 17} />
+          {status.isFree ? <Icon name="check" size={compact ? 15 : 17} /> : <MiniDeliveryTruck />}
         </span>
         <div className="shipping-text">
           {status.isFree ? (

@@ -730,8 +730,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   color: #14533d;
 }
 .shipping-icon-wrap {
-  width: 27px;
-  height: 27px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: #eedef5;
   color: var(--purple);
@@ -739,11 +739,46 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   place-items: center;
   flex-shrink: 0;
   transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
 }
 .free-shipping-card.is-free .shipping-icon-wrap {
   background: #d4f3e3;
   color: #0f7651;
   transform: scale(1.08);
+}
+.mini-delivery-truck {
+  width: 25px;
+  height: auto;
+  display: block;
+}
+.mini-truck-arch {
+  fill: #eedef5;
+}
+.free-shipping-card.is-compact .mini-truck-arch {
+  fill: rgba(255, 255, 255, 0.15);
+}
+.mini-wheel-spin {
+  animation: miniWheelSpin 0.55s linear infinite;
+}
+.mini-truck-body {
+  animation: miniTruckBounce 0.65s ease-in-out infinite alternate;
+}
+.mini-truck-shadow {
+  transform-origin: 177px 116px;
+  animation: miniShadowScale 0.65s ease-in-out infinite alternate;
+}
+
+@keyframes miniWheelSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes miniTruckBounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-2px); }
+}
+@keyframes miniShadowScale {
+  0% { transform: scaleX(1); opacity: 0.18; }
+  100% { transform: scaleX(0.92); opacity: 0.11; }
 }
 .shipping-text {
   flex: 1;
@@ -814,7 +849,12 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
-.free-shipping-card[data-motion-paused="true"] .shipping-progress-shine { animation-play-state: paused; }
+.free-shipping-card[data-motion-paused="true"] .shipping-progress-shine,
+.free-shipping-card[data-motion-paused="true"] .mini-wheel-spin,
+.free-shipping-card[data-motion-paused="true"] .mini-truck-body,
+.free-shipping-card[data-motion-paused="true"] .mini-truck-shadow {
+  animation-play-state: paused;
+}
 
 /* Compact variant for Toast */
 .free-shipping-card.is-compact {
@@ -862,6 +902,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   .shipping-progress-fill { transition: none !important; }
   .shipping-progress-shine { animation: none !important; }
+  .mini-wheel-spin, .mini-truck-body, .mini-truck-shadow { animation: none !important; }
 }
 
 @keyframes price-in { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
@@ -1103,7 +1144,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .cart-line-bottom > strong { font-size: 12px; }
   .free-shipping-card { padding: 10px 12px; gap: 7px; margin-top: 10px; margin-bottom: 10px; }
   .shipping-card-header { gap: 8px; font-size: 11px; min-height: 25px; }
-  .shipping-icon-wrap { width: 25px; height: 25px; }
+  .shipping-icon-wrap { width: 26px; height: 26px; }
+  .mini-delivery-truck { width: 23px; }
   .shipping-text { font-size: 11px; }
   .shipping-badge { font-size: 9.5px; padding: 2px 6px; }
   .continue-shopping { font-size: 11px; min-height: 45px; }
