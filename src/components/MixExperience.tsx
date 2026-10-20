@@ -148,7 +148,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
               <span className="finish-sparkle sparkle-one">✦</span><span className="finish-sparkle sparkle-two">✦</span><span className="finish-sparkle sparkle-three">✧</span>
               <div className="finished-package">
                 <ProductImage
-                  src="/images/ositos-bolsa.webp"
+                   src={near ? '/images/ositos-bolsa.webp' : undefined}
                   alt="Bolsa de ositos enchilados Onky's"
                    className="finished-package-img"
                    sizes="155px"

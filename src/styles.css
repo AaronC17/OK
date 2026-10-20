@@ -758,7 +758,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .shipping-badge {
   font-size: 10px;
   font-weight: 700;
-  color: #7b5b8f;
+  color: #715080;
   background: #ede2f2;
   padding: 2px 7px;
   border-radius: 12px;
@@ -952,7 +952,10 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .hero .button { min-height: 44px; font-size: 11px; padding: 11px 17px; gap: 20px; }
   .hero-secondary { max-width: none; font-size: 10px; margin-top: 9px; justify-content: center; }
   .hero-visual { height: 100%; min-height: 0; aspect-ratio: auto; margin: 0 auto; width: calc(100% - 53px); max-width: 350px; }
-  .hero-photo { object-fit: contain; object-position: center; -webkit-mask-image: none; mask-image: none; filter: drop-shadow(0 36px 30px #2a163666) drop-shadow(0 9px 12px #2a163642); }
+  /* Paint the soft shadow once. Chained alpha drop-shadows repeatedly rasterize
+     the large pouch on WebKit, including while a product dialog is open. */
+  .hero-visual:not(.has-video)::before { content: ''; position: absolute; top: 6%; left: 50%; height: 115%; aspect-ratio: 3 / 4; max-width: 125%; transform: translateX(-50%); background: radial-gradient(ellipse, #2a16364d 15%, #2a163629 44%, transparent 70%); pointer-events: none; }
+  .hero-photo { object-fit: contain; object-position: center; -webkit-mask-image: none; mask-image: none; filter: none; }
   .hero-photo-label { left: auto; right: 12px; top: 12px; font-size: 8px; }
   .hero-mini-card { width: 132px; bottom: 22px; left: -16px; padding: 7px; }
   .hero-mini-card > span { font-size: 7px; gap: 3px; }

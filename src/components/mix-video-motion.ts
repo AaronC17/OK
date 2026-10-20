@@ -6,8 +6,19 @@ export function animateMixVideo(video: HTMLVideoElement, container: HTMLElement,
   const animations = container.getAnimations({ subtree: true })
   let running = false
   let disposed = false
+  let previousTime = 0
+  const play = () => {
+    void video.play().catch(error => {
+      if (!disposed && running && error.name !== 'AbortError') onBlocked(true)
+    })
+  }
   const sync = () => {
     const time = video.currentTime * 1000
+    // Some WebKit decoders wrap to zero but leave a looping movie paused.
+    // Recover only that boundary, never an offscreen/overlay/manual pause.
+    const wrapped = time < 100 && previousTime > video.duration * 1000 - 1000
+    previousTime = time
+    if (wrapped && running && !disposed && video.loop && video.paused && !video.seeking) play()
     // Native readiness also recovers seeks/loop wraps that emit canplay without
     // a new playing event. A separate buffering flag could remain stuck.
     const playing = running && !video.paused && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
@@ -41,9 +52,7 @@ export function animateMixVideo(video: HTMLVideoElement, container: HTMLElement,
       if (!value) { video.pause(); sync(); return }
       // muted + playsInline permits native inline autoplay on iOS/Android.
       // Low-power mode may still require a tap; keep that recovery explicit.
-      void video.play().catch(error => {
-        if (!disposed && running && error.name !== 'AbortError') onBlocked(true)
-      })
+      play()
     },
     dispose() {
       disposed = true

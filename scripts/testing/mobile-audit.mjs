@@ -18,6 +18,9 @@ try {
       const errors = []
       page.on('pageerror', error => errors.push(error.message))
       const cdp = await context.newCDPSession(page)
+      const transfers = new Map()
+      cdp.on('Network.dataReceived', event => transfers.set(event.requestId, (transfers.get(event.requestId) || 0) + event.encodedDataLength))
+      cdp.on('Network.loadingFinished', event => transfers.set(event.requestId, event.encodedDataLength))
       await cdp.send('Network.enable')
       await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1_600_000 / 8, uploadThroughput: 750_000 / 8, connectionType: 'cellular4g' })
@@ -64,13 +67,13 @@ try {
           resources,
         }
       })
-      results.push({ ...result, errors })
+      results.push({ ...result, networkBytes: [...transfers.values()].reduce((sum, bytes) => sum + bytes, 0), errors })
       if (run === 0) await page.screenshot({ path: resolve(output, 'mobile-first-screen.png') })
     } finally { await context.close() }
   }
 } finally { await browser.close() }
 const median = key => results.map(result => result[key]).sort((a, b) => a - b)[Math.floor(runs / 2)]
-const summary = Object.fromEntries(['fcpMs', 'lcpMs', 'cls', 'longTaskBlockingMs', 'resourceBytes', 'requests', 'domElements'].map(key => [key, median(key)]))
+const summary = Object.fromEntries(['fcpMs', 'lcpMs', 'cls', 'longTaskBlockingMs', 'resourceBytes', 'networkBytes', 'requests', 'domElements'].map(key => [key, median(key)]))
 const report = { url, conditions: { width: 390, height: 844, dpr: 2, cpuSlowdown: 4, downloadMbps: 1.6, latencyMs: 150, coldCache: true, runs }, summary, results }
 await writeFile(resolve(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
 console.log(JSON.stringify({ output, summary }, null, 2))
