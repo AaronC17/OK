@@ -27,7 +27,7 @@ export default function App() {
   const [infoOpen, setInfoOpen] = useState(false)
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
 
-  useEffect(() => { document.title = `${store.name} — Pequeños momentos, a tu manera` }, [])
+  useEffect(() => { document.title = store.name }, [])
 
   useEffect(() => {
     if (!toast) return
