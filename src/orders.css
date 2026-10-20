@@ -402,12 +402,20 @@
   letter-spacing: -0.1px;
 }
 .transit-pulse-dot {
+  position: relative;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #1d9a5f;
-  box-shadow: 0 0 0 0 rgba(29, 154, 95, 0.55);
+}
+.transit-pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(29, 154, 95, 0.4);
   animation: transitPulseDot 1.8s ease-out infinite;
+  will-change: transform, opacity;
 }
 .transit-order-code {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -426,17 +434,24 @@
   background: #f5effa;
   line-height: 0;
   overflow: hidden;
+  aspect-ratio: 360 / 142;
+  contain: layout paint;
+  isolation: isolate;
 }
 .transit-svg {
   display: block;
   width: 100%;
   height: auto;
 }
+.transit-layer { position: absolute; inset: 0; pointer-events: none; will-change: transform, opacity; }
+.transit-layer > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.transit-wheel-arches { will-change: auto; }
 .transit-clouds {
   animation: transitCloudsDrift 14s linear infinite;
 }
 .sinpe-transit-card[data-motion-paused="true"],
-.sinpe-transit-card[data-motion-paused="true"] * { animation-play-state: paused; }
+.sinpe-transit-card[data-motion-paused="true"] *,
+.sinpe-transit-card[data-motion-paused="true"] *::after { animation-play-state: paused; }
 .transit-horizon {
   animation: transitHorizonDrift 7.5s linear infinite;
 }
@@ -444,10 +459,12 @@
   animation: transitRoadMove 0.55s linear infinite;
 }
 .transit-truck-chassis {
+  transform-origin: 0 0;
   animation: transitTruckBounce 0.65s ease-in-out infinite alternate;
 }
 .transit-truck-shadow {
-  transform-origin: 180px 115px;
+  opacity: .16;
+  transform-origin: 50% 80.985915%;
   animation: transitShadowScale 0.65s ease-in-out infinite alternate;
 }
 .transit-wheel {
@@ -461,9 +478,8 @@
 .puff {
   animation: transitPuffPop 1.05s ease-out infinite;
 }
-.puff-1 { transform-origin: 92px 101px; }
-.puff-2 { transform-origin: 82px 98px; animation-delay: -0.35s; }
-.puff-3 { transform-origin: 70px 95px; animation-delay: -0.7s; }
+.puff-2 { animation-delay: -0.35s; }
+.puff-3 { animation-delay: -0.7s; }
 
 .transit-steps {
   display: flex;
@@ -534,21 +550,20 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes transitPulseDot {
-  0% { box-shadow: 0 0 0 0 rgba(29, 154, 95, 0.55); }
-  70% { box-shadow: 0 0 0 7px rgba(29, 154, 95, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(29, 154, 95, 0); }
+  0% { transform: scale(1); opacity: 1; }
+  70%, 100% { transform: scale(2.75); opacity: 0; }
 }
 @keyframes transitWheelSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 @keyframes transitRoadMove {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: 36; }
+  from { transform: translateX(0); }
+  to { transform: translateX(-10%); }
 }
 @keyframes transitTruckBounce {
   0% { transform: translateY(0px) rotate(0deg); }
-  100% { transform: translateY(-2.2px) rotate(-0.35deg); }
+  100% { transform: translateY(-1.549296%) rotate(-0.35deg); }
 }
 @keyframes transitShadowScale {
   0% { transform: scaleX(1); opacity: 0.17; }
@@ -556,24 +571,29 @@
 }
 @keyframes transitCloudsDrift {
   from { transform: translateX(0); }
-  to { transform: translateX(-360px); }
+  to { transform: translateX(-100%); }
 }
 @keyframes transitHorizonDrift {
   from { transform: translateX(0); }
-  to { transform: translateX(-360px); }
+  to { transform: translateX(-100%); }
 }
 @keyframes transitWindStreak {
-  0% { transform: translateX(18px); opacity: 0; }
+  0% { transform: translateX(5%); opacity: 0; }
   35% { opacity: 0.85; }
-  100% { transform: translateX(-28px); opacity: 0; }
+  100% { transform: translateX(-7.777778%); opacity: 0; }
 }
 @keyframes transitPuffPop {
-  0% { transform: translate(6px, 2px) scale(0.45); opacity: 0.75; }
-  100% { transform: translate(-24px, -7px) scale(1.45); opacity: 0; }
+  0% { transform: translate(1.666667%, 1.408451%) scale(0.45); opacity: 0.75; }
+  100% { transform: translate(-6.666667%, -4.929577%) scale(1.45); opacity: 0; }
 }
 @keyframes transitStepBlink {
   from { transform: scale(0.75); opacity: 0.65; }
   to { transform: scale(1.1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sinpe-transit-card, .sinpe-transit-card *, .sinpe-transit-card *::after { animation: none !important; }
+  .transit-pulse-dot::after { display: none; }
 }
 
 .receipt-received {

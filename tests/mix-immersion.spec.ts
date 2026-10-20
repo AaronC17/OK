@@ -4,8 +4,10 @@ import { simulateMix, sampleSurface } from '../src/lib/mix-physics.ts'
 const simulation = simulateMix()
 const phases = [4.083333333333334, 4.15, 4.25, 4.4, 4.6, 4.9, 5.2, 7.5, 9.5]
 
-test('each gummy keeps its own coating at the physical liquid surface after depth sorting', async ({ page }) => {
+test('each gummy keeps its own coating at the physical liquid surface after depth sorting', async ({ page, isMobile, browserName }) => {
+  if (isMobile) await page.route('**/images/mix/preview-*.mp4', route => route.abort())
   await page.goto('/')
+  if (isMobile && browserName === 'webkit' && process.platform === 'win32') await page.locator('.mix-video').dispatchEvent('error')
   const film = page.locator('.mix-film')
   await film.scrollIntoViewIfNeeded()
   await expect(film).toHaveAttribute('data-scene-ready', 'true', { timeout: 15_000 })

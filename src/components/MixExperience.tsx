@@ -3,6 +3,7 @@ import { Icon } from './Icon.tsx'
 import { ProductImage } from './ui.tsx'
 import { GummyBowl } from './GummyBowl.tsx'
 import { MIX_CYCLE } from '../lib/mix-physics.ts'
+import mixVideo from '../config/mix-video.json'
 import type { MixSceneMotion } from './mix-motion.ts'
 import './mix-experience.css'
 
@@ -14,11 +15,14 @@ const MIX_INGREDIENTS = [
 ] as const
 
 /** Decorative, repeatable process illustration. Never connected to order status. */
-export const MixExperience = memo(function MixExperience({ onCustomize }: { onCustomize: () => void }) {
+export const MixExperience = memo(function MixExperience({ onCustomize, suspended = false }: { onCustomize: () => void; suspended?: boolean }) {
   const root = useRef<HTMLElement>(null)
   const film = useRef<HTMLDivElement>(null)
   const scene = useRef<MixSceneMotion | null>(null)
+  const video = useRef<HTMLVideoElement>(null)
   const shouldRun = useRef(false)
+  const [useVideo, setUseVideo] = useState(() => window.matchMedia('(max-width: 700px), (pointer: coarse)').matches)
+  const [playbackBlocked, setPlaybackBlocked] = useState(false)
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [motionRequested, setMotionRequested] = useState(!reduced)
   const [visible, setVisible] = useState(false)
@@ -41,7 +45,17 @@ export const MixExperience = memo(function MixExperience({ onCustomize }: { onCu
   }, [])
 
   useEffect(() => {
-    if (!near || !motionRequested) return
+    if (!near || !motionRequested || reduced) return
+    if (useVideo) {
+      let disposed = false
+      void import('./mix-video-motion.ts').then(({ animateMixVideo }) => {
+        if (disposed || !video.current || !film.current) return
+        const prepared = animateMixVideo(video.current, film.current, setPlaybackBlocked)
+        scene.current = prepared
+        prepared.setRunning(shouldRun.current)
+      }).catch(() => { if (!disposed) setUseVideo(false) })
+      return () => { disposed = true; scene.current?.dispose(); scene.current = null }
+    }
     const svg = film.current?.querySelector<SVGSVGElement>('.bowl-illustration')
     if (!svg) return
     let disposed = false
@@ -57,12 +71,12 @@ export const MixExperience = memo(function MixExperience({ onCustomize }: { onCu
       prepared.setRunning(shouldRun.current)
     }).catch(error => { if (!controller.signal.aborted) console.error('Mix animation could not be prepared:', error) })
     return () => { disposed = true; controller.abort(); scene.current?.dispose(); scene.current = null }
-  }, [near, motionRequested])
+  }, [near, motionRequested, useVideo, reduced])
 
   useEffect(() => {
-    shouldRun.current = visible && tabVisible && !reduced
+    shouldRun.current = visible && tabVisible && !reduced && !suspended
     scene.current?.setRunning(shouldRun.current)
-  }, [visible, tabVisible, reduced])
+  }, [visible, tabVisible, reduced, suspended])
 
   return <section ref={root} className="experience-section container" aria-labelledby="experience-title">
     <div className="experience-copy">
@@ -76,33 +90,42 @@ export const MixExperience = memo(function MixExperience({ onCustomize }: { onCu
       </div>
       <button className="button experience-cta" onClick={onCustomize}>Crear mi combinación <Icon name="arrow" size={19} /></button>
     </div>
-    <div ref={film} className="mix-film" style={{ '--cycle': `${MIX_CYCLE}ms` } as CSSProperties} data-static={reduced} data-scene-ready="false">
+    <div ref={film} className="mix-film" style={{ '--cycle': `${MIX_CYCLE}ms` } as CSSProperties} data-static={reduced} data-scene-ready="false" data-renderer={useVideo ? 'video' : undefined}>
       <div className="film-top"><div><span>Preparación<small>Vista previa</small></span></div><span className="film-loop-label">EN BUCLE</span></div>
       <p className="sr-only">Animación ilustrativa: se vierte chamoy, se espolvorea Tajín y se añade jugo de limón de una jarrita. Los ositos caen, se comprimen y se doblan suavemente al contacto. La cuchara barre los lados y pliega la mezcla hacia dentro; el chamoy espeso se adhiere y escurre lentamente. Al final aparece la bolsa terminada. No representa la preparación de un pedido real.</p>
-      <div className="film-scene" aria-hidden="true">
-        <div className="film-ingredients">{MIX_INGREDIENTS.map((item, index) => <div className={`film-ingredient ingredient-${index}`} key={item.id}>
+      <div className="film-scene">
+        <div className="film-ingredients" aria-hidden="true">{MIX_INGREDIENTS.map((item, index) => <div className={`film-ingredient ingredient-${index}`} key={item.id}>
           <div className="ingredient-photo"><ProductImage src={item.image} alt={item.alt} loading="lazy" /><span className="ingredient-tick"><Icon name="check" size={13} /></span></div>
           <span>{item.name}</span>
         </div>)}</div>
         <div className="mix-stage">
-          <div className="mix-bowl-scene">
-            <GummyBowl loadImages={near && motionRequested} />
-          </div>
-          <div className="finished-mix">
-            <span className="finish-sparkle sparkle-one">✦</span><span className="finish-sparkle sparkle-two">✦</span><span className="finish-sparkle sparkle-three">✧</span>
-            <div className="finished-package">
-              <ProductImage
-                src="/images/ositos-bolsa.webp"
-                alt="Bolsa de ositos enchilados Onky's"
-                className="finished-package-img"
-                loading="lazy"
-              />
+          {useVideo ? <>
+            <video ref={video} className="mix-video" src={near && motionRequested ? mixVideo.url : undefined} poster={mixVideo.poster}
+              width={mixVideo.width} height={mixVideo.height} muted playsInline loop preload={near && motionRequested ? 'auto' : 'none'} aria-hidden="true"
+              onError={() => { setPlaybackBlocked(false); setUseVideo(false) }} />
+            {playbackBlocked && !reduced && <button type="button" className="mix-play-button" onClick={() => {
+              void video.current?.play().catch(() => setPlaybackBlocked(true))
+            }}><Icon name="play" size={16} />Reproducir animación</button>}
+          </> : <>
+            <div className="mix-bowl-scene" aria-hidden="true">
+              <GummyBowl loadImages={near && motionRequested} />
             </div>
-            <span className="finished-tick"><Icon name="check" size={19} /></span>
-          </div>
-          <div className="film-captions"><span className="caption-season">Chamoy, Tajín y limón.</span><span className="caption-select">Ahora, tus ositos favoritos.</span><span className="caption-mix">Todo se mezcla. Todo se antoja.</span><span className="caption-ready">Lista para el carrito.</span></div>
+            <div className="finished-mix" aria-hidden="true">
+              <span className="finish-sparkle sparkle-one">✦</span><span className="finish-sparkle sparkle-two">✦</span><span className="finish-sparkle sparkle-three">✧</span>
+              <div className="finished-package">
+                <ProductImage
+                  src="/images/ositos-bolsa.webp"
+                  alt="Bolsa de ositos enchilados Onky's"
+                  className="finished-package-img"
+                  loading="lazy"
+                />
+              </div>
+              <span className="finished-tick"><Icon name="check" size={19} /></span>
+            </div>
+          </>}
+          <div className="film-captions" aria-hidden="true"><span className="caption-season">Chamoy, Tajín y limón.</span><span className="caption-select">Ahora, tus ositos favoritos.</span><span className="caption-mix">Todo se mezcla. Todo se antoja.</span><span className="caption-ready">Lista para el carrito.</span></div>
         </div>
-        <div className="film-timeline"><span className="film-step film-step-1"><i />Sazonar</span><span className="film-step film-step-2"><i />Mezclar</span><span className="film-step film-step-3"><i />Disfrutar</span></div>
+        <div className="film-timeline" aria-hidden="true"><span className="film-step film-step-1"><i />Sazonar</span><span className="film-step film-step-2"><i />Mezclar</span><span className="film-step film-step-3"><i />Disfrutar</span></div>
       </div>
     </div>
   </section>

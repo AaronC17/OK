@@ -68,7 +68,7 @@ export default function App() {
       </section>
       <BrandMarquee />
       <Catalog onProduct={openProduct} onZoom={setZoom} />
-      <MixExperience onCustomize={customizeMix} />
+      <MixExperience onCustomize={customizeMix} suspended={cartOpen || productOpen || !!zoom || infoOpen} />
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
         <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
         <div className="how-steps">

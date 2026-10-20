@@ -45,12 +45,15 @@ test('checkout and alternate views are loaded only when requested', async ({ pag
   await expect(cart.getByLabel('Tu nombre')).toHaveValue('Prueba de rendimiento')
 })
 
-test('recipe calculates once in a worker, synchronizes and pauses offscreen', async ({ page }) => {
+test('SVG recipe and mobile media fallback synchronize and pause offscreen', async ({ page, isMobile, browserName }) => {
+  if (isMobile) await page.route('**/images/mix/preview-*.mp4', route => route.abort())
   const workers: string[] = []
   const errors: string[] = []
   page.on('worker', worker => workers.push(worker.url()))
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
+  // Windows WebKit uses mock media and does not surface failed decoder loads.
+  if (isMobile && browserName === 'webkit' && process.platform === 'win32') await page.locator('.mix-video').dispatchEvent('error')
   const film = page.locator('.mix-film')
   await film.scrollIntoViewIfNeeded()
   const playback = async (state: 'running' | 'paused') => {
@@ -89,7 +92,7 @@ test('recipe calculates once in a worker, synchronizes and pauses offscreen', as
   expect(errors).toEqual([])
 })
 
-test('reduced motion does not calculate or download the animated bear photos', async ({ page }) => {
+test('reduced motion does not calculate or download the animated bear photos', async ({ page, isMobile }) => {
   const workers: string[] = []
   const bears: string[] = []
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -103,5 +106,5 @@ test('reduced motion does not calculate or download the animated bear photos', a
 
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await expect.poll(() => page.locator('.mix-film').evaluate(element => element.getAnimations({ subtree: true }).some(animation => animation.playState === 'running')), { timeout: 15_000 }).toBe(true)
-  expect(workers.filter(url => url.includes('mix-simulation.worker'))).toHaveLength(1)
+  expect(workers.filter(url => url.includes('mix-simulation.worker'))).toHaveLength(isMobile ? 0 : 1)
 })

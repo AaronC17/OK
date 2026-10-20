@@ -1,5 +1,42 @@
 # Rendimiento de la tienda
 
+## Ositos y camión en móvil — 20/10/2026
+
+La receta usa reproducción nativa de video en pantallas de hasta 700 px o con puntero táctil. Se capturaron **900 fotogramas de la animación SVG original**, con todas sus deformaciones, líquidos y transiciones: H.264 sin audio, **60 fps, 1080 × 918, 15 s y 2.323.661 bytes**. Los textos, ingredientes y progreso siguen siendo HTML; su reloj se sincroniza con el video al reproducir, pausar, buscar, cargar y reiniciar el bucle. El fondo móvil pasa a un color uniforme y la escena mantiene la proporción del material capturado.
+
+- En móvil no se montan las mallas SVG ni se descargan/calculan sus datos de física. La carga del video se activa por proximidad; movimiento reducido muestra el póster sin solicitar el MP4.
+- Fuera de pantalla, con la pestaña oculta o al abrir un diálogo, la receta se pausa. Esto evita que siga consumiendo recursos detrás del camión y del desenfoque del carrito.
+- Si el teléfono bloquea autoplay, aparece «Reproducir animación». Ante un error de carga/decodificación se recupera el renderer SVG. El escritorio continúa usando SVG.
+- El camión conserva el dibujo vectorial en capas HTML independientes, animadas mediante `transform`/`opacity`. La carretera se desplaza sin animar `stroke-dashoffset`; el pulso usa escala/opacidad en lugar de repintar `box-shadow`. Se respetan la pausa fuera de pantalla, el carrito cerrado y movimiento reducido.
+
+### Comparación local reproducible
+
+Dos ejecuciones alternadas por versión, compilaciones de producción, Edge headless, viewport 390 × 844, **DPR 3 y CPU ×4**, red local sin limitar. Cada muestra dura 15 s; se abre el pedido con respuestas de API ficticias mientras la receta está detrás. No se ejecutaron compilaciones ni otras pruebas durante la comparación.
+
+| Medida | Antes | Después |
+| --- | ---: | ---: |
+| Receta: intervalos rAF, p95 | 50 ms en ambas | 16,9 ms en ambas |
+| Receta: intervalos mayores de 50 ms | 24 / 17 | 0 / 0 |
+| Receta: CPU del hilo principal | 10.755 / 10.841 ms | 3.063 / 2.890 ms |
+| Pedido/camión: intervalos rAF, p95 | 50 ms en ambas | 16,9 ms en ambas |
+| Pedido/camión: intervalos mayores de 50 ms | 19 / 27 | 0 / 0 |
+| Pedido/camión: CPU del hilo principal | 12.855 / 12.734 ms | 4.399 / 3.803 ms |
+
+Reducción media de trabajo del hilo principal: **72,4 % en receta y 67,9 % en pedido/camión**. El decodificador reportó 900/901 fotogramas y un fotograma descartado por ciclo; con el carrito abierto, cero fotogramas adicionales y video pausado. No hubo errores JavaScript. Estos son resultados emulados y contadores del decodificador, **no una medición nueva en el iPhone físico**.
+
+Artefactos: `%LOCALAPPDATA%\Temp\opencode\onkys-mobile-fps-comparison\metrics.json` y capturas de ambas versiones a DPR 3.
+
+```powershell
+node scripts/testing/animation-performance.mjs --before=<build-anterior> --after=dist --output=<resultados> --runs=2
+node scripts/media/bake-mix-video.mjs --site=dist --ffmpeg=<ejecutable-ffmpeg>
+```
+
+El segundo comando solo se necesita al cambiar la ilustración; genera el MP4, póster y `src/config/mix-video.json`. El material ya generado viaja en `public/images/mix/` y no requiere ffmpeg al desplegar. Las pruebas de `tests/mobile-animations.spec.ts` cubren reproducción, sincronización/bucle, pausa por carrito/scroll, movimiento reducido, recuperación de autoplay y camión. Las pruebas SVG también comprueban la recuperación por fallo de video. WebKit de Playwright en Windows usa medios simulados: sus pruebas verifican el ciclo de vida, no la calidad del decodificador de Safari/iOS.
+
+Validación: TypeScript y compilación de producción correctos; regresiones de `performance.spec.ts`, `mix-immersion.spec.ts` y `mobile-animations.spec.ts` aprobadas en Chromium/Edge y WebKit, con las tres omisiones de escritorio previstas para los casos exclusivos de móvil.
+
+Los apartados siguientes documentan las optimizaciones y mediciones anteriores del renderer SVG.
+
 ## Máscaras de contacto y animaciones fuera de pantalla
 
 - Las máscaras del chamoy se ajustan una sola vez a todos los vértices de cada osito, incluyendo el margen de los triángulos y antialiasing. Su superficie total pasa al **19,12 %** de la original; se mantienen las fotos, deformaciones, gradientes y tiempos.

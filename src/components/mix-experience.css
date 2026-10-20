@@ -108,6 +108,28 @@
 .film-step::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #eee8f2; }
 .film-step i { position: absolute; inset: 0 0 auto; height: 2px; background: #9276a4; transform-origin: left; transform: scaleX(0); }
 
+/* Mobile decodes one high-resolution 60 fps surface instead of repainting the
+   deforming SVG meshes and their alpha masks. Labels stay sharp HTML. */
+.mix-film[data-renderer="video"] .mix-stage { height: auto; aspect-ratio: 360 / 306; background: #faf7fc; }
+.mix-video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.mix-play-button { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 15px; border: 1px solid #dfd3ea; border-radius: 24px; background: #fff; color: var(--purple); font: inherit; font-size: 12px; white-space: nowrap; box-shadow: 0 4px 16px #38244820; }
+.mix-film[data-renderer="video"] .film-step-1 i { animation-name: progress-one; }
+.mix-film[data-renderer="video"] .film-step-2 i { animation-name: progress-two; }
+.mix-film[data-renderer="video"] .film-step-3 i { animation-name: progress-three; }
+.mix-film[data-renderer="video"] .caption-season { animation-name: caption-season; }
+.mix-film[data-renderer="video"] .caption-select { animation-name: caption-select; }
+.mix-film[data-renderer="video"] .caption-mix { animation-name: caption-mix; }
+.mix-film[data-renderer="video"] .caption-ready { animation-name: caption-ready; }
+.mix-film[data-renderer="video"] .ingredient-0 .ingredient-tick { animation-name: ingredient-one; }
+.mix-film[data-renderer="video"] .ingredient-1 .ingredient-tick { animation-name: ingredient-two; }
+.mix-film[data-renderer="video"] .ingredient-2 .ingredient-tick { animation-name: ingredient-three; }
+.mix-film[data-renderer="video"] .ingredient-3 .ingredient-tick { animation-name: ingredient-four; }
+.mix-film[data-renderer="video"] .ingredient-0 .ingredient-photo { animation-name: border-one; }
+.mix-film[data-renderer="video"] .ingredient-1 .ingredient-photo { animation-name: border-two; }
+.mix-film[data-renderer="video"] .ingredient-2 .ingredient-photo { animation-name: border-three; }
+.mix-film[data-renderer="video"] .ingredient-3 .ingredient-photo { animation-name: border-four; }
+.mix-film[data-renderer="video"] :is(.film-step i, .film-captions > span, .ingredient-tick, .ingredient-photo) { animation-duration: var(--cycle); animation-timing-function: linear; animation-iteration-count: infinite; animation-fill-mode: both; animation-play-state: paused; }
+
 .mix-film[data-static="true"] *, .mix-film[data-static="true"] *::after { animation: none !important; }
 /* Same still frame that the previous paused WAAPI playhead displayed at 0ms,
    without calculating a simulation for a visitor who requested no motion. */
