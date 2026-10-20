@@ -132,6 +132,16 @@ export function shippingFee(subtotal: number, method: DeliveryMethod | undefined
   return validPrice(method.freeAboveMinor) && subtotal > method.freeAboveMinor ? 0 : method.feeMinor
 }
 
+export function freeShippingStatus(subtotal: number, config: StoreConfig) {
+  const delivery = config.deliveryMethods.find(method => method.id === 'delivery' && method.enabled)
+  const threshold = delivery?.freeAboveMinor ?? 1500000
+  const isFree = validPrice(threshold) && subtotal > threshold
+  const rawRemaining = threshold - subtotal
+  const remainingMinor = isFree ? 0 : (rawRemaining <= 0 ? 10000 : rawRemaining)
+  const percent = isFree ? 100 : Math.min(99, Math.max(0, Math.round((subtotal / threshold) * 100)))
+  return { threshold, isFree, remainingMinor, percent }
+}
+
 export function totals(lines: CartLine[], method: DeliveryMethod | undefined) {
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotalMinor, 0)
   const shipping = shippingFee(subtotal, method)

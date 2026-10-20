@@ -7,6 +7,7 @@ import { checkoutConfig, createOrder, currentOrder, errorMessage, fetchOrder } f
 import type { CheckoutConfig, OrderCustomer, ShopOrder } from '../order-types.ts'
 import type { Cart } from '../hooks/useCart.ts'
 import { Icon } from './Icon.tsx'
+import { FreeShippingBar } from './FreeShippingBar.tsx'
 import { OrderPanel } from './OrderPanel.tsx'
 import { Modal, ProductImage, Quantity } from './ui.tsx'
 import '../orders.css'
@@ -135,6 +136,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
       {!order && !cart.lines.length ? <div className="empty-cart"><div className="empty-bag"><Icon name="bag" size={48} /></div><span className="eyebrow">AQUÍ CABEN TUS FAVORITOS</span><h3>Un buen momento por empezar.</h3><p>Elige tus favoritos.<br />Ahora puedes pedir y pagar con SINPE Móvil.</p><button className="button button-primary" onClick={() => { onClose(); document.getElementById('catalogo')?.scrollIntoView() }}>Explorar el catálogo <Icon name="arrow" size={18} /></button></div> : <>
         <div className="drawer-scroll" ref={scrollRef}>
           {order ? <OrderPanel key={order.id} order={order} onChange={setOrder} onRefresh={() => { void refresh() }} onNew={newOrder} busy={loading} /> : <>
+            <FreeShippingBar subtotal={amounts.subtotal} />
             <div className="cart-lines">{cart.lines.map(line => <article key={line.key} className="cart-line"><ProductImage src={line.image} alt={line.imageAlt} /><div className="cart-line-details"><div className="cart-line-heading"><h3>{line.name}</h3><button className="icon-button remove-button" disabled={preparing} onClick={() => cart.remove(line.key)} aria-label={`Eliminar ${line.name}, ${line.options.join(', ')}`}><Icon name="trash" size={16} /></button></div><p>{line.options.join(' · ')}</p><span className="unit-price">{money(line.unitPriceMinor, store)} / unidad</span><div className="cart-line-bottom"><Quantity value={line.quantity} onChange={value => { if (!preparing) cart.update(line.key, value) }} label={`Cantidad de ${line.name}, ${line.options.join(', ')}`} /><strong>{money(line.lineTotalMinor, store)}</strong></div></div></article>)}</div>
             <button className="continue-shopping" disabled={preparing} onClick={onClose}><Icon name="plus" size={16} />Seguir explorando</button>
             <form ref={formRef} id="checkout-form" className="checkout-form" noValidate onSubmit={event => { void submit(event) }}>

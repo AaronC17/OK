@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { store } from './config/store.ts'
-import { MAX_QUANTITY, selectionKey } from './lib/shop.ts'
+import { MAX_QUANTITY, resolveLine, selectionKey } from './lib/shop.ts'
 import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
 import { Icon } from './components/Icon.tsx'
+import { FreeShippingBar } from './components/FreeShippingBar.tsx'
 import { Lightbox, Modal } from './components/ui.tsx'
 import type { ProductTarget } from './components/ProductDialog.tsx'
 import { Header } from './components/Header.tsx'
@@ -25,7 +26,7 @@ export default function App() {
   const [productOpen, setProductOpen] = useState(false)
   const [zoom, setZoom] = useState<{ src: string; alt: string; name: string } | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
-  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
+  const [toast, setToast] = useState<{ text: string; id: number; initialSubtotal?: number; subtotal?: number } | null>(null)
 
   useEffect(() => { document.title = store.name }, [])
 
@@ -45,9 +46,18 @@ export default function App() {
   const addProduct = (item: CartItem) => {
     const previous = cart.items.find(entry => selectionKey(entry.selection) === selectionKey(item.selection))?.quantity ?? 0
     const added = Math.min(MAX_QUANTITY - previous, item.quantity)
+    const prevSubtotal = cart.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0)
     cart.add(item)
     setProductOpen(false)
-    setToast({ text: added > 0 ? added < item.quantity ? `Añadimos ${added}. Límite de ${MAX_QUANTITY} por variante.` : 'Un gusto más en tu carrito.' : `Ya tienes el máximo de ${MAX_QUANTITY} de esta variante.`, id: Date.now() })
+    const line = resolveLine(item, store)
+    const addedMinor = line ? line.unitPriceMinor * added : 0
+    const newSubtotal = prevSubtotal + addedMinor
+    setToast({
+      text: added > 0 ? added < item.quantity ? `Añadimos ${added}. Límite de ${MAX_QUANTITY} por variante.` : 'Un gusto más en tu carrito.' : `Ya tienes el máximo de ${MAX_QUANTITY} de esta variante.`,
+      id: Date.now(),
+      initialSubtotal: prevSubtotal,
+      subtotal: newSubtotal,
+    })
   }
 
   return <>
@@ -117,9 +127,15 @@ export default function App() {
       </div>
     </Modal>
     <div className="toast-region" aria-live="polite" aria-atomic="true">{toast && <div className="toast" key={toast.id}>
-      <span className="toast-check"><Icon name="check" size={16} /></span><span>{toast.text}</span>
-      <button onClick={() => { setToast(null); openCart() }}>Ver carrito <Icon name="arrow" size={16} /></button>
-      <button className="toast-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button>
+      <div className="toast-header">
+        <span className="toast-check"><Icon name="check" size={16} /></span>
+        <span className="toast-text">{toast.text}</span>
+        <button className="toast-view-btn" onClick={() => { setToast(null); openCart() }}>Ver carrito <Icon name="arrow" size={15} /></button>
+        <button className="toast-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button>
+      </div>
+      {toast.subtotal !== undefined && (
+        <FreeShippingBar subtotal={toast.subtotal} initialSubtotal={toast.initialSubtotal} compact />
+      )}
     </div>}</div>
   </>
 }

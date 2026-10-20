@@ -690,11 +690,171 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .summary-details textarea { width: 100%; min-height: 260px; padding: 15px; border: 1px solid var(--line); border-radius: 5px; background: #f6f2f8; font-size: 11px; line-height: 1.8; color: #64516f; resize: vertical; }
 .order-ready .small-note { font-size: 9px; }
 .toast-region { position: fixed; bottom: 24px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 15; padding: 0 16px; }
-.toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: #25192e; color: #fff; border-radius: 8px; box-shadow: 0 5px 25px #25152f24; font-size: 11px; max-width: 100%; animation: toast-in .25s ease-out; }
+.toast { pointer-events: auto; display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; background: #25192e; color: #fff; border-radius: 10px; box-shadow: 0 8px 30px #25152f38; font-size: 11px; width: min(440px, 100%); animation: toast-in .25s ease-out; }
+.toast-header { display: flex; align-items: center; gap: 10px; width: 100%; }
+.toast-text { flex: 1; font-size: 11.5px; font-weight: 500; color: #fff; line-height: 1.35; }
 .toast-check { display: grid; place-items: center; width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #c5a4d729; color: #dac4e6; }
-.toast > button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 8px; white-space: nowrap; font-size: 10px; color: #ead9f3; background: transparent; }
-.toast > button:not(.toast-close) { margin-left: 10px; border-left: 1px solid #ffffff2b; padding-left: 18px; }
-.toast > .toast-close { padding: 7px 0; color: #b4a1bf; }
+.toast button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 8px; white-space: nowrap; font-size: 10px; color: #ead9f3; background: transparent; }
+.toast .toast-view-btn { margin-left: auto; border-left: 1px solid #ffffff2b; padding-left: 14px; font-weight: 600; }
+.toast .toast-view-btn:hover { color: #fff; }
+.toast .toast-close { padding: 6px 0 6px 6px; color: #b4a1bf; }
+.toast .toast-close:hover { color: #fff; }
+
+/* Free shipping progress card & animations */
+.free-shipping-card {
+  background: #fbf5fc;
+  border: 1px solid #ebdfee;
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: background .25s, border-color .25s;
+}
+.free-shipping-card.is-free {
+  background: #f1faf4;
+  border-color: #d1ecdf;
+}
+.shipping-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #382448;
+}
+.free-shipping-card.is-free .shipping-card-header {
+  color: #14533d;
+}
+.shipping-icon-wrap {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #eedef5;
+  color: var(--purple);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.free-shipping-card.is-free .shipping-icon-wrap {
+  background: #d4f3e3;
+  color: #0f7651;
+  transform: scale(1.08);
+}
+.shipping-text {
+  flex: 1;
+  font-size: 11.5px;
+}
+.shipping-text strong {
+  font-weight: 700;
+  color: var(--purple);
+}
+.free-shipping-card.is-free .shipping-text strong {
+  color: #0f7651;
+}
+.shipping-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #7b5b8f;
+  background: #ede2f2;
+  padding: 2px 7px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.free-shipping-card.is-free .shipping-badge {
+  color: #0f7651;
+  background: #d4f3e3;
+}
+.shipping-progress-track {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  background: #e9deed;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.free-shipping-card.is-free .shipping-progress-track {
+  background: #dbefe4;
+}
+.shipping-progress-fill {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60287a 0%, #a43eb1 100%);
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+.shipping-progress-fill.is-complete {
+  background: linear-gradient(90deg, #108e5c 0%, #22c55e 100%);
+}
+.shipping-progress-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  width: 100%;
+  animation: progress-shimmer 2.2s infinite ease-in-out;
+}
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Compact variant for Toast */
+.free-shipping-card.is-compact {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  padding: 7px 9px;
+  margin: 4px 0 0;
+  gap: 6px;
+  width: 100%;
+}
+.free-shipping-card.is-compact .shipping-card-header {
+  color: #f7eff9;
+  font-size: 10.5px;
+  gap: 7px;
+}
+.free-shipping-card.is-compact .shipping-icon-wrap {
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #eed6f5;
+}
+.free-shipping-card.is-compact .shipping-text strong {
+  color: #ffffff;
+}
+.free-shipping-card.is-compact .shipping-progress-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.free-shipping-card.is-compact.is-free {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.32);
+}
+.free-shipping-card.is-compact.is-free .shipping-card-header {
+  color: #bbf7d0;
+}
+.free-shipping-card.is-compact.is-free .shipping-text strong {
+  color: #86efac;
+}
+.free-shipping-card.is-compact.is-free .shipping-icon-wrap {
+  background: rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shipping-progress-fill { transition: none !important; }
+  .shipping-progress-shine { animation: none !important; }
+}
 
 @keyframes price-in { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fade-in { from { opacity: .6; } to { opacity: 1; } }
@@ -955,9 +1115,9 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .info-dialog h2 { font-size: 25px; }
   .info-dialog h2 br { display: none; }
   .toast-region { bottom: 15px; padding: 0 10px; }
-  .toast { padding: 11px 9px; gap: 8px; font-size: 10px; }
-  .toast > button:not(.toast-close) { margin-left: 0; padding-left: 10px; font-size: 9px; }
-  .toast > .toast-close { display: none; }
+  .toast { padding: 10px 12px; gap: 6px; font-size: 10px; width: 100%; }
+  .toast .toast-view-btn { padding-left: 10px; font-size: 9.5px; }
+  .toast .toast-close { display: none; }
   .toast-check { width: 23px; height: 23px; }
   .summary-details textarea { font-size: 16px; }
 }

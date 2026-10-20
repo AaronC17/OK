@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { store } from '../config/store.ts'
-import { addItem, money, resolveLine, restoreCart, selectionKey, shippingFee, totals, validateCheckout } from './shop.ts'
+import { addItem, freeShippingStatus, money, resolveLine, restoreCart, selectionKey, shippingFee, totals, validateCheckout } from './shop.ts'
 import type { CartItem, Customer, StoreConfig } from '../types.ts'
 
 const gummy: CartItem = { selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 2 }
@@ -159,3 +159,11 @@ test('uvarindas product resolves with price of 2000 colones', () => {
   assert.ok(line.options.includes('Uvas con tamarindo'))
   assert.equal(line.unitPriceMinor, 200000)
 })
+
+test('freeShippingStatus calculates remaining amount and percentage correctly', () => {
+  assert.deepEqual(freeShippingStatus(0, store), { threshold: 1500000, isFree: false, remainingMinor: 1500000, percent: 0 })
+  assert.deepEqual(freeShippingStatus(750000, store), { threshold: 1500000, isFree: false, remainingMinor: 750000, percent: 50 })
+  assert.deepEqual(freeShippingStatus(1200000, store), { threshold: 1500000, isFree: false, remainingMinor: 300000, percent: 80 })
+  assert.deepEqual(freeShippingStatus(1560000, store), { threshold: 1500000, isFree: true, remainingMinor: 0, percent: 100 })
+})
+
