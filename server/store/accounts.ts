@@ -9,7 +9,7 @@ const derive = (password: string, salt: string) => new Promise<Buffer>((resolve,
 const dummyHash = `${'0'.repeat(32)}:${'0'.repeat(128)}`
 
 export async function accountPasswordHash(value: unknown) {
-  if (typeof value !== 'string' || value.length < 12 || value.length > 128 || !value.trim()) throw new StoreError(422, 'Usa una contraseña de entre 12 y 128 caracteres.')
+  if (typeof value !== 'string' || value.length < 8 || value.length > 128 || !value.trim()) throw new StoreError(422, 'Usa una contraseña de entre 8 y 128 caracteres.')
   const salt = randomBytes(16).toString('hex')
   return `${salt}:${(await derive(value, salt)).toString('hex')}`
 }

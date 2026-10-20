@@ -26,7 +26,7 @@ test('accounts: passwords are salted, expensive, space-sensitive hashes, never p
   assert.equal(await accountPasswordMatches(password, a), true)
   assert.equal(await accountPasswordMatches(password.trim(), a), false)
   assert.equal(await accountPasswordMatches(password), false)
-  await assert.rejects(accountPasswordHash('corta'), /12 y 128/)
+  await assert.rejects(accountPasswordHash('corta'), /8 y 128/)
   await assert.rejects(accountPasswordHash(' '.repeat(20)))
 })
 

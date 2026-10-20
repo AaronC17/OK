@@ -7,7 +7,7 @@ export const newToken = () => randomBytes(32).toString('base64url')
 export const constantEqual = (a: string, b: string) => timingSafeEqual(Buffer.from(tokenHash(a), 'hex'), Buffer.from(tokenHash(b), 'hex'))
 
 export function passwordHash(value: unknown): string {
-  const password = text(value, 12, 200, 'Contraseña')
+  const password = text(value, 8, 200, 'Contraseña')
   const salt = randomBytes(16).toString('hex')
   return `${salt}:${scryptSync(password, salt, 64, { N: 32768, maxmem: 64 * 1024 * 1024 }).toString('hex')}`
 }

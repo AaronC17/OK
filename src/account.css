@@ -2,6 +2,8 @@
 .header-actions { display: flex; align-items: center; gap: 16px; }
 .account-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 10px; border-radius: 24px; background: transparent; color: var(--purple); font-size: 12px; font-weight: 550; position: relative; }
 .account-toggle:hover { background: #eee8f180; }
+.account-toggle:focus,
+.account-toggle:focus-visible { outline: none !important; box-shadow: none !important; }
 .account-toggle i { width: 5px; height: 5px; border-radius: 50%; background: #64816b; position: absolute; top: 10px; left: 25px; box-shadow: 0 0 0 2px var(--paper); }
 .header-actions-divider { height: 18px; width: 1px; background: var(--line); }
 .welcome-marquee { justify-content: center; }
@@ -33,9 +35,10 @@
 .account-brand-symbol { width: 22px; height: 26px; display: grid; place-items: center; color: var(--purple); filter: drop-shadow(0 1px 1px #38244819); }
 .account-brand .wordmark { font-size: 25px; letter-spacing: -1.7px; }
 .account-brand-caption { border-left: 1px solid #e1d7e7; padding-left: 9px; font-size: 11px; color: #76657e; white-space: nowrap; }
-.account-close { border: 1px solid #e6dfeb; color: #705e7c; background: linear-gradient(160deg, #fff, #f0eaf4); box-shadow: 0 2px 5px #38244806, inset 0 1px 0 #fff; }
-.account-close:hover { background: #eee6f3; }
-.account-close:focus-visible { outline: 2px solid #8b659f; outline-offset: 2px; }
+.account-close { border: 0; color: #705e7c; background: transparent; box-shadow: none; }
+.account-close:hover { background: #eee8f0; }
+.account-close:focus,
+.account-close:focus-visible { outline: none !important; box-shadow: none !important; }
 .account-layout { display: block; }
 .account-story { display: none; }
 .account-form-panel { display: grid; gap: var(--account-gap); min-width: 0; padding: 0 var(--account-gutter) 20px; }
@@ -68,6 +71,8 @@
 .account-form .account-password input { padding-right: 50px; }
 .account-password > button { position: absolute; right: 1px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; color: #826b90; border-radius: 11px; }
 .account-password > button:hover { background: #eee6f380; }
+.account-password > button:focus,
+.account-password > button:focus-visible { outline: none !important; box-shadow: none !important; }
 .account-consent label { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-size: 11px; line-height: 1.5; color: #77677f; }
 .account-consent input { appearance: none; display: grid; place-items: center; width: 18px; height: 18px; margin: 0; flex-shrink: 0; border: 1px solid #ad99ba; border-radius: 6px; background: #fffdfd; box-shadow: inset 0 1px 2px #38244806; cursor: pointer; accent-color: var(--purple); }
 .account-consent input::before { content: ''; width: 8px; height: 5px; border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff; transform: translateY(-1px) rotate(-45deg); opacity: 0; }

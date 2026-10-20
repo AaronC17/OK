@@ -499,7 +499,7 @@ var tokenHash = (token) => createHash("sha256").update(token).digest("hex");
 var newToken = () => randomBytes(32).toString("base64url");
 var constantEqual = (a, b) => timingSafeEqual(Buffer.from(tokenHash(a), "hex"), Buffer.from(tokenHash(b), "hex"));
 function passwordHash(value) {
-  const password = text2(value, 12, 200, "Contrase\xF1a");
+  const password = text2(value, 8, 200, "Contrase\xF1a");
   const salt = randomBytes(16).toString("hex");
   return `${salt}:${scryptSync(password, salt, 64, { N: 32768, maxmem: 64 * 1024 * 1024 }).toString("hex")}`;
 }
@@ -548,7 +548,7 @@ var derive = (password, salt) => new Promise((resolve2, reject) => {
 });
 var dummyHash = `${"0".repeat(32)}:${"0".repeat(128)}`;
 async function accountPasswordHash(value) {
-  if (typeof value !== "string" || value.length < 12 || value.length > 128 || !value.trim()) throw new StoreError(422, "Usa una contrase\xF1a de entre 12 y 128 caracteres.");
+  if (typeof value !== "string" || value.length < 8 || value.length > 128 || !value.trim()) throw new StoreError(422, "Usa una contrase\xF1a de entre 8 y 128 caracteres.");
   const salt = randomBytes2(16).toString("hex");
   return `${salt}:${(await derive(value, salt)).toString("hex")}`;
 }

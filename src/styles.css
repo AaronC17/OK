@@ -321,6 +321,12 @@ summary::-webkit-details-marker { display: none; }
 .modal-close:hover { background: #eee8f0; }
 .modal-close:focus,
 .modal-close:focus-visible,
+.account-close:focus,
+.account-close:focus-visible,
+.account-toggle:focus,
+.account-toggle:focus-visible,
+.cart-toggle:focus,
+.cart-toggle:focus-visible,
 .drawer-header .icon-button:focus,
 .drawer-header .icon-button:focus-visible,
 .lightbox-heading .icon-button:focus,
