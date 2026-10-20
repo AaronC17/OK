@@ -3,6 +3,7 @@ import { store } from './config/store.ts'
 import { MAX_QUANTITY, selectionKey } from './lib/shop.ts'
 import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
+import { useCustomer } from './hooks/useCustomer.ts'
 import { Icon } from './components/Icon.tsx'
 import { Lightbox, Modal } from './components/ui.tsx'
 import type { ProductTarget } from './components/ProductDialog.tsx'
@@ -12,13 +13,20 @@ import { MixExperience } from './components/MixExperience.tsx'
 import { HeroMedia } from './components/HeroMedia.tsx'
 import { BrandMarquee } from './components/BrandMarquee.tsx'
 import { SectionLink } from './components/SectionLink.tsx'
+import type { AccountMode } from './components/AccountDialog.tsx'
+import './account.css'
 
 const ProductDialog = lazy(() => import('./components/ProductDialog.tsx').then(module => ({ default: module.ProductDialog })))
 const CartDrawer = lazy(() => import('./components/CartDrawer.tsx').then(module => ({ default: module.CartDrawer })))
+const AccountDialog = lazy(() => import('./components/AccountDialog.tsx').then(module => ({ default: module.AccountDialog })))
 const weightList = new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))
 
 export default function App() {
   const cart = useCart()
+  const customer = useCustomer()
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [accountMode, setAccountMode] = useState<AccountMode>('login')
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
   const [cartRequested, setCartRequested] = useState(false)
   const [product, setProduct] = useState<{ target: ProductTarget; instance: number } | null>(null)
@@ -35,7 +43,9 @@ export default function App() {
     return () => window.clearTimeout(timeout)
   }, [toast])
 
-  const openCart = useCallback(() => { setCartRequested(true); setCartOpen(true) }, [])
+  const openCart = useCallback(() => { setSelectedOrderId(null); setCartRequested(true); setCartOpen(true) }, [])
+  const openAccount = useCallback((mode: AccountMode = 'login') => { setAccountMode(mode); setCartOpen(false); setAccountOpen(true) }, [])
+  const viewAccountOrder = (id: string) => { setSelectedOrderId(id); setAccountOpen(false); setCartRequested(true); setCartOpen(true) }
   const openProduct = useCallback((target: ProductTarget) => {
     setProduct({ target, instance: Date.now() })
     setProductOpen(true)
@@ -55,7 +65,7 @@ export default function App() {
 
   return <>
     <SectionLink section="catalogo" className="skip-link">Saltar al catálogo</SectionLink>
-    <Header count={cart.count} onCart={openCart} />
+    <Header count={cart.count} onCart={openCart} signedIn={!!customer.user} onAccount={() => openAccount()} />
     <main>
       <section id="inicio" className="hero container" aria-labelledby="hero-title">
         <div className="hero-copy">
@@ -69,9 +79,9 @@ export default function App() {
           <div className="hero-photo-label"><Icon name="pepper" size={17} /> Dulce. Ácido. Picosito.</div>
         </div>
       </section>
-      <BrandMarquee />
+      <BrandMarquee signedIn={!!customer.user} loading={customer.loading} onRegister={() => openAccount('register')} />
       <Catalog onProduct={openProduct} onZoom={setZoom} />
-      <MixExperience onCustomize={customizeMix} suspended={cartOpen || productOpen || !!zoom || infoOpen} />
+      <MixExperience onCustomize={customizeMix} suspended={cartOpen || productOpen || !!zoom || infoOpen || accountOpen} />
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
         <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
         <div className="how-steps">
@@ -95,6 +105,7 @@ export default function App() {
         <div className="footer-links"><span className="eyebrow">EXPLORA</span><SectionLink section="gomitas">Gomitas enchiladas</SectionLink>{store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}{store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}<SectionLink section="como-pedir">Cómo pedir</SectionLink></div>
         <div className="footer-contact"><span className="eyebrow">TU PEDIDO, AQUÍ</span>
           <button className="text-button" onClick={openCart}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
+          <button className="text-button" onClick={event => { event.currentTarget.focus({ preventScroll: true }); openAccount() }}>{customer.user ? 'Mi cuenta y mis pedidos' : 'Iniciar sesión o crear cuenta'} <Icon name="user" size={16} /></button>
           <p>Pago con SINPE Móvil · Revisión del abono</p>
           {store.contact.email && <a href={`mailto:${store.contact.email}`}>{store.contact.email}</a>}
           {store.contact.instagramUrl && <a href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram <Icon name="arrow-up" size={14} /></a>}
@@ -106,7 +117,10 @@ export default function App() {
       {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
     </Suspense>
     <Suspense fallback={null}>
-      {cartRequested && <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} />}
+      {cartRequested && <CartDrawer key={`${customer.user?.id ?? 'guest'}:${selectedOrderId ?? 'cart'}`} open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} customerAccount={customer.user} selectedOrderId={selectedOrderId} onRegister={() => openAccount('register')} onOrderCreated={customer.orderCreated} />}
+    </Suspense>
+    <Suspense fallback={null}>
+      {accountOpen && <AccountDialog open initialMode={accountMode} customer={customer} onClose={() => setAccountOpen(false)} onOrder={viewAccountOrder} />}
     </Suspense>
     <Lightbox image={zoom} onClose={() => setZoom(null)} />
     <Modal open={infoOpen} onClose={() => setInfoOpen(false)} titleId="info-title" className="info-dialog">

@@ -50,6 +50,13 @@ test('mailer: without credentials the mailer stays off and store keeps working',
   assert.equal(createOrderMailer({}), null)
 })
 
+test('mailer: welcome discount is explicit in both HTML and plain-text order totals', () => {
+  const message = orderEmailMessage('order.created', order({ discountMinor: 24000, totalMinor: 216000 }))!
+  assert.match(message.html, /Bienvenida · 10%/)
+  assert.match(message.text, /Bienvenida · 10%: −₡240/)
+  assert.match(message.text, /₡2\s160/)
+})
+
 test('mailer: sends one email per order-state version, with bcc copy and brand sender', async () => {
   const outbox: Array<{ from: string; to: string; bcc?: string; subject: string; html: string }> = []
   const mailer = createOrderMailer({

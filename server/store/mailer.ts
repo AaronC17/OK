@@ -46,6 +46,7 @@ function linesTable(order: ShopOrder, paid: boolean): { html: string; text: stri
       </tr></thead>
       <tbody>${html}
         <tr><td style="padding:14px 10px 6px 0;color:#716b76;font-size:13px;">Subtotal</td><td align="right" style="padding:14px 0 6px;color:#211d25;font-size:13px;white-space:nowrap;">${esc(money(order.subtotalMinor, store))}</td></tr>
+        ${order.discountMinor ? `<tr><td style="padding:4px 10px 6px 0;color:#65447a;font-size:13px;">Bienvenida · 10%</td><td align="right" style="padding:4px 0 6px;color:#65447a;font-size:13px;">−${esc(money(order.discountMinor, store))}</td></tr>` : ''}
         <tr><td style="padding:4px 10px 14px 0;color:#716b76;font-size:13px;line-height:19px;">${esc(order.delivery.name)}</td><td align="right" style="padding:4px 0 14px;color:#211d25;font-size:13px;line-height:19px;">${esc(shipping)}</td></tr>
         <tr>
           <th scope="row" align="left" bgcolor="#f2edf5" style="padding:14px 16px;border-radius:8px 0 0 8px;color:#382448;font-size:14px;font-weight:700;">${paid ? 'Total pagado' : 'Total del pedido'}<br><span style="font-size:11px;line-height:20px;font-weight:400;color:#716b76;">Colones costarricenses · CRC</span></th>
@@ -53,7 +54,7 @@ function linesTable(order: ShopOrder, paid: boolean): { html: string; text: stri
         </tr>
       </tbody></table>`,
     text: order.lines.map(line => `• ${line.quantity} × ${line.name}${line.options.length ? ` (${line.options.join(', ')})` : ''} — ${money(line.lineTotalMinor, store)}`).join('\n') +
-      `\nSubtotal: ${money(order.subtotalMinor, store)}\n${order.delivery.name}: ${shipping}\n${paid ? 'Total pagado' : 'Total del pedido'}: ${total} (CRC)`,
+      `\nSubtotal: ${money(order.subtotalMinor, store)}${order.discountMinor ? `\nBienvenida · 10%: −${money(order.discountMinor, store)}` : ''}\n${order.delivery.name}: ${shipping}\n${paid ? 'Total pagado' : 'Total del pedido'}: ${total} (CRC)`,
   }
 }
 

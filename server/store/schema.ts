@@ -6,9 +6,14 @@ CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS admin (
   id INTEGER PRIMARY KEY CHECK (id = 1), username TEXT NOT NULL, password_hash TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL, welcome_order_id TEXT,
+  privacy_version TEXT NOT NULL, privacy_accepted_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY, role TEXT NOT NULL CHECK (role IN ('customer', 'admin')),
-  csrf TEXT NOT NULL, expires_at INTEGER NOT NULL
+  csrf TEXT NOT NULL, expires_at INTEGER NOT NULL, account_id TEXT REFERENCES customers(id)
 );
 CREATE TABLE IF NOT EXISTS shop_orders (
   id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, owner_hash TEXT NOT NULL,
@@ -22,6 +27,7 @@ CREATE TABLE IF NOT EXISTS shop_orders (
   shipping_minor INTEGER CHECK (shipping_minor >= 0), total_minor INTEGER CHECK (total_minor > 0),
   current_receipt_id TEXT, customer_message TEXT, payment_confirmed_at TEXT,
   privacy_version TEXT NOT NULL, privacy_accepted_at TEXT NOT NULL,
+  account_id TEXT REFERENCES customers(id), discount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_minor >= 0),
   UNIQUE (owner_hash, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS shop_orders_queue ON shop_orders(status, created_at);

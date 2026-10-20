@@ -175,9 +175,14 @@ CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS admin (
   id INTEGER PRIMARY KEY CHECK (id = 1), username TEXT NOT NULL, password_hash TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL, welcome_order_id TEXT,
+  privacy_version TEXT NOT NULL, privacy_accepted_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY, role TEXT NOT NULL CHECK (role IN ('customer', 'admin')),
-  csrf TEXT NOT NULL, expires_at INTEGER NOT NULL
+  csrf TEXT NOT NULL, expires_at INTEGER NOT NULL, account_id TEXT REFERENCES customers(id)
 );
 CREATE TABLE IF NOT EXISTS shop_orders (
   id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, owner_hash TEXT NOT NULL,
@@ -191,6 +196,7 @@ CREATE TABLE IF NOT EXISTS shop_orders (
   shipping_minor INTEGER CHECK (shipping_minor >= 0), total_minor INTEGER CHECK (total_minor > 0),
   current_receipt_id TEXT, customer_message TEXT, payment_confirmed_at TEXT,
   privacy_version TEXT NOT NULL, privacy_accepted_at TEXT NOT NULL,
+  account_id TEXT REFERENCES customers(id), discount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_minor >= 0),
   UNIQUE (owner_hash, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS shop_orders_queue ON shop_orders(status, created_at);
@@ -503,20 +509,20 @@ function passwordMatches(value, stored) {
   const actual = scryptSync(value.trim(), salt, 64, { N: 32768, maxmem: 64 * 1024 * 1024 });
   return hash.length === 128 && timingSafeEqual(actual, Buffer.from(hash, "hex"));
 }
-function generateSession(role, now = Date.now()) {
+function generateSession(role, now = Date.now(), accountId = null) {
   const token = newToken();
-  const session = { hash: tokenHash(token), role, csrf: newToken(), expiresAt: now + (role === "admin" ? 8 * 36e5 : 7 * 864e5) };
+  const session = { hash: tokenHash(token), role, csrf: newToken(), expiresAt: now + (role === "admin" ? 8 * 36e5 : 7 * 864e5), accountId };
   return { token, session };
 }
-function createSession(db, role, now = Date.now()) {
-  const { token, session } = generateSession(role, now);
-  db.prepare("INSERT INTO sessions (token_hash, role, csrf, expires_at) VALUES (?, ?, ?, ?)").run(session.hash, role, session.csrf, session.expiresAt);
+function createSession(db, role, now = Date.now(), accountId = null) {
+  const { token, session } = generateSession(role, now, accountId);
+  db.prepare("INSERT INTO sessions (token_hash, role, csrf, expires_at, account_id) VALUES (?, ?, ?, ?, ?)").run(session.hash, role, session.csrf, session.expiresAt, accountId);
   return { token, session };
 }
 function findSession(db, token, role, now = Date.now()) {
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const row = db.prepare("SELECT * FROM sessions WHERE token_hash = ? AND role = ? AND expires_at > ?").get(tokenHash(token), role, now);
-  return row ? { hash: row.token_hash, role, csrf: row.csrf, expiresAt: row.expires_at } : null;
+  return row ? { hash: row.token_hash, role, csrf: row.csrf, expiresAt: row.expires_at, accountId: row.account_id } : null;
 }
 function requireCsrf(session, supplied) {
   if (!supplied || !constantEqual(session.csrf, supplied)) throw new StoreError(403, "La sesi\xF3n de seguridad cambi\xF3. Actualiza la p\xE1gina antes de continuar.");
@@ -535,6 +541,57 @@ var RateLimits = class {
   }
 };
 
+// server/store/accounts.ts
+import { randomBytes as randomBytes2, scrypt, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+var derive = (password, salt) => new Promise((resolve2, reject) => {
+  scrypt(password, salt, 64, { N: 32768, maxmem: 64 * 1024 * 1024 }, (error, key) => error ? reject(error) : resolve2(key));
+});
+var dummyHash = `${"0".repeat(32)}:${"0".repeat(128)}`;
+async function accountPasswordHash(value) {
+  if (typeof value !== "string" || value.length < 12 || value.length > 128 || !value.trim()) throw new StoreError(422, "Usa una contrase\xF1a de entre 12 y 128 caracteres.");
+  const salt = randomBytes2(16).toString("hex");
+  return `${salt}:${(await derive(value, salt)).toString("hex")}`;
+}
+async function accountPasswordMatches(password, stored) {
+  const [salt, hash] = (stored ?? dummyHash).split(":");
+  const valid = /^[a-f0-9]{32}$/.test(salt) && /^[a-f0-9]{128}$/.test(hash);
+  if (!valid) {
+    await derive(password, "0".repeat(32));
+    return false;
+  }
+  const actual = await derive(password, salt);
+  return timingSafeEqual2(actual, Buffer.from(hash, "hex")) && !!stored;
+}
+function parseRegistration(value) {
+  const data = record(value);
+  fields2(data, ["name", "email", "password", "privacyAccepted"]);
+  if (data.privacyAccepted !== true) throw new StoreError(422, "Acepta el uso de tus datos para crear y gestionar tu cuenta.");
+  return { name: text2(data.name, 2, 100, "Nombre"), email: email(data.email), password: data.password };
+}
+function parseAccountLogin(value) {
+  const data = record(value);
+  fields2(data, ["email", "password"]);
+  const address = email(data.email);
+  if (typeof data.password !== "string" || !data.password.length || data.password.length > 128) throw new StoreError(401, "Correo o contrase\xF1a incorrectos.");
+  return { email: address, password: data.password };
+}
+function requireGuest(session) {
+  if (session.accountId) throw new StoreError(409, "Ya tienes una sesi\xF3n iniciada. Ci\xE9rrala antes de cambiar de cuenta.");
+}
+function requireAccount(session) {
+  if (!session.accountId) throw new StoreError(401, "Inicia sesi\xF3n para consultar tu cuenta y tus pedidos.");
+  return session.accountId;
+}
+var accountOwner = (id) => `account:${id}`;
+var orderOwner = (session) => session.accountId ? accountOwner(session.accountId) : session.hash;
+var accountIdFromOwner = (owner) => /^account:([a-f0-9-]{36})$/.exec(owner)?.[1] ?? null;
+var accountPage = (query) => Math.max(1, Math.min(1e5, Number.parseInt(query.get("page") ?? "1", 10) || 1));
+
+// src/lib/welcome.ts
+function welcomeDiscount(subtotalMinor, eligible) {
+  return eligible ? Math.round(subtotalMinor / 10) : 0;
+}
+
 // server/store/database.ts
 var statuses = ["pending_details", "awaiting_payment", "pending_review", "ready", "rejected"];
 var timestamp = () => (/* @__PURE__ */ new Date()).toISOString();
@@ -545,6 +602,14 @@ var ShopDatabase = class {
     this.database = new DatabaseSync(path);
     this.catalog = catalog;
     this.database.exec(schema);
+    for (const [table, name, definition] of [
+      ["sessions", "account_id", "TEXT REFERENCES customers(id)"],
+      ["shop_orders", "account_id", "TEXT REFERENCES customers(id)"],
+      ["shop_orders", "discount_minor", "INTEGER NOT NULL DEFAULT 0 CHECK (discount_minor >= 0)"]
+    ]) {
+      if (!this.database.prepare(`SELECT name FROM pragma_table_info('${table}') WHERE name = ?`).get(name)) this.database.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+    this.database.exec("CREATE INDEX IF NOT EXISTS shop_orders_customer ON shop_orders(account_id, created_at)");
     const receiptCol = this.database.prepare(`SELECT "notnull" FROM pragma_table_info('manual_payments') WHERE name = 'receipt_id'`).get();
     if (receiptCol?.notnull === 1) {
       this.transaction(() => {
@@ -631,6 +696,59 @@ var ShopDatabase = class {
   logout(session) {
     this.database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(session.hash);
   }
+  accountFromRow(row) {
+    return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at, welcomeAvailable: row.welcome_order_id === null };
+  }
+  account(session) {
+    if (!session.accountId) return null;
+    const row = this.database.prepare("SELECT id, name, email, created_at, welcome_order_id FROM customers WHERE id = ?").get(session.accountId);
+    return row ? this.accountFromRow(row) : null;
+  }
+  signInCustomer(id, previous) {
+    const valid = this.database.prepare("SELECT token_hash FROM sessions WHERE token_hash = ? AND role = 'customer' AND account_id IS NULL AND expires_at > ?").get(previous.hash, Date.now());
+    if (!valid) throw new StoreError(409, "La sesi\xF3n cambi\xF3. Actualiza la p\xE1gina antes de continuar.");
+    this.database.prepare("UPDATE shop_orders SET owner_hash = ?, account_id = ? WHERE owner_hash = ? AND account_id IS NULL").run(accountOwner(id), id, previous.hash);
+    this.logout(previous);
+    return createSession(this.database, "customer", Date.now(), id);
+  }
+  async registerCustomer(value, previous) {
+    requireGuest(previous);
+    const data = parseRegistration(value);
+    const hash = await accountPasswordHash(data.password);
+    return this.transaction(() => {
+      if (this.database.prepare("SELECT id FROM customers WHERE email = ?").get(data.email)) throw new StoreError(409, "Ya existe una cuenta con este correo. Inicia sesi\xF3n.");
+      const id = randomUUID();
+      const now = timestamp();
+      this.database.prepare("INSERT INTO customers (id, name, email, password_hash, created_at, privacy_version, privacy_accepted_at) VALUES (?, ?, ?, ?, ?, 'customer-account-v1', ?)").run(id, data.name, data.email, hash, now, now);
+      const result = this.signInCustomer(id, previous);
+      this.audit(null, "customer.registered", id, "Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.");
+      return result;
+    });
+  }
+  async loginCustomer(value, previous) {
+    requireGuest(previous);
+    const data = parseAccountLogin(value);
+    const row = this.database.prepare("SELECT id, password_hash FROM customers WHERE email = ?").get(data.email);
+    if (!await accountPasswordMatches(data.password, row?.password_hash)) throw new StoreError(401, "Correo o contrase\xF1a incorrectos.");
+    return this.transaction(() => this.signInCustomer(row.id, previous));
+  }
+  accountOrders(session, query) {
+    const id = requireAccount(session);
+    const page = accountPage(query);
+    const total = Number(this.database.prepare("SELECT count(*) AS count FROM shop_orders WHERE account_id = ?").get(id).count);
+    const orders = this.database.prepare("SELECT * FROM shop_orders WHERE account_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 20 OFFSET ?").all(id, (page - 1) * 20).map((row) => this.fromRow(row));
+    return { orders, total, page, pageSize: 20 };
+  }
+  customers(query) {
+    const page = accountPage(query);
+    const search = (query.get("q") ?? "").trim().slice(0, 80);
+    const where = search ? "WHERE (c.name LIKE ? ESCAPE '\\' OR c.email LIKE ? ESCAPE '\\')" : "";
+    const like = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+    const params = search ? [like, like] : [];
+    const total = Number(this.database.prepare(`SELECT count(*) AS count FROM customers c ${where}`).get(...params).count);
+    const rows = this.database.prepare(`SELECT c.id, c.name, c.email, c.created_at, c.welcome_order_id, (SELECT count(*) FROM shop_orders o WHERE o.account_id = c.id) AS order_count FROM customers c ${where} ORDER BY c.created_at DESC, c.id DESC LIMIT 50 OFFSET ?`).all(...params, (page - 1) * 50);
+    return { customers: rows.map((row) => ({ ...this.accountFromRow(row), orderCount: Number(row.order_count) })), total, page, pageSize: 50 };
+  }
   settings() {
     const value = this.database.prepare("SELECT value FROM metadata WHERE key = 'sinpe'").get()?.value;
     return value ? JSON.parse(value) : { enabled: false, phone: "", beneficiary: "" };
@@ -656,7 +774,7 @@ var ShopDatabase = class {
     for (const row of this.database.prepare("SELECT * FROM shop_orders WHERE status = 'pending_details' AND current_receipt_id IS NULL").all()) {
       const delivery = JSON.parse(row.delivery_json);
       const shipping = row.shipping_minor === null ? shippingFee(row.subtotal_minor, this.catalog.deliveryMethods.find((method) => method.id === delivery.id)) : row.shipping_minor;
-      const total = shipping === null ? null : minorAmount(row.subtotal_minor + shipping);
+      const total = shipping === null ? null : minorAmount(row.subtotal_minor - row.discount_minor + shipping);
       const savedDestination = destination ? JSON.stringify(destination) : row.destination_json;
       const status = total !== null && destination ? "awaiting_payment" : "pending_details";
       if (shipping === row.shipping_minor && total === row.total_minor && savedDestination === row.destination_json && status === row.status) continue;
@@ -681,6 +799,8 @@ var ShopDatabase = class {
       subtotalMinor: row.subtotal_minor,
       shippingMinor: row.shipping_minor,
       totalMinor: row.total_minor,
+      discountMinor: row.discount_minor,
+      customerAccountId: row.account_id,
       receipt: receipt ? { id: receipt.id, contentType: receipt.content_type, size: receipt.size, submittedAt: receipt.submitted_at, bankReference: receipt.bank_reference } : null,
       customerMessage: row.customer_message,
       paymentConfirmedAt: row.payment_confirmed_at,
@@ -712,6 +832,11 @@ var ShopDatabase = class {
         return this.fromRow(previous);
       }
       const parsed = parseNewOrder(value, this.catalog);
+      const accountId = accountIdFromOwner(owner);
+      const account = accountId ? this.database.prepare("SELECT welcome_order_id FROM customers WHERE id = ?").get(accountId) : null;
+      if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para registrar el pedido.");
+      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && account.welcome_order_id === null);
+      const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount;
       const destination = this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID();
@@ -738,8 +863,8 @@ var ShopDatabase = class {
       const now = timestamp();
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
-         destination_json, subtotal_minor, shipping_minor, total_minor, privacy_version, privacy_accepted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sinpe-checkout-v1', ?)`).run(
+         destination_json, subtotal_minor, shipping_minor, total_minor, privacy_version, privacy_accepted_at, account_id, discount_minor)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sinpe-checkout-v1', ?, ?, ?)`).run(
         id,
         code,
         owner,
@@ -755,9 +880,12 @@ var ShopDatabase = class {
         destination ? JSON.stringify(destination) : null,
         parsed.amounts.subtotal,
         parsed.amounts.shipping,
-        parsed.amounts.total,
-        now
+        total,
+        now,
+        accountId,
+        discount
       );
+      if (accountId && account?.welcome_order_id === null) this.database.prepare("UPDATE customers SET welcome_order_id = ? WHERE id = ? AND welcome_order_id IS NULL").run(id, accountId);
       this.audit(id, "order.created", "customer", ready ? "Pedido registrado. Pendiente de pago; no se ha verificado ning\xFAn abono." : "Pedido registrado. No solicitar pago hasta confirmar destino y total.");
       const order = this.getOrder(id);
       this.event(order, "order.created");
@@ -820,7 +948,7 @@ var ShopDatabase = class {
       }
       const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor);
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0));
       const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
       if (this.database.prepare("SELECT order_id FROM manual_payments WHERE bank_reference = ? AND order_id != ?").get(reference, id)) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
       const now = timestamp();
@@ -855,6 +983,11 @@ var ShopDatabase = class {
     const search = (query.get("q") ?? "").trim().slice(0, 80);
     const conditions = [];
     const parameters = [];
+    const customerId = query.get("customerId");
+    if (customerId) {
+      conditions.push("account_id = ?");
+      parameters.push(customerId.slice(0, 36));
+    }
     if (filter === "pending") conditions.push("status IN ('pending_details', 'awaiting_payment', 'pending_review', 'rejected')");
     else if (statuses.includes(filter)) {
       conditions.push("status = ?");
@@ -869,7 +1002,7 @@ var ShopDatabase = class {
     const total = Number(this.database.prepare(`SELECT count(*) AS count FROM shop_orders ${where}`).get(...parameters).count);
     const orders = this.database.prepare(`SELECT * FROM shop_orders ${where} ORDER BY created_at DESC, rowid DESC LIMIT 50 OFFSET ?`).all(...parameters, (page - 1) * 50).map((row) => this.fromRow(row));
     const counts = Object.fromEntries(statuses.map((status) => [status, 0]));
-    for (const row of this.database.prepare("SELECT status, count(*) AS count FROM shop_orders GROUP BY status").all()) counts[row.status] = Number(row.count);
+    for (const row of this.database.prepare(`SELECT status, count(*) AS count FROM shop_orders ${customerId ? "WHERE account_id = ?" : ""} GROUP BY status`).all(...customerId ? [customerId.slice(0, 36)] : [])) counts[row.status] = Number(row.count);
     return { orders, counts, total, page, pageSize: 50 };
   }
 };
@@ -900,9 +1033,12 @@ var MongoShopDatabase = class {
           this.collection("admin").createIndex({ id: 1 }, { unique: true }),
           this.collection("sessions").createIndex({ token_hash: 1 }, { unique: true }),
           this.collection("sessions").createIndex({ expires_at: 1 }),
+          this.collection("customers").createIndex({ id: 1 }, { unique: true }),
+          this.collection("customers").createIndex({ email: 1 }, { unique: true }),
           this.collection("shop_orders").createIndex({ code: 1 }, { unique: true }),
           this.collection("shop_orders").createIndex({ owner_hash: 1, idempotency_key: 1 }, { unique: true }),
           this.collection("shop_orders").createIndex({ status: 1, created_at: -1 }),
+          this.collection("shop_orders").createIndex({ account_id: 1, created_at: -1 }),
           this.collection("receipts").createIndex({ order_id: 1, upload_key: 1 }, { unique: true }),
           this.collection("receipts").createIndex({ raw_hash: 1 }),
           this.collection("manual_payments").createIndex({ bank_reference: 1 }, { unique: true }),
@@ -1009,7 +1145,7 @@ var MongoShopDatabase = class {
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
     const hash = tokenHash(token);
     const doc = await this.collection("sessions").findOne({ token_hash: hash, role, expires_at: { $gt: Date.now() } });
-    return doc ? { hash: doc.token_hash, role, csrf: doc.csrf, expiresAt: doc.expires_at } : null;
+    return doc ? { hash: doc.token_hash, role, csrf: doc.csrf, expiresAt: doc.expires_at, accountId: doc.account_id ?? null } : null;
   }
   async customerSession(token) {
     const existing = await this.session(token, "customer");
@@ -1025,6 +1161,67 @@ var MongoShopDatabase = class {
   }
   async logout(session) {
     await this.collection("sessions").deleteOne({ token_hash: session.hash });
+  }
+  accountFromDoc(row) {
+    return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at, welcomeAvailable: !row.welcome_order_id };
+  }
+  async account(session) {
+    if (!session.accountId) return null;
+    const row = await this.collection("customers").findOne({ id: session.accountId }, { projection: { password_hash: 0 } });
+    return row ? this.accountFromDoc(row) : null;
+  }
+  async signInCustomer(id, previous, session) {
+    const removed = await this.collection("sessions").deleteOne({ token_hash: previous.hash, role: "customer", account_id: null, expires_at: { $gt: Date.now() } }, { session });
+    if (removed.deletedCount !== 1) throw new StoreError(409, "La sesi\xF3n cambi\xF3. Actualiza la p\xE1gina antes de continuar.");
+    await this.collection("shop_orders").updateMany({ owner_hash: previous.hash, account_id: null }, { $set: { owner_hash: accountOwner(id), account_id: id } }, { session });
+    const result = generateSession("customer", Date.now(), id);
+    const next = result.session;
+    await this.collection("sessions").insertOne({ _id: next.hash, token_hash: next.hash, role: next.role, csrf: next.csrf, expires_at: next.expiresAt, account_id: id }, { session });
+    return result;
+  }
+  async registerCustomer(value, previous) {
+    requireGuest(previous);
+    const data = parseRegistration(value);
+    const hash = await accountPasswordHash(data.password);
+    try {
+      return await this.transaction(async (session) => {
+        if (await this.collection("customers").findOne({ email: data.email }, { session })) throw new StoreError(409, "Ya existe una cuenta con este correo. Inicia sesi\xF3n.");
+        const id = randomUUID2();
+        const now = timestamp2();
+        await this.collection("customers").insertOne({ _id: id, id, name: data.name, email: data.email, password_hash: hash, created_at: now, welcome_order_id: null, privacy_version: "customer-account-v1", privacy_accepted_at: now }, { session });
+        const result = await this.signInCustomer(id, previous, session);
+        await this.audit(null, "customer.registered", id, "Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.", session);
+        return result;
+      });
+    } catch (error) {
+      if (error.code === 11e3) throw new StoreError(409, "Ya existe una cuenta con este correo. Inicia sesi\xF3n.");
+      throw error;
+    }
+  }
+  async loginCustomer(value, previous) {
+    requireGuest(previous);
+    const data = parseAccountLogin(value);
+    const row = await this.collection("customers").findOne({ email: data.email });
+    if (!await accountPasswordMatches(data.password, row?.password_hash)) throw new StoreError(401, "Correo o contrase\xF1a incorrectos.");
+    return this.transaction((session) => this.signInCustomer(row.id, previous, session));
+  }
+  async accountOrders(session, query) {
+    const id = requireAccount(session);
+    const page = accountPage(query);
+    const filter = { account_id: id };
+    const total = await this.collection("shop_orders").countDocuments(filter);
+    const rows = await this.collection("shop_orders").find(filter).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 20).limit(20).toArray();
+    return { orders: await Promise.all(rows.map((row) => this.fromDoc(row))), total, page, pageSize: 20 };
+  }
+  async customers(query) {
+    const page = accountPage(query);
+    const search = (query.get("q") ?? "").trim().slice(0, 80);
+    const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const filter = search ? { $or: [{ name: regex }, { email: regex }] } : {};
+    const total = await this.collection("customers").countDocuments(filter);
+    const rows = await this.collection("customers").find(filter, { projection: { password_hash: 0 } }).sort({ created_at: -1, id: -1 }).skip((page - 1) * 50).limit(50).toArray();
+    const customers = await Promise.all(rows.map(async (row) => ({ ...this.accountFromDoc(row), orderCount: await this.collection("shop_orders").countDocuments({ account_id: row.id }) })));
+    return { customers, total, page, pageSize: 50 };
   }
   async settings() {
     const doc = await this.collection("metadata").findOne({ key: "sinpe" });
@@ -1056,7 +1253,7 @@ var MongoShopDatabase = class {
     for await (const row of cursor) {
       const delivery = JSON.parse(row.delivery_json);
       const shipping = row.shipping_minor === null ? shippingFee(row.subtotal_minor, this.catalog.deliveryMethods.find((method) => method.id === delivery.id)) : row.shipping_minor;
-      const total = shipping === null ? null : minorAmount(row.subtotal_minor + shipping);
+      const total = shipping === null ? null : minorAmount(row.subtotal_minor - (row.discount_minor ?? 0) + shipping);
       const savedDestination = destination ? JSON.stringify(destination) : row.destination_json;
       const status = total !== null && destination ? "awaiting_payment" : "pending_details";
       if (shipping === row.shipping_minor && total === row.total_minor && savedDestination === row.destination_json && status === row.status) continue;
@@ -1095,6 +1292,8 @@ var MongoShopDatabase = class {
       delivery: JSON.parse(row.delivery_json),
       destination: row.destination_json ? JSON.parse(row.destination_json) : null,
       subtotalMinor: row.subtotal_minor,
+      discountMinor: row.discount_minor ?? 0,
+      customerAccountId: row.account_id ?? null,
       shippingMinor: row.shipping_minor,
       totalMinor: row.total_minor,
       receipt: receipt ? {
@@ -1134,15 +1333,20 @@ var MongoShopDatabase = class {
         return this.fromDoc(previous, session);
       }
       const parsed = parseNewOrder(value, this.catalog);
+      const accountId = accountIdFromOwner(owner);
+      const account = accountId ? await this.collection("customers").findOne({ id: accountId }, { session }) : null;
+      if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para registrar el pedido.");
+      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !account.welcome_order_id);
+      const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount;
       const destination = await this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID2();
       let nextNum = 1001;
-      const meta = await this.collection("metadata").findOne({ key: "order_number" });
+      const meta = await this.collection("metadata").findOne({ key: "order_number" }, { session });
       if (meta && typeof meta.seq === "number" && meta.seq >= nextNum) {
         nextNum = meta.seq + 1;
       } else {
-        const last = await this.collection("shop_orders").find({ code: /^ONK-\d+$/ }, { projection: { code: 1 } }).sort({ created_at: -1 }).limit(50).toArray();
+        const last = await this.collection("shop_orders").find({ code: /^ONK-\d+$/ }, { projection: { code: 1 }, session }).sort({ created_at: -1 }).limit(50).toArray();
         for (const doc of last) {
           const match = /^ONK-(\d+)$/.exec(doc.code);
           if (match) {
@@ -1151,10 +1355,10 @@ var MongoShopDatabase = class {
           }
         }
       }
-      while (await this.collection("shop_orders").findOne({ code: `ONK-${nextNum}` })) {
+      while (await this.collection("shop_orders").findOne({ code: `ONK-${nextNum}` }, { session })) {
         nextNum++;
       }
-      await this.collection("metadata").updateOne({ key: "order_number" }, { $set: { seq: nextNum } }, { upsert: true });
+      await this.collection("metadata").updateOne({ key: "order_number" }, { $set: { seq: nextNum } }, { upsert: true, session });
       const code = `ONK-${nextNum}`;
       const now = timestamp2();
       const newOrder = {
@@ -1175,7 +1379,9 @@ var MongoShopDatabase = class {
         destination_json: destination ? JSON.stringify(destination) : null,
         subtotal_minor: parsed.amounts.subtotal,
         shipping_minor: parsed.amounts.shipping,
-        total_minor: parsed.amounts.total,
+        total_minor: total,
+        discount_minor: discount,
+        account_id: accountId,
         current_receipt_id: null,
         customer_message: null,
         payment_confirmed_at: null,
@@ -1183,6 +1389,7 @@ var MongoShopDatabase = class {
         privacy_accepted_at: now
       };
       await this.collection("shop_orders").insertOne(newOrder, { session });
+      if (accountId && !account?.welcome_order_id) await this.collection("customers").updateOne({ id: accountId, welcome_order_id: null }, { $set: { welcome_order_id: id } }, { session });
       await this.audit(id, "order.created", "customer", ready ? "Pedido registrado. Pendiente de pago; no se ha verificado ning\xFAn abono." : "Pedido registrado. No solicitar pago hasta confirmar destino y total.", session);
       const order = await this.getOrder(id, session);
       await this.event(order, "order.created", session);
@@ -1264,7 +1471,7 @@ var MongoShopDatabase = class {
       }
       const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor);
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0));
       const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
       const dup = await this.collection("manual_payments").findOne({ bank_reference: reference, order_id: { $ne: id } }, { session });
       if (dup) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
@@ -1329,6 +1536,8 @@ var MongoShopDatabase = class {
     const filter = query.get("status") ?? "all";
     const search = (query.get("q") ?? "").trim().slice(0, 80);
     const filterQuery = {};
+    const customerId = query.get("customerId");
+    if (customerId) filterQuery.account_id = customerId.slice(0, 36);
     if (filter === "pending") {
       filterQuery.status = { $in: ["pending_details", "awaiting_payment", "pending_review", "rejected"] };
     } else if (statuses2.includes(filter)) {
@@ -1348,6 +1557,7 @@ var MongoShopDatabase = class {
     const orders = await Promise.all(rows.map((row) => this.fromDoc(row)));
     const counts = Object.fromEntries(statuses2.map((status) => [status, 0]));
     const agg = await this.collection("shop_orders").aggregate([
+      ...customerId ? [{ $match: { account_id: customerId.slice(0, 36) } }] : [],
       { $group: { _id: "$status", count: { $sum: 1 } } }
     ]).toArray();
     for (const item of agg) {
@@ -1468,12 +1678,35 @@ function makeShopHandler(store2, options = {}) {
         username: session ? await store2.adminName() : null,
         csrfToken: session?.csrf ?? null
       });
-      if (path === "/api/checkout" && method === "GET") {
+      if ((path === "/api/checkout" || path === "/api/account/session") && method === "GET") {
         const token = cookie(request, CUSTOMER_COOKIE);
         if (!await store2.session(token, "customer")) limits.check(`session:${ip}`, 120, 36e5);
         const customer = await store2.customerSession(token);
         if (customer.token) setCookie(response, CUSTOMER_COOKIE, customer.token, 7 * 86400, secureCookies);
-        json(response, 200, { csrfToken: customer.session.csrf, sinpe: await store2.destination(), demo: store2.isDemo(), maxReceiptBytes: MAX_RECEIPT_BYTES });
+        const account = await store2.account(customer.session);
+        json(response, 200, path === "/api/account/session" ? { csrfToken: customer.session.csrf, user: account } : { csrfToken: customer.session.csrf, account, sinpe: await store2.destination(), demo: store2.isDemo(), maxReceiptBytes: MAX_RECEIPT_BYTES });
+        return;
+      }
+      if ((path === "/api/account/register" || path === "/api/account/login") && method === "POST") {
+        const previous = await requireSession("customer", true);
+        const register = path.endsWith("/register");
+        limits.check(`account-${register ? "register" : "login"}:${ip}`, register ? 8 : 20, register ? 36e5 : 15 * 6e4);
+        const data = await jsonBody(request);
+        if (!register && typeof data.email === "string") limits.check(`account-email:${tokenHash(data.email.trim().toLowerCase().slice(0, 254))}`, 10, 15 * 6e4);
+        const result = await (register ? store2.registerCustomer(data, previous) : store2.loginCustomer(data, previous));
+        setCookie(response, CUSTOMER_COOKIE, result.token, 7 * 86400, secureCookies);
+        json(response, 200, { user: await store2.account(result.session), csrfToken: result.session.csrf });
+        return;
+      }
+      if (path === "/api/account/logout" && method === "POST") {
+        await store2.logout(await requireSession("customer", true));
+        const guest = await store2.customerSession(void 0);
+        setCookie(response, CUSTOMER_COOKIE, guest.token, 7 * 86400, secureCookies);
+        json(response, 200, { user: null, csrfToken: guest.session.csrf });
+        return;
+      }
+      if (path === "/api/account/orders" && method === "GET") {
+        json(response, 200, await store2.accountOrders(await requireSession("customer"), url.searchParams));
         return;
       }
       if (path === "/api/admin/session" && method === "GET") {
@@ -1515,7 +1748,7 @@ function makeShopHandler(store2, options = {}) {
         }
       }
       if (path === "/api/orders/current" && method === "GET") {
-        json(response, 200, { order: await store2.currentOrder((await requireSession("customer")).hash) });
+        json(response, 200, { order: await store2.currentOrder(orderOwner(await requireSession("customer"))) });
         return;
       }
       if (path === "/api/orders" && method === "POST") {
@@ -1523,13 +1756,13 @@ function makeShopHandler(store2, options = {}) {
         limits.check(`order:${session.hash}`, 20, 15 * 6e4);
         const key = request.headers["idempotency-key"];
         if (typeof key !== "string") throw new StoreError(422, "Falta Idempotency-Key.");
-        const created = await store2.createOrder(await jsonBody(request), session.hash, key);
+        const created = await store2.createOrder(await jsonBody(request), orderOwner(session), key);
         json(response, 200, created);
         return;
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path);
       if (orderPath && method === "GET") {
-        json(response, 200, await store2.customerOrder(orderPath[1], (await requireSession("customer")).hash));
+        json(response, 200, await store2.customerOrder(orderPath[1], orderOwner(await requireSession("customer"))));
         return;
       }
       const uploadPath = new RegExp(`^/api/orders/(${ID})/receipt$`).exec(path);
@@ -1549,14 +1782,14 @@ function makeShopHandler(store2, options = {}) {
         const entries = [...form.entries()];
         const keys = entries.map(([key]) => key);
         if (new Set(keys).size !== entries.length || keys.some((key) => !["code", "bankReference", "uploadKey", "version", "receipt"].includes(key)) || !["uploadKey", "version", "receipt"].every((req) => keys.includes(req))) throw new StoreError(422, "El formulario contiene campos ausentes, repetidos o no permitidos.");
-        await store2.checkUpload(uploadPath[1], session.hash, form.get("code"));
+        await store2.checkUpload(uploadPath[1], orderOwner(session), form.get("code"));
         const file = form.get("receipt");
         if (!(file instanceof Blob)) throw new StoreError(422, "Selecciona un comprobante.");
         if (file.size > MAX_RECEIPT_BYTES) throw new StoreError(413, "El comprobante no puede superar 5 MB.");
         const version2 = form.get("version");
         if (typeof version2 !== "string" || !/^[1-9]\d{0,8}$/.test(version2)) throw new StoreError(422, "Versi\xF3n del pedido inv\xE1lida.");
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type);
-        const received = await store2.addReceipt(uploadPath[1], session.hash, form.get("code"), form.get("bankReference"), form.get("uploadKey"), Number(version2), prepared);
+        const received = await store2.addReceipt(uploadPath[1], orderOwner(session), form.get("code"), form.get("bankReference"), form.get("uploadKey"), Number(version2), prepared);
         await options.mailer?.notify("receipt.submitted", received);
         json(response, 200, received);
         return;
@@ -1564,7 +1797,7 @@ function makeShopHandler(store2, options = {}) {
       const receiptPath = new RegExp(`^/api/(admin/)?orders/(${ID})/receipts/(${ID})$`).exec(path);
       if (receiptPath && method === "GET") {
         if (receiptPath[1]) await requireSession("admin");
-        else await store2.customerOrder(receiptPath[2], (await requireSession("customer")).hash);
+        else await store2.customerOrder(receiptPath[2], orderOwner(await requireSession("customer")));
         const receipt = await store2.receipt(receiptPath[2], receiptPath[3]);
         const order = await store2.getOrder(receiptPath[2]);
         const pdf = receipt.contentType === "application/pdf";
@@ -1577,6 +1810,11 @@ function makeShopHandler(store2, options = {}) {
           "Content-Security-Policy": "sandbox; default-src 'none'; frame-ancestors 'none'"
         });
         response.end(receipt.data);
+        return;
+      }
+      if (path === "/api/admin/customers" && method === "GET") {
+        await requireSession("admin");
+        json(response, 200, await store2.customers(url.searchParams));
         return;
       }
       if (path === "/api/admin/orders" && method === "GET") {
@@ -1644,6 +1882,7 @@ function linesTable(order, paid) {
       </tr></thead>
       <tbody>${html}
         <tr><td style="padding:14px 10px 6px 0;color:#716b76;font-size:13px;">Subtotal</td><td align="right" style="padding:14px 0 6px;color:#211d25;font-size:13px;white-space:nowrap;">${esc(money(order.subtotalMinor, store))}</td></tr>
+        ${order.discountMinor ? `<tr><td style="padding:4px 10px 6px 0;color:#65447a;font-size:13px;">Bienvenida \xB7 10%</td><td align="right" style="padding:4px 0 6px;color:#65447a;font-size:13px;">\u2212${esc(money(order.discountMinor, store))}</td></tr>` : ""}
         <tr><td style="padding:4px 10px 14px 0;color:#716b76;font-size:13px;line-height:19px;">${esc(order.delivery.name)}</td><td align="right" style="padding:4px 0 14px;color:#211d25;font-size:13px;line-height:19px;">${esc(shipping)}</td></tr>
         <tr>
           <th scope="row" align="left" bgcolor="#f2edf5" style="padding:14px 16px;border-radius:8px 0 0 8px;color:#382448;font-size:14px;font-weight:700;">${paid ? "Total pagado" : "Total del pedido"}<br><span style="font-size:11px;line-height:20px;font-weight:400;color:#716b76;">Colones costarricenses \xB7 CRC</span></th>
@@ -1651,7 +1890,8 @@ function linesTable(order, paid) {
         </tr>
       </tbody></table>`,
     text: order.lines.map((line) => `\u2022 ${line.quantity} \xD7 ${line.name}${line.options.length ? ` (${line.options.join(", ")})` : ""} \u2014 ${money(line.lineTotalMinor, store)}`).join("\n") + `
-Subtotal: ${money(order.subtotalMinor, store)}
+Subtotal: ${money(order.subtotalMinor, store)}${order.discountMinor ? `
+Bienvenida \xB7 10%: \u2212${money(order.discountMinor, store)}` : ""}
 ${order.delivery.name}: ${shipping}
 ${paid ? "Total pagado" : "Total del pedido"}: ${total} (CRC)`
   };

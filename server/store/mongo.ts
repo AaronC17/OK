@@ -9,6 +9,9 @@ import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { shippingFee } from '../../src/lib/shop.ts'
 import type { CustomerSession, ShopRepository, StoredReceipt } from './repository.ts'
+import type { AdminCustomers, CustomerAccount, CustomerOrders } from '../../src/account-types.ts'
+import { accountIdFromOwner, accountOwner, accountPage, accountPasswordHash, accountPasswordMatches, parseAccountLogin, parseRegistration, requireAccount, requireGuest } from './accounts.ts'
+import { welcomeDiscount } from '../../src/lib/welcome.ts'
 
 const statuses: ShopOrderStatus[] = ['pending_details', 'awaiting_payment', 'pending_review', 'ready', 'rejected']
 const timestamp = () => new Date().toISOString()
@@ -37,9 +40,12 @@ export class MongoShopDatabase implements ShopRepository {
           this.collection('admin').createIndex({ id: 1 }, { unique: true }),
           this.collection('sessions').createIndex({ token_hash: 1 }, { unique: true }),
           this.collection('sessions').createIndex({ expires_at: 1 }),
+          this.collection('customers').createIndex({ id: 1 }, { unique: true }),
+          this.collection('customers').createIndex({ email: 1 }, { unique: true }),
           this.collection('shop_orders').createIndex({ code: 1 }, { unique: true }),
           this.collection('shop_orders').createIndex({ owner_hash: 1, idempotency_key: 1 }, { unique: true }),
           this.collection('shop_orders').createIndex({ status: 1, created_at: -1 }),
+          this.collection('shop_orders').createIndex({ account_id: 1, created_at: -1 }),
           this.collection('receipts').createIndex({ order_id: 1, upload_key: 1 }, { unique: true }),
           this.collection('receipts').createIndex({ raw_hash: 1 }),
           this.collection('manual_payments').createIndex({ bank_reference: 1 }, { unique: true }),
@@ -157,7 +163,7 @@ export class MongoShopDatabase implements ShopRepository {
     if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null
     const hash = tokenHash(token)
     const doc = await this.collection('sessions').findOne({ token_hash: hash, role, expires_at: { $gt: Date.now() } })
-    return doc ? { hash: doc.token_hash as string, role, csrf: doc.csrf as string, expiresAt: doc.expires_at as number } : null
+    return doc ? { hash: doc.token_hash as string, role, csrf: doc.csrf as string, expiresAt: doc.expires_at as number, accountId: doc.account_id as string | null ?? null } : null
   }
 
   async customerSession(token: string | undefined): Promise<CustomerSession> {
@@ -175,6 +181,74 @@ export class MongoShopDatabase implements ShopRepository {
 
   async logout(session: Session): Promise<void> {
     await this.collection('sessions').deleteOne({ token_hash: session.hash })
+  }
+
+  private accountFromDoc(row: Record<string, any>): CustomerAccount {
+    return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at, welcomeAvailable: !row.welcome_order_id }
+  }
+
+  async account(session: Session): Promise<CustomerAccount | null> {
+    if (!session.accountId) return null
+    const row = await this.collection('customers').findOne({ id: session.accountId }, { projection: { password_hash: 0 } })
+    return row ? this.accountFromDoc(row) : null
+  }
+
+  private async signInCustomer(id: string, previous: Session, session: ClientSession) {
+    const removed = await this.collection('sessions').deleteOne({ token_hash: previous.hash, role: 'customer', account_id: null, expires_at: { $gt: Date.now() } }, { session })
+    if (removed.deletedCount !== 1) throw new StoreError(409, 'La sesión cambió. Actualiza la página antes de continuar.')
+    await this.collection('shop_orders').updateMany({ owner_hash: previous.hash, account_id: null }, { $set: { owner_hash: accountOwner(id), account_id: id } }, { session })
+    const result = generateSession('customer', Date.now(), id)
+    const next = result.session
+    await this.collection('sessions').insertOne({ _id: next.hash, token_hash: next.hash, role: next.role, csrf: next.csrf, expires_at: next.expiresAt, account_id: id }, { session })
+    return result
+  }
+
+  async registerCustomer(value: unknown, previous: Session) {
+    requireGuest(previous)
+    const data = parseRegistration(value)
+    const hash = await accountPasswordHash(data.password)
+    try {
+      return await this.transaction(async session => {
+        if (await this.collection('customers').findOne({ email: data.email }, { session })) throw new StoreError(409, 'Ya existe una cuenta con este correo. Inicia sesión.')
+        const id = randomUUID()
+        const now = timestamp()
+        await this.collection('customers').insertOne({ _id: id, id, name: data.name, email: data.email, password_hash: hash, created_at: now, welcome_order_id: null, privacy_version: 'customer-account-v1', privacy_accepted_at: now }, { session })
+        const result = await this.signInCustomer(id, previous, session)
+        await this.audit(null, 'customer.registered', id, 'Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.', session)
+        return result
+      })
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) throw new StoreError(409, 'Ya existe una cuenta con este correo. Inicia sesión.')
+      throw error
+    }
+  }
+
+  async loginCustomer(value: unknown, previous: Session) {
+    requireGuest(previous)
+    const data = parseAccountLogin(value)
+    const row = await this.collection('customers').findOne({ email: data.email })
+    if (!await accountPasswordMatches(data.password, row?.password_hash)) throw new StoreError(401, 'Correo o contraseña incorrectos.')
+    return this.transaction(session => this.signInCustomer(row!.id, previous, session))
+  }
+
+  async accountOrders(session: Session, query: URLSearchParams): Promise<CustomerOrders> {
+    const id = requireAccount(session)
+    const page = accountPage(query)
+    const filter = { account_id: id }
+    const total = await this.collection('shop_orders').countDocuments(filter)
+    const rows = await this.collection('shop_orders').find(filter).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 20).limit(20).toArray()
+    return { orders: await Promise.all(rows.map(row => this.fromDoc(row))), total, page, pageSize: 20 }
+  }
+
+  async customers(query: URLSearchParams): Promise<AdminCustomers> {
+    const page = accountPage(query)
+    const search = (query.get('q') ?? '').trim().slice(0, 80)
+    const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+    const filter = search ? { $or: [{ name: regex }, { email: regex }] } : {}
+    const total = await this.collection('customers').countDocuments(filter)
+    const rows = await this.collection('customers').find(filter, { projection: { password_hash: 0 } }).sort({ created_at: -1, id: -1 }).skip((page - 1) * 50).limit(50).toArray()
+    const customers = await Promise.all(rows.map(async row => ({ ...this.accountFromDoc(row), orderCount: await this.collection('shop_orders').countDocuments({ account_id: row.id }) })))
+    return { customers, total, page, pageSize: 50 }
   }
 
   async settings(): Promise<SinpeSettings> {
@@ -211,7 +285,7 @@ export class MongoShopDatabase implements ShopRepository {
     for await (const row of cursor) {
       const delivery = JSON.parse(row.delivery_json as string) as ShopOrder['delivery']
       const shipping = row.shipping_minor === null ? shippingFee(row.subtotal_minor as number, this.catalog.deliveryMethods.find(method => method.id === delivery.id)) : row.shipping_minor as number
-      const total = shipping === null ? null : minorAmount((row.subtotal_minor as number) + shipping)
+      const total = shipping === null ? null : minorAmount((row.subtotal_minor as number) - (row.discount_minor ?? 0) + shipping)
       const savedDestination = destination ? JSON.stringify(destination) : row.destination_json as string | null
       const status = total !== null && destination ? 'awaiting_payment' : 'pending_details'
       if (shipping === row.shipping_minor && total === row.total_minor && savedDestination === row.destination_json && status === row.status) continue
@@ -251,6 +325,8 @@ export class MongoShopDatabase implements ShopRepository {
       delivery: JSON.parse(row.delivery_json as string) as ShopOrder['delivery'],
       destination: row.destination_json ? JSON.parse(row.destination_json as string) as SinpeDestination : null,
       subtotalMinor: row.subtotal_minor as number,
+      discountMinor: row.discount_minor ?? 0,
+      customerAccountId: row.account_id ?? null,
       shippingMinor: row.shipping_minor as number | null,
       totalMinor: row.total_minor as number | null,
       receipt: receipt ? {
@@ -294,15 +370,20 @@ export class MongoShopDatabase implements ShopRepository {
         return this.fromDoc(previous, session)
       }
       const parsed = parseNewOrder(value, this.catalog)
+      const accountId = accountIdFromOwner(owner)
+      const account = accountId ? await this.collection('customers').findOne({ id: accountId }, { session }) : null
+      if (accountId && !account) throw new StoreError(401, 'Inicia sesión de nuevo para registrar el pedido.')
+      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !account.welcome_order_id)
+      const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount
       const destination = await this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
       let nextNum = 1001
-      const meta = await this.collection('metadata').findOne({ key: 'order_number' })
+      const meta = await this.collection('metadata').findOne({ key: 'order_number' }, { session })
       if (meta && typeof meta.seq === 'number' && meta.seq >= nextNum) {
         nextNum = meta.seq + 1
       } else {
-        const last = await this.collection('shop_orders').find({ code: /^ONK-\d+$/ }, { projection: { code: 1 } }).sort({ created_at: -1 }).limit(50).toArray()
+        const last = await this.collection('shop_orders').find({ code: /^ONK-\d+$/ }, { projection: { code: 1 }, session }).sort({ created_at: -1 }).limit(50).toArray()
         for (const doc of last) {
           const match = /^ONK-(\d+)$/.exec(doc.code)
           if (match) {
@@ -311,10 +392,10 @@ export class MongoShopDatabase implements ShopRepository {
           }
         }
       }
-      while (await this.collection('shop_orders').findOne({ code: `ONK-${nextNum}` })) {
+      while (await this.collection('shop_orders').findOne({ code: `ONK-${nextNum}` }, { session })) {
         nextNum++
       }
-      await this.collection('metadata').updateOne({ key: 'order_number' }, { $set: { seq: nextNum } }, { upsert: true })
+      await this.collection('metadata').updateOne({ key: 'order_number' }, { $set: { seq: nextNum } }, { upsert: true, session })
       const code = `ONK-${nextNum}`
       const now = timestamp()
       const newOrder = {
@@ -335,7 +416,9 @@ export class MongoShopDatabase implements ShopRepository {
         destination_json: destination ? JSON.stringify(destination) : null,
         subtotal_minor: parsed.amounts.subtotal,
         shipping_minor: parsed.amounts.shipping,
-        total_minor: parsed.amounts.total,
+        total_minor: total,
+        discount_minor: discount,
+        account_id: accountId,
         current_receipt_id: null,
         customer_message: null,
         payment_confirmed_at: null,
@@ -343,6 +426,7 @@ export class MongoShopDatabase implements ShopRepository {
         privacy_accepted_at: now,
       }
       await this.collection('shop_orders').insertOne(newOrder, { session })
+      if (accountId && !account?.welcome_order_id) await this.collection('customers').updateOne({ id: accountId, welcome_order_id: null }, { $set: { welcome_order_id: id } }, { session })
       await this.audit(id, 'order.created', 'customer', ready ? 'Pedido registrado. Pendiente de pago; no se ha verificado ningún abono.' : 'Pedido registrado. No solicitar pago hasta confirmar destino y total.', session)
       const order = await this.getOrder(id, session)
       await this.event(order, 'order.created', session)
@@ -431,7 +515,7 @@ export class MongoShopDatabase implements ShopRepository {
       }
       const useReceipt = order.receipt && order.status === 'pending_review' ? order.receipt : null
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor)
+      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0))
       const note = useReceipt
         ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
         : 'Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria automática.'
@@ -501,6 +585,8 @@ export class MongoShopDatabase implements ShopRepository {
     const filter = query.get('status') ?? 'all'
     const search = (query.get('q') ?? '').trim().slice(0, 80)
     const filterQuery: any = {}
+    const customerId = query.get('customerId')
+    if (customerId) filterQuery.account_id = customerId.slice(0, 36)
     if (filter === 'pending') {
       filterQuery.status = { $in: ['pending_details', 'awaiting_payment', 'pending_review', 'rejected'] }
     } else if (statuses.includes(filter as ShopOrderStatus)) {
@@ -528,6 +614,7 @@ export class MongoShopDatabase implements ShopRepository {
 
     const counts = Object.fromEntries(statuses.map(status => [status, 0])) as Record<ShopOrderStatus, number>
     const agg = await this.collection('shop_orders').aggregate([
+      ...(customerId ? [{ $match: { account_id: customerId.slice(0, 36) } }] : []),
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]).toArray()
     for (const item of agg) {

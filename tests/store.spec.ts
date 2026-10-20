@@ -134,7 +134,7 @@ test('symmetrical glass menu, proportional icons, responsive layout and keyboard
   await expect(page.locator('.site-header')).not.toHaveClass(/is-scrolled/)
   await page.screenshot({ path: `test-results/${testInfo.project.name}-store.png`, fullPage: true })
   await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Tu mezcla. Tus reglas.' })
+  const dialog = page.getByRole('dialog', { name: 'Ositos enchilados' })
   await expect(dialog).toHaveCSS('opacity', '1')
   await expect(dialog.getByText('Fotografía de referencia', { exact: true })).toHaveCount(0)
   const modalAccessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()

@@ -7,6 +7,7 @@ import type { TestContext } from 'node:test'
 import sharp from 'sharp'
 import { store } from '../../src/config/store.ts'
 import type { CheckoutConfig, ShopOrder } from '../../src/order-types.ts'
+import type { AdminCustomers, CustomerAuth, CustomerOrders } from '../../src/account-types.ts'
 import { ShopDatabase } from './database.ts'
 import { makeShopHandler } from './http.ts'
 import { newToken } from './security.ts'
@@ -148,4 +149,68 @@ test('store HTTP: simultaneous idempotent requests create one order; no direct s
   assert.equal(new Set(replies.map(reply => reply.data.id)).size, 1)
   assert.equal((await buyer.call('/api/orders', { ...input(), totalMinor: 1 }, 'POST', { 'Idempotency-Key': randomUUID() })).status, 422)
   assert.equal((await buyer.call(`/api/orders/${replies[0].data.id}/confirm`, { status: 'ready' })).status, 404)
+})
+
+const customerRegistration = () => ({ name: 'Cliente con cuenta', email: 'cuenta@ejemplo.cr', password: 'Una-frase-segura-2026!', privacyAccepted: true })
+
+test('accounts HTTP: registration and logout rotate HttpOnly sessions and CSRF; guests cannot access private history or the directory', async t => {
+  const { buyer, client, admin } = await setup(t)
+  const outsider = client()
+  await outsider.call('/api/checkout')
+  assert.equal((await outsider.call('/api/account/orders')).status, 401)
+  assert.equal((await outsider.call('/api/admin/customers')).status, 401)
+  assert.equal((await buyer.call('/api/account/register', customerRegistration(), 'POST', { 'X-CSRF-Token': '' })).status, 403)
+  assert.equal((await buyer.call('/api/account/login', { email: 'cuenta@ejemplo.cr', password: 'irrelevante' }, 'POST', { Origin: 'https://attacker.invalid' })).status, 403)
+  const signed = await buyer.call<CustomerAuth>('/api/account/register', customerRegistration())
+  assert.equal(signed.status, 200)
+  assert.ok(signed.data.user?.id)
+  assert.ok(!JSON.stringify(signed.data).includes('password'))
+  assert.match(signed.headers.get('set-cookie')!, /HttpOnly; SameSite=Strict/)
+  const order = await buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': randomUUID() })
+  assert.equal(order.data.discountMinor, 12000)
+  assert.equal((await buyer.call<CustomerOrders>('/api/account/orders')).data.total, 1)
+  assert.equal((await outsider.call(`/api/orders/${order.data.id}`)).status, 404)
+  assert.equal((await admin.call<AdminCustomers>('/api/admin/customers')).data.customers[0].orderCount, 1)
+  assert.equal((await buyer.call('/api/account/logout', {}, 'POST', { 'X-CSRF-Token': '' })).status, 403)
+  const loggedOut = await buyer.call<CustomerAuth>('/api/account/logout', {})
+  assert.equal(loggedOut.data.user, null)
+  assert.notEqual(loggedOut.data.csrfToken, signed.data.csrfToken)
+  assert.equal((await buyer.call('/api/account/orders')).status, 401)
+  assert.equal((await buyer.call(`/api/orders/${order.data.id}`)).status, 404)
+  assert.equal((await buyer.call('/api/account/login', { email: 'cuenta@ejemplo.cr', password: 'Incorrecta-2026!' })).status, 401)
+  const login = await buyer.call<CustomerAuth>('/api/account/login', { email: 'CUENTA@ejemplo.cr', password: customerRegistration().password })
+  assert.equal(login.status, 200)
+  assert.equal(login.data.user!.id, signed.data.user!.id)
+  assert.equal((await buyer.call<ShopOrder>(`/api/orders/${order.data.id}`)).data.totalMinor, 108000)
+})
+
+test('accounts HTTP: simultaneous orders and idempotent retries cannot duplicate a welcome discount', async t => {
+  const { buyer, client } = await setup(t)
+  const signed = await buyer.call<CustomerAuth>('/api/account/register', customerRegistration())
+  const secondDevice = client()
+  await secondDevice.call('/api/checkout')
+  const login = await secondDevice.call<CustomerAuth>('/api/account/login', { email: customerRegistration().email, password: customerRegistration().password })
+  assert.equal(login.data.user!.id, signed.data.user!.id)
+  const key = randomUUID()
+  const [first, second] = await Promise.all([
+    buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': key }),
+    secondDevice.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': randomUUID() }),
+  ])
+  assert.equal(first.status, 200)
+  assert.equal(second.status, 200)
+  assert.equal(first.data.discountMinor! + second.data.discountMinor!, 12000)
+  const retried = await secondDevice.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': key })
+  assert.equal(retried.data.id, first.data.id)
+  assert.equal(retried.data.totalMinor, first.data.totalMinor)
+  assert.equal((await secondDevice.call<CustomerOrders>('/api/account/orders')).data.total, 2)
+})
+
+test('accounts HTTP: credential failures are generic and account brute-force attempts are bounded', async t => {
+  const { buyer } = await setup(t)
+  for (let i = 0; i < 10; i++) {
+    const response = await buyer.call('/api/account/login', { email: 'no-existe@ejemplo.cr', password: 'Incorrecta-2026!' })
+    assert.equal(response.status, 401)
+    assert.equal(response.data.error, 'Correo o contraseña incorrectos.')
+  }
+  assert.equal((await buyer.call('/api/account/login', { email: 'no-existe@ejemplo.cr', password: 'Incorrecta-2026!' })).status, 429)
 })

@@ -5,6 +5,8 @@ import { store } from '../config/store.ts'
 import { money, totals, validateCheckout } from '../lib/shop.ts'
 import { checkoutConfig, createOrder, currentOrder, errorMessage, fetchOrder } from '../lib/orders-api.ts'
 import type { CheckoutConfig, OrderCustomer, ShopOrder } from '../order-types.ts'
+import type { CustomerAccount } from '../account-types.ts'
+import { welcomeDiscount } from '../lib/welcome.ts'
 import type { Cart } from '../hooks/useCart.ts'
 import { Icon } from './Icon.tsx'
 import { FreeShippingBar } from './FreeShippingBar.tsx'
@@ -38,8 +40,10 @@ function setDismissedOrderId(id: string | null) {
   } catch { /* Ignore storage quota/privacy errors */ }
 }
 
-export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: () => void; cart: Cart }) {
-  const [customer, setCustomer] = useState<OrderCustomer>({ name: '', phone: '', email: '', address: '', notes: '' })
+export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrderId, onRegister, onOrderCreated }: {
+  open: boolean; onClose: () => void; cart: Cart; customerAccount: CustomerAccount | null; selectedOrderId: string | null; onRegister: () => void; onOrderCreated: () => void
+}) {
+  const [customer, setCustomer] = useState<OrderCustomer>({ name: customerAccount?.name ?? '', phone: '', email: customerAccount?.email ?? '', address: '', notes: '' })
   const [deliveryId, setDeliveryId] = useState(getInitialDeliveryId)
   const [privacy, setPrivacy] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
@@ -53,14 +57,15 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
   const attempt = useRef<{ fingerprint: string; key: string } | null>(null)
   const method = store.deliveryMethods.find(method => method.id === deliveryId && method.enabled)
   const calculated = totals(cart.lines, method)
-  const amounts = order ? { subtotal: order.subtotalMinor, shipping: order.shippingMinor, total: order.totalMinor } : calculated
+  const discount = order ? order.discountMinor ?? 0 : welcomeDiscount(calculated.subtotal, !!config?.account?.welcomeAvailable)
+  const amounts = order ? { subtotal: order.subtotalMinor, shipping: order.shippingMinor, total: order.totalMinor } : { ...calculated, total: calculated.total === null ? null : calculated.total - discount }
 
   useEffect(() => {
-    if (cart.items.length > 0 && order) {
+    if (cart.items.length > 0 && order && !selectedOrderId) {
       setDismissedOrderId(order.id)
       setOrder(null)
     }
-  }, [cart.items.length, order])
+  }, [cart.items.length, order, selectedOrderId])
 
   useEffect(() => {
     if (!open) return
@@ -69,7 +74,10 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
     setServerError('')
     void checkoutConfig().then(async settings => {
       if (alive) setConfig(settings)
-      if (!cart.items.length) {
+      if (selectedOrderId) {
+        const selected = await fetchOrder(selectedOrderId)
+        if (alive) setOrder(selected)
+      } else if (!cart.items.length) {
         const result = await currentOrder()
         if (alive) {
           const activeOrder = result.order && result.order.id !== getDismissedOrderId() ? result.order : null
@@ -78,7 +86,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
       }
     }).catch(error => { if (alive) setServerError(errorMessage(error)) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [open, cart.items.length])
+  }, [open, cart.items.length, selectedOrderId])
 
   useEffect(() => {
     if (!open || !order || order.status === 'ready') return
@@ -126,6 +134,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
     setServerError('')
     try {
       const created = await createOrder(cart.items, deliveryId, customer, privacy, attempt.current.key)
+      onOrderCreated()
       setDismissedOrderId(null)
       flushSync(() => { setOrder(created); cart.clear(); setPreparing(false) })
       scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
@@ -151,6 +160,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
             <div className="cart-lines">{cart.lines.map(line => <article key={line.key} className="cart-line"><ProductImage src={line.image} alt={line.imageAlt} sizes="83px" /><div className="cart-line-details"><div className="cart-line-heading"><h3>{line.name}</h3><button className="icon-button remove-button" disabled={preparing} onClick={() => cart.remove(line.key)} aria-label={`Eliminar ${line.name}, ${line.options.join(', ')}`}><Icon name="trash" size={16} /></button></div><p>{line.options.join(' · ')}</p><span className="unit-price">{money(line.unitPriceMinor, store)} / unidad</span><div className="cart-line-bottom"><Quantity value={line.quantity} onChange={value => { if (!preparing) cart.update(line.key, value) }} label={`Cantidad de ${line.name}, ${line.options.join(', ')}`} /><strong>{money(line.lineTotalMinor, store)}</strong></div></div></article>)}</div>
             <form ref={formRef} id="checkout-form" className="checkout-form" noValidate onSubmit={event => { void submit(event) }}>
               <fieldset disabled={preparing} className="checkout-fields">
+                {!customerAccount ? <div className="checkout-account-note"><Icon name="gift" size={19} /><div><strong>Tu primer antojo, con 10% menos.</strong><p>Crea tu cuenta para recibir el descuento en productos y guardar tus pedidos. También puedes continuar como invitado.</p><button type="button" className="text-button" onClick={onRegister}>Crear mi cuenta <Icon name="arrow" size={14} /></button></div></div> : config?.account?.welcomeAvailable && <div className="checkout-account-note"><Icon name="gift" size={19} /><div><strong>Tu 10% de bienvenida está aplicado.</strong><p>Solo en los productos de este primer pedido. No necesitas un código.</p></div></div>}
                 <div className="form-heading"><span className="step-marker">01</span><h3>¿Cómo lo quieres recibir?</h3></div>
                 <fieldset className="delivery-fieldset"><legend className="sr-only">Método de entrega</legend><div className="delivery-options">{store.deliveryMethods.filter(method => method.enabled).map(option => <label className="delivery-option" key={option.id}><input type="radio" name="delivery" value={option.id} checked={deliveryId === option.id} onChange={() => { setDeliveryId(option.id); try { window.localStorage.setItem(DELIVERY_PREF_KEY, option.id) } catch {}; setErrors(current => ({ ...current, deliveryId: undefined, address: undefined })) }} aria-invalid={!!errors.deliveryId} /><Icon name={option.requiresAddress ? 'truck' : 'pin'} size={23} /><strong>{option.name}</strong><small>{option.description}</small></label>)}</div>{errors.deliveryId && <p className="field-error">{errors.deliveryId}</p>}{method?.conditions && <p className="delivery-note">{method.conditions}{method.pickupPoint ? ` Punto: ${method.pickupPoint}.` : ''}</p>}</fieldset>
                 <div className="form-heading"><span className="step-marker">02</span><h3>Tus datos y tu forma de pago.</h3></div>
@@ -166,7 +176,7 @@ export function CartDrawer({ open, onClose, cart }: { open: boolean; onClose: ()
             </form>
           </>}
         </div>
-        {!order && <footer className="cart-footer"><dl className="order-totals"><div><dt>Subtotal</dt><dd>{money(amounts.subtotal, store)}</dd></div><div><dt>Entrega</dt><dd>{method?.name ?? 'Por elegir'}</dd></div><div><dt>Costo de entrega</dt><dd>{amounts.shipping === null ? 'Envío por confirmar' : money(amounts.shipping, store)}</dd></div>{amounts.total !== null && <div className="total-row"><dt>Total</dt><dd>{money(amounts.total, store)}</dd></div>}</dl>
+        {!order && <footer className="cart-footer"><dl className="order-totals"><div><dt>Subtotal</dt><dd>{money(amounts.subtotal, store)}</dd></div>{discount > 0 && <div className="welcome-discount-row"><dt>Bienvenida · 10%</dt><dd>−{money(discount, store)}</dd></div>}<div><dt>Entrega</dt><dd>{method?.name ?? 'Por elegir'}</dd></div><div><dt>Costo de entrega</dt><dd>{amounts.shipping === null ? 'Envío por confirmar' : money(amounts.shipping, store)}</dd></div>{amounts.total !== null && <div className="total-row"><dt>Total</dt><dd>{money(amounts.total, store)}</dd></div>}</dl>
           {amounts.total === null && <p className="shipping-pending">No pagues todavía: falta confirmar el costo de envío.</p>}
           {errors.cart && <p className="field-error" role="alert">{errors.cart}</p>}
           <button form="checkout-form" type="submit" className="button button-primary checkout-button" disabled={preparing || loading || !config}><Icon name="bank" size={21} />{preparing ? 'Registrando tu pedido…' : 'Crear pedido con SINPE'}<Icon name="arrow" size={17} /></button>

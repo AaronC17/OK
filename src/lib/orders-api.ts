@@ -1,5 +1,6 @@
 import type { CartItem } from '../types.ts'
 import type { AdminAuth, AdminOrders, CheckoutConfig, OrderAudit, OrderCustomer, ShopOrder, SinpeSettings } from '../order-types.ts'
+import type { AdminCustomers, CustomerAuth, CustomerOrders, Registration } from '../account-types.ts'
 
 export class ApiError extends Error {
   status: number
@@ -30,6 +31,19 @@ export function checkoutConfig(): Promise<CheckoutConfig> {
   checkoutRequest ??= request<CheckoutConfig>('/api/checkout').then(config => { customerCsrf = config.csrfToken; return config }).finally(() => { checkoutRequest = null })
   return checkoutRequest
 }
+export const customerSession = async (): Promise<CustomerAuth> => {
+  const config = await checkoutConfig()
+  return { user: config.account ?? null, csrfToken: config.csrfToken }
+}
+async function rememberCustomer(promise: Promise<CustomerAuth>) {
+  const auth = await promise
+  customerCsrf = auth.csrfToken
+  return auth
+}
+export const registerCustomer = (data: Registration) => rememberCustomer(request<CustomerAuth>('/api/account/register', 'POST', data))
+export const loginCustomer = (email: string, password: string) => rememberCustomer(request<CustomerAuth>('/api/account/login', 'POST', { email, password }))
+export const logoutCustomer = () => rememberCustomer(request<CustomerAuth>('/api/account/logout', 'POST', {}))
+export const customerOrders = (page = 1) => request<CustomerOrders>(`/api/account/orders?page=${page}`)
 export const currentOrder = () => request<{ order: ShopOrder | null }>('/api/orders/current')
 export const fetchOrder = (id: string) => request<ShopOrder>(`/api/orders/${encodeURIComponent(id)}`)
 
@@ -70,6 +84,7 @@ export async function adminLogout() { await request('/api/admin/logout', 'POST',
 export const adminSettings = () => request<SinpeSettings>('/api/admin/settings', 'GET', undefined, 'admin')
 export const saveSettings = (settings: SinpeSettings) => request<SinpeSettings>('/api/admin/settings', 'PUT', settings, 'admin')
 export const adminOrders = (query: URLSearchParams) => request<AdminOrders>(`/api/admin/orders?${query}`, 'GET', undefined, 'admin')
+export const adminCustomers = (query: URLSearchParams) => request<AdminCustomers>(`/api/admin/customers?${query}`, 'GET', undefined, 'admin')
 export const adminOrder = (id: string) => request<{ order: ShopOrder; audit: OrderAudit[] }>(`/api/admin/orders/${id}`, 'GET', undefined, 'admin')
 export const reviewOrder = (id: string, action: 'confirm' | 'reject', value: unknown) => request<ShopOrder>(`/api/admin/orders/${id}/${action}`, 'POST', value, 'admin')
 

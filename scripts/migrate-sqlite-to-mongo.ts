@@ -39,12 +39,21 @@ export async function migrateSqliteToMongo() {
     }
     console.log(`✓ admin: ${adminRows.length} registros migrados`)
 
+    // Customer accounts are optional in databases created before registration existed.
+    if (sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'customers'").get()) {
+      const customers = sqlite.prepare('SELECT * FROM customers').all() as Record<string, any>[]
+      for (const customer of customers) {
+        await db.collection('customers').updateOne({ id: customer.id }, { $set: { ...customer, _id: customer.id } }, { upsert: true })
+      }
+      console.log(`✓ customers: ${customers.length} cuentas migradas`)
+    }
+
     // 3. Sessions
-    const sessionRows = sqlite.prepare('SELECT token_hash, role, csrf, expires_at FROM sessions').all() as { token_hash: string; role: string; csrf: string; expires_at: number }[]
+    const sessionRows = sqlite.prepare('SELECT * FROM sessions').all() as { token_hash: string; role: string; csrf: string; expires_at: number; account_id?: string | null }[]
     for (const row of sessionRows) {
       await db.collection('sessions').updateOne(
         { token_hash: row.token_hash },
-        { $set: { _id: row.token_hash, token_hash: row.token_hash, role: row.role, csrf: row.csrf, expires_at: row.expires_at } },
+        { $set: { _id: row.token_hash, token_hash: row.token_hash, role: row.role, csrf: row.csrf, expires_at: row.expires_at, account_id: row.account_id ?? null } },
         { upsert: true }
       )
     }
@@ -75,6 +84,8 @@ export async function migrateSqliteToMongo() {
             subtotal_minor: row.subtotal_minor,
             shipping_minor: row.shipping_minor,
             total_minor: row.total_minor,
+            account_id: row.account_id ?? null,
+            discount_minor: row.discount_minor ?? 0,
             current_receipt_id: row.current_receipt_id,
             customer_message: row.customer_message,
             payment_confirmed_at: row.payment_confirmed_at,

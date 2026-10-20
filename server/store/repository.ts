@@ -1,6 +1,7 @@
 import type { AdminOrders, OrderAudit, ShopOrder, SinpeSettings } from '../../src/order-types.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import type { Session } from './security.ts'
+import type { AdminCustomers, CustomerAccount, CustomerOrders } from '../../src/account-types.ts'
 
 export type MaybePromise<T> = T | Promise<T>
 export interface CustomerSession { session: Session; token: string | null }
@@ -17,6 +18,11 @@ export interface ShopRepository {
   session(token: string | undefined, role: Session['role']): MaybePromise<Session | null>
   customerSession(token: string | undefined): MaybePromise<CustomerSession>
   logout(session: Session): MaybePromise<void>
+  account(session: Session): MaybePromise<CustomerAccount | null>
+  registerCustomer(value: unknown, previous: Session): MaybePromise<{ token: string; session: Session }>
+  loginCustomer(value: unknown, previous: Session): MaybePromise<{ token: string; session: Session }>
+  accountOrders(session: Session, query: URLSearchParams): MaybePromise<CustomerOrders>
+  customers(query: URLSearchParams): MaybePromise<AdminCustomers>
   settings(): MaybePromise<SinpeSettings>
   destination(): MaybePromise<ShopOrder['destination']>
   configure(value: unknown, actor: string): MaybePromise<SinpeSettings>

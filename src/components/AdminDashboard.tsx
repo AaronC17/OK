@@ -7,6 +7,8 @@ import { money } from '../lib/shop.ts'
 import { Icon } from './Icon.tsx'
 import { Modal } from './ui.tsx'
 import { OrderLines } from './OrderPanel.tsx'
+import { AdminCustomers } from './AdminCustomers.tsx'
+import type { AdminCustomer } from '../account-types.ts'
 import '../orders.css'
 
 type OrderDetail = { order: ShopOrder; audit: OrderAudit[] }
@@ -155,6 +157,7 @@ function AdminOrderDialog({ detail, onClose, onChanged }: { detail: OrderDetail;
         <OrderLines order={order} />
         <dl className="order-totals">
           <div><dt>Subtotal</dt><dd>{money(order.subtotalMinor, store)}</dd></div>
+          {!!order.discountMinor && <div className="admin-discount-row"><dt>Bienvenida · 10%</dt><dd>−{money(order.discountMinor, store)}</dd></div>}
           <div><dt>Envío</dt><dd>{order.shippingMinor === null ? 'Por cotizar' : money(order.shippingMinor, store)}</dd></div>
           <div className="total-row"><dt>Total</dt><dd>{order.totalMinor === null ? 'Por confirmar' : money(order.totalMinor, store)}</dd></div>
         </dl>
@@ -180,7 +183,8 @@ function AdminOrderDialog({ detail, onClose, onChanged }: { detail: OrderDetail;
 }
 
 function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void }) {
-  const [tab, setTab] = useState<'orders' | 'settings'>('orders')
+  const [tab, setTab] = useState<'orders' | 'customers' | 'settings'>('orders')
+  const [selectedCustomer, setSelectedCustomer] = useState<AdminCustomer | null>(null)
   const [settings, setSettings] = useState<SinpeSettings | null>(null)
   const [data, setData] = useState<AdminOrders | null>(null)
   const [filter, setFilter] = useState<'all' | 'pending' | 'ready'>('all')
@@ -200,7 +204,7 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
     const load = async (quiet = false) => {
       if (!quiet) setLoading(true)
       try {
-        const result = await adminOrders(new URLSearchParams({ status: filter, q: search, page: String(page) }))
+        const result = await adminOrders(new URLSearchParams({ status: filter, q: search, page: String(page), ...(selectedCustomer ? { customerId: selectedCustomer.id } : {}) }))
         if (alive) { setData(result); setError('') }
       } catch (error) {
         if (alive) { if (error instanceof ApiError && error.status === 401) onExit(); else setError(errorMessage(error)) }
@@ -209,7 +213,7 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
     void load()
     const timer = window.setInterval(() => { if (!document.hidden) void load(true) }, 10_000)
     return () => { alive = false; window.clearInterval(timer) }
-  }, [filter, search, page, revision])
+  }, [filter, search, page, revision, selectedCustomer?.id])
 
   const openOrder = async (id: string) => {
     const sequence = ++openSequence.current
@@ -271,6 +275,7 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
         >
           Pedidos
         </button>
+        <button type="button" className={tab === 'customers' ? 'is-active' : ''} onClick={() => setTab('customers')} aria-current={tab === 'customers' ? 'page' : undefined}>Clientes</button>
         <button
           type="button"
           className={tab === 'settings' ? 'is-active' : ''}
@@ -297,10 +302,11 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
       {error && <p className="admin-banner is-error" role="alert">{error}</p>}
       {message && <p className="admin-banner is-success" role="status">{message}</p>}
 
-      {tab === 'settings' ? (
+      {tab === 'customers' ? <AdminCustomers onExit={onExit} onOrders={customer => { setSelectedCustomer(customer); setFilter('all'); setSearch(''); setPage(1); setTab('orders') }} /> : tab === 'settings' ? (
         settings ? <SettingsPanel initial={settings} onSaved={setSettings} /> : <p className="admin-loading" role="status">Cargando configuración…</p>
       ) : (
         <>
+          {selectedCustomer && <div className="admin-banner admin-customer-filter"><Icon name="user" size={16} /><p>Pedidos de <strong>{selectedCustomer.name}</strong></p><button className="text-button" onClick={() => { setSelectedCustomer(null); setPage(1) }}>Ver todos <Icon name="close" size={14} /></button></div>}
           {settings && !settings.enabled && (
             <div className="admin-banner">
               <Icon name="info" size={16} />

@@ -254,6 +254,7 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
       <OrderLines order={order} />
       <dl className="order-totals gateway-summary-totals">
         <div><dt>Subtotal</dt><dd>{money(order.subtotalMinor, store)}</dd></div>
+        {!!order.discountMinor && <div className="welcome-discount-row"><dt>Bienvenida · 10%</dt><dd>−{money(order.discountMinor, store)}</dd></div>}
         <div><dt>Envío ({order.delivery.name})</dt><dd>{order.shippingMinor === null ? 'Por confirmar' : money(order.shippingMinor, store)}</dd></div>
         {order.totalMinor !== null && <div className="total-row"><dt>Total</dt><dd>{money(order.totalMinor, store)}</dd></div>}
       </dl>

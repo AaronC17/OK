@@ -1034,6 +1034,40 @@
 .admin-access-card form .button { width: 100%; margin-top: 16px; min-height: 42px; justify-content: space-between; }
 .admin-access-card .small-note { display: block; font-size: 10px; overflow-wrap: anywhere; }
 
+/* Registered customer directory. Only the authenticated admin can access its API. */
+.admin-customers-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 10px 0 24px; }
+.admin-customers-heading h1 { font-size: 25px; letter-spacing: -.8px; font-weight: 650; }
+.admin-customers-heading p { color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 6px; }
+.admin-customer-count { color: var(--muted); font-size: 12px; }
+.admin-customer-list { display: grid; gap: 10px; }
+.admin-customer-card { display: grid; grid-template-columns: minmax(0, 1fr) 150px 130px; align-items: center; gap: 24px; padding: 22px; background: #fffefd; border: 1px solid var(--line); border-radius: 12px; }
+.admin-customer-identity { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.admin-customer-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; background: #f0e9f4; color: var(--purple); font-size: 18px; font-weight: 550; }
+.admin-customer-identity > div { min-width: 0; }
+.admin-customer-identity h2 { font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.admin-customer-identity a { display: block; color: #735e80; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; margin-top: 3px; }
+.admin-customer-identity small { display: block; color: var(--muted); font-size: 10px; line-height: 1.7; margin-top: 2px; }
+.admin-customer-benefit { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.admin-customer-benefit > span { color: var(--muted); font-size: 10px; }
+.admin-customer-benefit > strong { font-size: 10px; font-weight: 550; color: #716377; background: #f2edf5; border-radius: 20px; padding: 4px 10px; }
+.admin-customer-benefit > strong.is-available { background: #eef4ef; color: #3e674b; }
+.admin-customer-orders { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; color: var(--purple); background: #f6f1f8; border: 1px solid #eae2ef; border-radius: 7px; padding: 10px 13px; font-size: 11px; }
+.admin-customer-orders:hover { background: #ece3f2; }
+.admin-customer-orders strong { font-weight: 700; }
+.admin-customer-filter { margin-bottom: 17px; }
+.admin-customer-filter .text-button { margin-left: auto; white-space: nowrap; }
+.admin-discount-row { color: #65447a; }
+@media (max-width: 600px) {
+  .admin-customer-card { grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px; }
+  .admin-customer-identity { grid-column: 1 / -1; }
+  .admin-customer-orders { justify-self: end; }
+  .admin-customers-heading { margin: 8px 0 18px; }
+  .admin-customers-heading h1 { font-size: 23px; }
+  .admin-customers-heading p { font-size: 11px; }
+  .admin-customer-filter { flex-wrap: wrap; }
+  .admin-nav-pills > button { padding-inline: 9px; }
+}
+
 /* Order Detail Modal */
 .admin-order-dialog {
   width: min(520px, calc(100% - 24px));

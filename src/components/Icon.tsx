@@ -2,7 +2,7 @@ import {
   ArrowRight, ArrowUpRight, ShoppingBag, Plus, Minus, X, Check, Truck, MapPin,
   Copy, ZoomIn, Heart, SlidersHorizontal, Info, Trash2, ChevronDown, Flame,
   Candy, CakeSlice, Package, Pause, Play, Blend, Cookie, Layers3,
-  Landmark, Upload, ShieldCheck, Clock3, ReceiptText, Download, RefreshCw, Search, LogOut, Settings2, LockKeyhole,
+  Landmark, Upload, ShieldCheck, Clock3, ReceiptText, Download, RefreshCw, Search, LogOut, Settings2, LockKeyhole, UserRound, Eye, EyeOff, Gift, Mail,
 } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
@@ -15,6 +15,7 @@ const icons = {
   cookie: Cookie, layers: Layers3, bank: Landmark, upload: Upload, shield: ShieldCheck,
   clock: Clock3, receipt: ReceiptText, download: Download, refresh: RefreshCw, search: Search,
   logout: LogOut, settings: Settings2, lock: LockKeyhole,
+  user: UserRound, eye: Eye, 'eye-off': EyeOff, gift: Gift, mail: Mail,
 }
 
 export type IconName = keyof typeof icons | 'bear'

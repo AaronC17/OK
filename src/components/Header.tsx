@@ -6,7 +6,7 @@ import { SectionLink } from './SectionLink.tsx'
 
 const freeShippingThreshold = money(store.deliveryMethods.find(method => method.id === 'delivery')!.freeAboveMinor!, store).replace(/\s/g, '.')
 
-export function Header({ count, onCart }: { count: number; onCart: () => void }) {
+export function Header({ count, onCart, signedIn = false, onAccount }: { count: number; onCart: () => void; signedIn?: boolean; onAccount: () => void }) {
   const [scrolled, setScrolled] = useState(false)
   const sentinel = useRef<HTMLSpanElement>(null)
 
@@ -24,7 +24,12 @@ export function Header({ count, onCart }: { count: number; onCart: () => void })
     <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="container header-inner">
         <SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink>
-        <button className="cart-toggle" onClick={onCart} aria-label={`Abrir carrito, ${count} artículos`}><Icon name="bag" size={20} /><span className="cart-label">Carrito</span><span className="cart-count" key={count}>{count}</span></button>
+        <div className="header-actions">
+          {/* Safari does not focus tapped buttons; the dialog needs a return-focus target. */}
+          <button className={`account-toggle ${signedIn ? 'is-signed-in' : ''}`} onClick={event => { event.currentTarget.focus({ preventScroll: true }); onAccount() }} aria-label={signedIn ? 'Abrir mi cuenta' : 'Iniciar sesión'}><Icon name="user" size={19} /><span>{signedIn ? 'Mi cuenta' : 'Iniciar sesión'}</span>{signedIn && <i aria-hidden="true" />}</button>
+          <span className="header-actions-divider" aria-hidden="true" />
+          <button className="cart-toggle" onClick={onCart} aria-label={`Abrir carrito, ${count} artículos`}><Icon name="bag" size={20} /><span className="cart-label">Carrito</span><span className="cart-count" key={count}>{count}</span></button>
+        </div>
       </div>
     </header>
   </>

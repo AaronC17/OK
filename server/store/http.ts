@@ -2,7 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { unlinkSync } from 'node:fs'
 import type { ShopRepository } from './repository.ts'
 import type { Session } from './security.ts'
-import { RateLimits, requireCsrf } from './security.ts'
+import { RateLimits, requireCsrf, tokenHash } from './security.ts'
+import { orderOwner } from './accounts.ts'
 import { MAX_RECEIPT_BYTES, prepareReceipt } from './receipts.ts'
 import { StoreError, record } from './validation.ts'
 import { PaymentsError } from '../payments/model.ts'
@@ -83,12 +84,37 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         csrfToken: session?.csrf ?? null
       })
 
-      if (path === '/api/checkout' && method === 'GET') {
+      if ((path === '/api/checkout' || path === '/api/account/session') && method === 'GET') {
         const token = cookie(request, CUSTOMER_COOKIE)
         if (!await store.session(token, 'customer')) limits.check(`session:${ip}`, 120, 3600_000)
         const customer = await store.customerSession(token)
         if (customer.token) setCookie(response, CUSTOMER_COOKIE, customer.token, 7 * 86400, secureCookies)
-        json(response, 200, { csrfToken: customer.session.csrf, sinpe: await store.destination(), demo: store.isDemo(), maxReceiptBytes: MAX_RECEIPT_BYTES })
+        const account = await store.account(customer.session)
+        json(response, 200, path === '/api/account/session'
+          ? { csrfToken: customer.session.csrf, user: account }
+          : { csrfToken: customer.session.csrf, account, sinpe: await store.destination(), demo: store.isDemo(), maxReceiptBytes: MAX_RECEIPT_BYTES })
+        return
+      }
+      if ((path === '/api/account/register' || path === '/api/account/login') && method === 'POST') {
+        const previous = await requireSession('customer', true)
+        const register = path.endsWith('/register')
+        limits.check(`account-${register ? 'register' : 'login'}:${ip}`, register ? 8 : 20, register ? 3600_000 : 15 * 60_000)
+        const data = await jsonBody(request)
+        if (!register && typeof data.email === 'string') limits.check(`account-email:${tokenHash(data.email.trim().toLowerCase().slice(0, 254))}`, 10, 15 * 60_000)
+        const result = await (register ? store.registerCustomer(data, previous) : store.loginCustomer(data, previous))
+        setCookie(response, CUSTOMER_COOKIE, result.token, 7 * 86400, secureCookies)
+        json(response, 200, { user: await store.account(result.session), csrfToken: result.session.csrf })
+        return
+      }
+      if (path === '/api/account/logout' && method === 'POST') {
+        await store.logout(await requireSession('customer', true))
+        const guest = await store.customerSession(undefined)
+        setCookie(response, CUSTOMER_COOKIE, guest.token!, 7 * 86400, secureCookies)
+        json(response, 200, { user: null, csrfToken: guest.session.csrf })
+        return
+      }
+      if (path === '/api/account/orders' && method === 'GET') {
+        json(response, 200, await store.accountOrders(await requireSession('customer'), url.searchParams))
         return
       }
       if (path === '/api/admin/session' && method === 'GET') {
@@ -119,7 +145,7 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         if (method === 'PUT') { json(response, 200, await store.configure(await jsonBody(request), (await store.adminName())!)); return }
       }
       if (path === '/api/orders/current' && method === 'GET') {
-        json(response, 200, { order: await store.currentOrder((await requireSession('customer')).hash) })
+        json(response, 200, { order: await store.currentOrder(orderOwner(await requireSession('customer'))) })
         return
       }
       if (path === '/api/orders' && method === 'POST') {
@@ -127,13 +153,13 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         limits.check(`order:${session.hash}`, 20, 15 * 60_000)
         const key = request.headers['idempotency-key']
         if (typeof key !== 'string') throw new StoreError(422, 'Falta Idempotency-Key.')
-        const created = await store.createOrder(await jsonBody(request), session.hash, key)
+        const created = await store.createOrder(await jsonBody(request), orderOwner(session), key)
         json(response, 200, created)
         return
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path)
       if (orderPath && method === 'GET') {
-        json(response, 200, await store.customerOrder(orderPath[1], (await requireSession('customer')).hash))
+        json(response, 200, await store.customerOrder(orderPath[1], orderOwner(await requireSession('customer'))))
         return
       }
       const uploadPath = new RegExp(`^/api/orders/(${ID})/receipt$`).exec(path)
@@ -150,14 +176,14 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         const entries = [...form.entries()]
         const keys = entries.map(([key]) => key)
         if (new Set(keys).size !== entries.length || keys.some(key => !['code', 'bankReference', 'uploadKey', 'version', 'receipt'].includes(key)) || !['uploadKey', 'version', 'receipt'].every(req => keys.includes(req))) throw new StoreError(422, 'El formulario contiene campos ausentes, repetidos o no permitidos.')
-        await store.checkUpload(uploadPath[1], session.hash, form.get('code'))
+        await store.checkUpload(uploadPath[1], orderOwner(session), form.get('code'))
         const file = form.get('receipt')
         if (!(file instanceof Blob)) throw new StoreError(422, 'Selecciona un comprobante.')
         if (file.size > MAX_RECEIPT_BYTES) throw new StoreError(413, 'El comprobante no puede superar 5 MB.')
         const version = form.get('version')
         if (typeof version !== 'string' || !/^[1-9]\d{0,8}$/.test(version)) throw new StoreError(422, 'Versión del pedido inválida.')
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type)
-        const received = await store.addReceipt(uploadPath[1], session.hash, form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared)
+        const received = await store.addReceipt(uploadPath[1], orderOwner(session), form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared)
         await options.mailer?.notify('receipt.submitted', received)
         json(response, 200, received)
         return
@@ -165,7 +191,7 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
       const receiptPath = new RegExp(`^/api/(admin/)?orders/(${ID})/receipts/(${ID})$`).exec(path)
       if (receiptPath && method === 'GET') {
         if (receiptPath[1]) await requireSession('admin')
-        else await store.customerOrder(receiptPath[2], (await requireSession('customer')).hash)
+        else await store.customerOrder(receiptPath[2], orderOwner(await requireSession('customer')))
         const receipt = await store.receipt(receiptPath[2], receiptPath[3])
         const order = await store.getOrder(receiptPath[2])
         const pdf = receipt.contentType === 'application/pdf'
@@ -175,6 +201,11 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
           'Content-Security-Policy': "sandbox; default-src 'none'; frame-ancestors 'none'",
         })
         response.end(receipt.data)
+        return
+      }
+      if (path === '/api/admin/customers' && method === 'GET') {
+        await requireSession('admin')
+        json(response, 200, await store.customers(url.searchParams))
         return
       }
       if (path === '/api/admin/orders' && method === 'GET') {

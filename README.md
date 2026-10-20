@@ -20,6 +20,12 @@ npm.cmd run dev
 
 Administración: **http://localhost:5173/admin**. El backend arranca junto con la tienda. En el primer inicio, leer el código privado de instalación con `Get-Content '.data/store/admin-setup-token.txt'` y crear tu propio usuario/contraseña. Luego configurar número SINPE y beneficiario desde el panel. **No existe una contraseña predeterminada y no se asumió ningún número receptor.** Guía: **[`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md)**.
 
+### Cuentas de clientes y bienvenida
+
+El botón de usuario del encabezado permite crear una cuenta, iniciar sesión y consultar **Mis pedidos**, también desde otros dispositivos. La franja bajo la portada invita a los visitantes a registrarse con un **10% de bienvenida**; al iniciar sesión recupera las frases y ositos originales. Se puede seguir comprando como invitado.
+
+El descuento se calcula en el backend **una sola vez por cuenta, en los productos del primer pedido creado**; no incluye envío ni modifica pedidos anteriores. Se ve desglosado en carrito, pedido, administración y correos. El panel `/admin` → **Clientes** permite buscar cuentas y consultar sus pedidos. SQLite y MongoDB comparten el mismo comportamiento. Reglas, seguridad y pendientes comerciales: **[`docs/cuentas-clientes.md`](docs/cuentas-clientes.md)**.
+
 ### Producción
 
 ```sh

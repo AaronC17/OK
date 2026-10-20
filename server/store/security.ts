@@ -18,24 +18,24 @@ export function passwordMatches(value: unknown, stored: string): boolean {
   return hash.length === 128 && timingSafeEqual(actual, Buffer.from(hash, 'hex'))
 }
 
-export interface Session { hash: string; role: 'admin' | 'customer'; csrf: string; expiresAt: number }
+export interface Session { hash: string; role: 'admin' | 'customer'; csrf: string; expiresAt: number; accountId?: string | null }
 
-export function generateSession(role: Session['role'], now = Date.now()) {
+export function generateSession(role: Session['role'], now = Date.now(), accountId: string | null = null) {
   const token = newToken()
-  const session: Session = { hash: tokenHash(token), role, csrf: newToken(), expiresAt: now + (role === 'admin' ? 8 * 3600_000 : 7 * 86400_000) }
+  const session: Session = { hash: tokenHash(token), role, csrf: newToken(), expiresAt: now + (role === 'admin' ? 8 * 3600_000 : 7 * 86400_000), accountId }
   return { token, session }
 }
 
-export function createSession(db: DatabaseSync, role: Session['role'], now = Date.now()) {
-  const { token, session } = generateSession(role, now)
-  db.prepare('INSERT INTO sessions (token_hash, role, csrf, expires_at) VALUES (?, ?, ?, ?)').run(session.hash, role, session.csrf, session.expiresAt)
+export function createSession(db: DatabaseSync, role: Session['role'], now = Date.now(), accountId: string | null = null) {
+  const { token, session } = generateSession(role, now, accountId)
+  db.prepare('INSERT INTO sessions (token_hash, role, csrf, expires_at, account_id) VALUES (?, ?, ?, ?, ?)').run(session.hash, role, session.csrf, session.expiresAt, accountId)
   return { token, session }
 }
 
 export function findSession(db: DatabaseSync, token: string | undefined, role: Session['role'], now = Date.now()): Session | null {
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null
   const row = db.prepare('SELECT * FROM sessions WHERE token_hash = ? AND role = ? AND expires_at > ?').get(tokenHash(token), role, now)
-  return row ? { hash: row.token_hash as string, role, csrf: row.csrf as string, expiresAt: row.expires_at as number } : null
+  return row ? { hash: row.token_hash as string, role, csrf: row.csrf as string, expiresAt: row.expires_at as number, accountId: row.account_id as string | null } : null
 }
 
 export function requireCsrf(session: Session, supplied: string | undefined) {

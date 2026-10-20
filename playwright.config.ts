@@ -40,6 +40,6 @@ export default defineConfig({
     command: 'node --experimental-strip-types scripts/testing/store-preview.ts',
     url: baseURL,
     reuseExistingServer: false,
-    env: { NODE_ENV: 'test', STORE_DATA_DIR: process.env.ONKYS_E2E_DIR, STORE_PUBLIC_ORIGIN: baseURL, STORE_SECURE_COOKIES: 'false' },
+    env: { NODE_ENV: 'test', STORE_DATA_DIR: process.env.ONKYS_E2E_DIR, STORE_PUBLIC_ORIGIN: baseURL, STORE_SECURE_COOKIES: 'false', MONGODB_URI: '', SMTP_HOST: '', SMTP_USER: '', SMTP_PASS: '' },
   },
 })

@@ -1,5 +1,15 @@
 import { test, expect } from '@playwright/test'
 
+// These visual tests cover the original strip shown to signed-in customers.
+// Real registration and session behavior are exercised in accounts.spec.ts.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/checkout', async route => {
+    const response = await route.fetch()
+    const config = await response.json()
+    await route.fulfill({ response, json: { ...config, account: { id: 'visual-test-member', name: 'Cliente visual', email: 'visual@ejemplo.cr', createdAt: '2026-01-01T00:00:00Z', welcomeAvailable: true } } })
+  })
+})
+
 test('brand strip sits below the hero and scrolls seamlessly without overflowing', async ({ page }, testInfo) => {
   await page.goto('/')
   const strip = page.locator('.brand-marquee')

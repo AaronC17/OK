@@ -1,3 +1,5 @@
+import type { CustomerAccount } from './account-types.ts'
+
 export type ShopOrderStatus = 'pending_details' | 'awaiting_payment' | 'pending_review' | 'ready' | 'rejected'
 
 export interface SinpeDestination { phone: string; beneficiary: string; bank: 'BAC Credomatic' }
@@ -28,6 +30,8 @@ export interface ShopOrder {
   updatedAt: string
   lines: OrderLine[]
   subtotalMinor: number
+  discountMinor?: number
+  customerAccountId?: string | null
   shippingMinor: number | null
   totalMinor: number | null
   delivery: { id: string; name: string; requiresAddress: boolean }
@@ -40,6 +44,7 @@ export interface ShopOrder {
 }
 export interface CheckoutConfig {
   csrfToken: string
+  account?: CustomerAccount | null
   sinpe: SinpeDestination | null
   demo: boolean
   maxReceiptBytes: number
