@@ -44,7 +44,7 @@ export function FreeShippingBar({ subtotal, initialSubtotal, className = '', com
         <div className="shipping-text">
           {status.isFree ? (
             <span>
-              <strong>¡Felicidades!</strong> Tienes <strong>Envío Gratis</strong> a todo Costa Rica
+              <strong>¡Felicidades!</strong> Tienes <strong>Envío Gratis</strong>
             </span>
           ) : (
             <span>
