@@ -116,6 +116,21 @@ var store = {
       ]
     }
   ],
+  products: [
+    {
+      id: "uvarindas",
+      name: "Uvarindas",
+      tag: "Uvas con tamarindo",
+      description: "Uvas frescas cubiertas con pulpa de tamarindo, chamoy de la casa y chilito en polvo.",
+      image: "/images/uvarindas.webp",
+      imageAlt: "Domo de Uvarindas Onky\u2019s: uvas cubiertas con tamarindo y chamoy",
+      available: true,
+      priceMinor: 2e5,
+      unitLabel: "Domo individual",
+      ingredients: "Uvas frescas, pulpa de tamarindo, chamoy artesanal, Taj\xEDn y chilito",
+      allergenInfo: null
+    }
+  ],
   deliveryMethods: [
     {
       id: "delivery",
@@ -212,7 +227,13 @@ function money(amountMinor, config) {
   }).format(amountMinor / 10 ** fractionDigits);
 }
 function selectionKey(selection2) {
-  return selection2.kind === "gummy" ? `gummy:${[...new Set(selection2.typeIds)].sort().join("+")}:${selection2.weight}` : `dessert:${selection2.productId}:${selection2.variantId}`;
+  if (selection2.kind === "gummy") {
+    return `gummy:${[...new Set(selection2.typeIds)].sort().join("+")}:${selection2.weight}`;
+  }
+  if (selection2.kind === "product") {
+    return `product:${selection2.productId}`;
+  }
+  return `dessert:${selection2.productId}:${selection2.variantId}`;
 }
 function validPrice(value) {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -241,6 +262,21 @@ function resolveLine(item, config) {
       imageAlt: mix?.image ? config.heroImageAlt : first.imageAlt,
       unitPriceMinor: price,
       lineTotalMinor: price * quantity
+    };
+  }
+  if (selection2.kind === "product") {
+    const product = config.products?.find((p) => p.id === selection2.productId);
+    if (!product?.available || !validPrice(product.priceMinor)) return null;
+    return {
+      selection: selection2,
+      quantity,
+      key,
+      name: product.name,
+      options: [product.tag, product.unitLabel ?? "Presentaci\xF3n individual"],
+      image: product.image,
+      imageAlt: product.imageAlt,
+      unitPriceMinor: product.priceMinor,
+      lineTotalMinor: product.priceMinor * quantity
     };
   }
   if (!config.categories.dessertsEnabled) return null;
@@ -317,6 +353,10 @@ function selection(value) {
   if (data.kind === "dessert") {
     fields(data, ["kind", "productId", "variantId"]);
     return { kind: "dessert", productId: text(data.productId, 64), variantId: text(data.variantId, 64) };
+  }
+  if (data.kind === "product") {
+    fields(data, ["kind", "productId"]);
+    return { kind: "product", productId: text(data.productId, 64) };
   }
   throw new PaymentsError(422, "El producto no es v\xE1lido.");
 }

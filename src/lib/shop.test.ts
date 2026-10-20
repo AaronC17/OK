@@ -150,3 +150,12 @@ test('delivery requires address, pickup does not; notes remain optional', () => 
   assert.ok(validateCheckout(lines, { ...customer, deliveryId: 'missing' }, store).deliveryId)
   assert.ok(validateCheckout([], customer, store).cart)
 })
+
+test('uvarindas product resolves with price of 2000 colones', () => {
+  const line = resolveLine({ selection: { kind: 'product', productId: 'uvarindas' }, quantity: 2 }, store)!
+  assert.equal(line.name, 'Uvarindas')
+  assert.equal(line.unitPriceMinor, 200000)
+  assert.equal(line.lineTotalMinor, 400000)
+  assert.ok(line.options.includes('Uvas con tamarindo'))
+  assert.equal(line.unitPriceMinor, 200000)
+})

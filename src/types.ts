@@ -55,6 +55,21 @@ export interface DeliveryMethod {
   pickupPoint?: string | null
 }
 
+export interface Product {
+  id: string
+  name: string
+  tag: string
+  description: string
+  image: string
+  imageAlt: string
+  imagePosition?: string
+  available: boolean
+  priceMinor: number
+  unitLabel?: string
+  ingredients?: string | null
+  allergenInfo?: string | null
+}
+
 export interface StoreConfig {
   name: string
   demo: boolean
@@ -80,12 +95,14 @@ export interface StoreConfig {
     }
   }
   desserts: Dessert[]
+  products?: Product[]
   deliveryMethods: DeliveryMethod[]
 }
 
 export type Selection =
   | { kind: 'gummy'; typeIds: string[]; weight: Weight }
   | { kind: 'dessert'; productId: string; variantId: string }
+  | { kind: 'product'; productId: string }
 
 export interface CartItem {
   selection: Selection

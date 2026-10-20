@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { store } from '../config/store.ts'
 import { money, resolveLine } from '../lib/shop.ts'
-import type { CartItem, Dessert, Selection, Weight } from '../types.ts'
+import type { CartItem, Dessert, Product, Selection, Weight } from '../types.ts'
 import { Icon } from './Icon.tsx'
 import { Modal, ProductImage, Quantity } from './ui.tsx'
 
-export type ProductTarget = { kind: 'gummy'; typeId: string; mixed?: boolean } | { kind: 'dessert'; dessert: Dessert }
+export type ProductTarget =
+  | { kind: 'gummy'; typeId: string; mixed?: boolean }
+  | { kind: 'dessert'; dessert: Dessert }
+  | { kind: 'product'; product: Product }
 
 function GummyTypeGraphic({ id }: { id: string }) {
   if (id === 'tiritas') {
@@ -118,13 +121,19 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
     ? target.dessert.variants.find(variant => variant.available && variant.priceMinor !== null)?.id ?? '' : '')
   const [quantity, setQuantity] = useState(1)
   const isGummy = target.kind === 'gummy'
-  const type = store.gummies.types.find(type => type.id === typeIds[0]) ?? store.gummies.types[0]
+  const isProduct = target.kind === 'product'
+  const product = isProduct ? target.product : null
   const dessert = target.kind === 'dessert' ? target.dessert : null
-  const selection: Selection = isGummy ? { kind: 'gummy', typeIds, weight } : { kind: 'dessert', productId: dessert!.id, variantId }
+  const type = isGummy ? store.gummies.types.find(type => type.id === typeIds[0]) ?? store.gummies.types[0] : null
+  const selection: Selection = isGummy
+    ? { kind: 'gummy', typeIds, weight }
+    : isProduct
+      ? { kind: 'product', productId: product!.id }
+      : { kind: 'dessert', productId: dessert!.id, variantId }
   const enoughTypes = !isGummy || mode === 'single' || typeIds.length >= 2
   const line = enoughTypes ? resolveLine({ selection, quantity }, store) : null
-  const image = line?.image ?? (isGummy ? (mode === 'mixed' ? store.heroImage : type?.image) : dessert?.image) ?? '/images/placeholder.svg'
-  const imageAlt = line?.imageAlt ?? (isGummy ? type?.imageAlt : dessert?.imageAlt) ?? 'Producto por actualizar'
+  const image = line?.image ?? (isGummy ? (mode === 'mixed' ? store.heroImage : type?.image) : isProduct ? product?.image : dessert?.image) ?? '/images/placeholder.svg'
+  const imageAlt = line?.imageAlt ?? (isGummy ? type?.imageAlt : isProduct ? product?.imageAlt : dessert?.imageAlt) ?? 'Producto por actualizar'
 
   const visibleTypes = store.gummies.types
   const chooseType = (id: string) => {
@@ -142,7 +151,13 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
         </div>
       </div>
       <div className="product-options">
-        {!isGummy ? (
+        {isProduct ? (
+          <>
+            <span className="eyebrow">ANTOJO ESPECIAL · ONKY’S</span>
+            <h2 id="product-title">{product!.name}</h2>
+            <p className="muted">{product!.description}</p>
+          </>
+        ) : !isGummy ? (
           <>
             <span className="eyebrow">UN PEQUEÑO GUSTO, MUY TUYO</span>
             <h2 id="product-title">{dessert!.name}</h2>
@@ -151,7 +166,7 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
         ) : (
           <div className="dialog-compact-head">
             <h2 id="product-title">
-              {mode === 'mixed' ? 'Mix de gomitas' : `${type.name} ${type.coatingLabel}`}
+              {mode === 'mixed' ? 'Mix de gomitas' : `${type?.name} ${type?.coatingLabel}`}
             </h2>
             <span className="dialog-mode-pill">
               {mode === 'mixed'
@@ -214,6 +229,23 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
               })}
             </div>
           </fieldset>
+        </> : isProduct ? <>
+          <fieldset className="dialog-fieldset">
+            <legend>
+              <span className="legend-step">01</span>
+              <span>Presentación</span>
+            </legend>
+            <div className="size-options">
+              <label className="size-option" style={{ cursor: 'default' }}>
+                <input type="radio" name="product-variant" checked readOnly />
+                <span><strong>{product!.unitLabel ?? 'Domo individual'}</strong><small>{product!.tag}</small></span>
+                <span>{money(product!.priceMinor, store)}</span>
+              </label>
+            </div>
+          </fieldset>
+          {product!.ingredients && (
+            <p className="option-note"><Icon name="info" size={16} />Ingredientes: {product!.ingredients}.</p>
+          )}
         </> : <>
           <fieldset><legend>01 <span>Elige tu presentación</span></legend>
             <div className="size-options">{dessert!.variants.map(variant => <label key={variant.id} className={`size-option ${!variant.available || variant.priceMinor === null ? 'unavailable' : ''}`}>
@@ -226,8 +258,8 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
           {dessert!.allergenInfo && <p className="option-note">Alérgenos: {dessert!.allergenInfo}</p>}
         </>}
         <div className="configuration-bottom">
-          <div><span className="field-label">{isGummy ? 'Cantidad' : 'Cantidad de presentaciones'}</span><Quantity value={quantity} onChange={setQuantity} label={isGummy ? 'Cantidad de bolsas' : 'Cantidad de presentaciones'} /></div>
-          <div className="configuration-price" aria-live="polite" aria-atomic="true"><span className="muted">{quantity > 1 ? `Total (${quantity} bolsas)` : 'Total'}</span><strong key={line?.lineTotalMinor}>{line ? money(line.lineTotalMinor, store) : '—'}</strong></div>
+          <div><span className="field-label">{isGummy ? 'Cantidad' : isProduct ? 'Cantidad de domos' : 'Cantidad de presentaciones'}</span><Quantity value={quantity} onChange={setQuantity} label={isGummy ? 'Cantidad de bolsas' : isProduct ? 'Cantidad de domos' : 'Cantidad de presentaciones'} /></div>
+          <div className="configuration-price" aria-live="polite" aria-atomic="true"><span className="muted">{quantity > 1 ? `Total (${quantity} unidades)` : 'Total'}</span><strong key={line?.lineTotalMinor}>{line ? money(line.lineTotalMinor, store) : '—'}</strong></div>
         </div>
         {!line && <p className="field-error" role="status">{!enoughTypes ? 'Selecciona al menos 2 tipos de gomitas para tu mix.' : 'Esta combinación o presentación no está disponible todavía.'}</p>}
         <button className="button button-primary add-button" disabled={!line} onClick={() => { if (line) onAdd({ selection, quantity }) }}><Icon name="bag" size={19} /> Añadir al carrito <Icon name="arrow" size={19} /></button>

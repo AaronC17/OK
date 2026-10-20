@@ -83,6 +83,21 @@ export const store: StoreConfig = {
       ],
     },
   ],
+  products: [
+    {
+      id: 'uvarindas',
+      name: 'Uvarindas',
+      tag: 'Uvas con tamarindo',
+      description: 'Uvas frescas cubiertas con pulpa de tamarindo, chamoy de la casa y chilito en polvo.',
+      image: '/images/uvarindas.webp',
+      imageAlt: 'Domo de Uvarindas Onky’s: uvas cubiertas con tamarindo y chamoy',
+      available: true,
+      priceMinor: 200000,
+      unitLabel: 'Domo individual',
+      ingredients: 'Uvas frescas, pulpa de tamarindo, chamoy artesanal, Tajín y chilito',
+      allergenInfo: null,
+    },
+  ],
   deliveryMethods: [
     {
       id: 'delivery', name: 'Envío por Correos', description: '₡2.800 · Todo Costa Rica', enabled: true,

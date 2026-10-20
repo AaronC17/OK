@@ -44,6 +44,27 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
       {store.gummies.mixes.enabled && <div className="mix-invitation"><span className="mix-invitation-icon"><Icon name="layers" size={23} /></span><div><strong>¿Para qué elegir solo uno?</strong><p>Combina dos o tres favoritos en una misma bolsa.</p></div><button onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })}>Armar mi mix <Icon name="arrow" size={17} /></button></div>}
       {store.demo && <p className="catalog-footnote">Disponibilidad por confirmar con la tienda.</p>}
     </section>
+    {store.products && store.products.length > 0 && <section id="uvarindas" className="product-section" aria-labelledby="uvarindas-title">
+      <div className="section-heading">
+        <div><span className="eyebrow section-kicker"><span>02</span> UVARINDAS</span><h2 id="uvarindas-title">El antojo más fresco.</h2><p>Uvas cubiertas con tamarindo, chamoy de la casa y chilito.</p></div>
+        <span className="section-side-note"><Icon name="pepper" size={18} /> Antojo especial</span>
+      </div>
+      <div className="product-grid gummy-grid">
+        {store.products.map(product => <article className="product-card" key={product.id}>
+          <button className="card-photo blended-card" onClick={() => onProduct({ kind: 'product', product })} aria-label={`Pedir ${product.name}`}>
+            <ProductImage src={product.image} alt={product.imageAlt} width={800} height={800} />
+            <span className="premium-badge">Nuevo</span>
+            <span className="product-tag">{product.tag}</span>
+            <span className="photo-action"><Icon name="plus" size={20} /></span>
+          </button>
+          <div className="product-card-info">
+            <div className="product-card-title"><h3>{product.name}</h3><span className="product-number">03</span></div>
+            <p>{product.description}</p>
+            <div className="product-card-footer"><div><span className="price-from">Precio</span><strong>{money(product.priceMinor, store)}</strong></div><button className="product-action" onClick={() => onProduct({ kind: 'product', product })} aria-label={`Elegir ${product.name}`}>Pedir <span className="action-icon"><Icon name="plus" size={17} /></span></button></div>
+          </div>
+        </article>)}
+      </div>
+    </section>}
     {store.categories.dessertsEnabled && <section id="postres" className="product-section dessert-section" aria-labelledby="desserts-title">
       <div className="section-heading">
         <div><span className="eyebrow section-kicker"><span>02</span> POSTRES</span><h2 id="desserts-title">Una pausa que sabe bien.</h2></div>

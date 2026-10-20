@@ -15,9 +15,13 @@ export function money(amountMinor: number, config: StoreConfig): string {
 }
 
 export function selectionKey(selection: Selection): string {
-  return selection.kind === 'gummy'
-    ? `gummy:${[...new Set(selection.typeIds)].sort().join('+')}:${selection.weight}`
-    : `dessert:${selection.productId}:${selection.variantId}`
+  if (selection.kind === 'gummy') {
+    return `gummy:${[...new Set(selection.typeIds)].sort().join('+')}:${selection.weight}`
+  }
+  if (selection.kind === 'product') {
+    return `product:${selection.productId}`
+  }
+  return `dessert:${selection.productId}:${selection.variantId}`
 }
 
 function validPrice(value: unknown): value is number {
@@ -53,6 +57,16 @@ export function resolveLine(item: CartItem, config: StoreConfig): CartLine | nul
       imageAlt: mix?.image ? config.heroImageAlt : first.imageAlt, unitPriceMinor: price, lineTotalMinor: price * quantity,
     }
   }
+  if (selection.kind === 'product') {
+    const product = config.products?.find(p => p.id === selection.productId)
+    if (!product?.available || !validPrice(product.priceMinor)) return null
+    return {
+      selection, quantity, key, name: product.name,
+      options: [product.tag, product.unitLabel ?? 'Presentación individual'],
+      image: product.image, imageAlt: product.imageAlt,
+      unitPriceMinor: product.priceMinor, lineTotalMinor: product.priceMinor * quantity,
+    }
+  }
   if (!config.categories.dessertsEnabled) return null
   const dessert = config.desserts.find(product => product.id === selection.productId)
   const variant = dessert?.variants.find(variant => variant.id === selection.variantId)
@@ -82,6 +96,9 @@ function parseSelection(value: unknown): Selection | null {
   }
   if (data.kind === 'dessert' && typeof data.productId === 'string' && typeof data.variantId === 'string') {
     return { kind: 'dessert', productId: data.productId, variantId: data.variantId }
+  }
+  if (data.kind === 'product' && typeof data.productId === 'string') {
+    return { kind: 'product', productId: data.productId }
   }
   return null
 }

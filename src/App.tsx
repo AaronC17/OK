@@ -89,7 +89,7 @@ export default function App() {
     <footer className="site-footer"><div className="container">
       <div className="footer-main">
         <div><SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink></div>
-        <div className="footer-links"><span className="eyebrow">EXPLORA</span><SectionLink section="gomitas">Gomitas enchiladas</SectionLink>{store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}<SectionLink section="como-pedir">Cómo pedir</SectionLink></div>
+        <div className="footer-links"><span className="eyebrow">EXPLORA</span><SectionLink section="gomitas">Gomitas enchiladas</SectionLink>{store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}{store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}<SectionLink section="como-pedir">Cómo pedir</SectionLink></div>
         <div className="footer-contact"><span className="eyebrow">TU PEDIDO, AQUÍ</span>
           <button className="text-button" onClick={openCart}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
           <p>Pago con SINPE Móvil · Revisión del abono</p>
