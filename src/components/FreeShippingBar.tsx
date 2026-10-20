@@ -39,7 +39,7 @@ export function FreeShippingBar({ subtotal, initialSubtotal, className = '', com
       aria-live="polite"
     >
       <div className="shipping-card-header">
-        <span className="shipping-icon-wrap" aria-hidden="true">
+        <span className={`shipping-icon-wrap ${status.isFree ? 'is-badge' : 'is-truck'}`} aria-hidden="true">
           {status.isFree ? <Icon name="check" size={compact ? 15 : 17} /> : <MiniDeliveryTruck />}
         </span>
         <div className="shipping-text">

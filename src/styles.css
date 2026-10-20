@@ -730,32 +730,38 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   color: #14533d;
 }
 .shipping-icon-wrap {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #eedef5;
-  color: var(--purple);
   display: grid;
   place-items: center;
   flex-shrink: 0;
   transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  overflow: hidden;
 }
-.free-shipping-card.is-free .shipping-icon-wrap {
+.shipping-icon-wrap.is-truck {
+  width: 35px;
+  height: 27px;
+  background: transparent;
+}
+.shipping-icon-wrap.is-badge {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
   background: #d4f3e3;
   color: #0f7651;
   transform: scale(1.08);
 }
+.free-shipping-card.is-free .shipping-icon-wrap {
+  background: #d4f3e3;
+  color: #0f7651;
+}
 .mini-delivery-truck {
-  width: 25px;
+  width: 34px;
   height: auto;
   display: block;
 }
 .mini-truck-arch {
-  fill: #eedef5;
+  fill: #fbf5fc;
 }
 .free-shipping-card.is-compact .mini-truck-arch {
-  fill: rgba(255, 255, 255, 0.15);
+  fill: rgba(255, 255, 255, 0.12);
 }
 .mini-wheel-spin {
   animation: miniWheelSpin 0.55s linear infinite;
@@ -1144,8 +1150,9 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .cart-line-bottom > strong { font-size: 12px; }
   .free-shipping-card { padding: 10px 12px; gap: 7px; margin-top: 10px; margin-bottom: 10px; }
   .shipping-card-header { gap: 8px; font-size: 11px; min-height: 25px; }
-  .shipping-icon-wrap { width: 26px; height: 26px; }
-  .mini-delivery-truck { width: 23px; }
+  .shipping-icon-wrap.is-truck { width: 31px; height: 25px; }
+  .shipping-icon-wrap.is-badge { width: 25px; height: 25px; }
+  .mini-delivery-truck { width: 30px; }
   .shipping-text { font-size: 11px; }
   .shipping-badge { font-size: 9.5px; padding: 2px 6px; }
   .continue-shopping { font-size: 11px; min-height: 45px; }
