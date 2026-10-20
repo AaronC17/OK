@@ -28,7 +28,7 @@ test('six generated brand concepts preview locally without making generation req
   const preview = page.getByRole('dialog', { name: 'Vista previa de portada · 03' })
   await expect(preview).toBeVisible()
   await expect(preview.getByRole('heading', { name: 'Un momento. A tu gusto.' })).toBeVisible()
-  await expect(preview.locator('.brand-mock-hero > img')).toHaveAttribute('src', '/brand-concepts/onkys-o-round-01/03.png')
+  await expect(preview.locator('.brand-mock-hero > img')).toHaveAttribute('src', '/brand-concepts/onkys-o-round-01/03.webp')
   await preview.screenshot({ path: `test-results/${testInfo.project.name}-brand-03-preview.png` })
   await page.keyboard.press('Escape')
   await expect(preview).not.toBeVisible()

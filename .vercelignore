@@ -6,3 +6,14 @@ references
 test-results*
 .git
 .env*.local
+
+# Keep original media in Git, but don't ship unused masters and source images.
+public/brand-media/onkys-bag-01
+public/brand-media/onkys-gummies-03
+public/brand-media/onkys-gummies-01/hero.mp4
+public/brand-media/onkys-gummies-01/reference.png
+public/brand-media/onkys-gummies-02/hero.mp4
+public/brand-media/onkys-gummies-02/start.png
+public/brand-media/onkys-gummies-02/middle.png
+public/brand-media/onkys-gummies-02/end.png
+public/brand-concepts/onkys-o-round-01/*.png

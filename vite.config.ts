@@ -1,10 +1,34 @@
 import { defineConfig, normalizePath } from 'vite'
+import { rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { shopApiPlugin } from './server/store/vite-plugin.ts'
 
+const vercelArchivedAssets = [
+  'brand-media/onkys-bag-01',
+  'brand-media/onkys-gummies-03',
+  'brand-media/onkys-gummies-01/hero.mp4',
+  'brand-media/onkys-gummies-01/reference.png',
+  'brand-media/onkys-gummies-02/hero.mp4',
+  'brand-media/onkys-gummies-02/start.png',
+  'brand-media/onkys-gummies-02/middle.png',
+  'brand-media/onkys-gummies-02/end.png',
+  ...Array.from({ length: 6 }, (_, index) => `brand-concepts/onkys-o-round-01/0${index + 1}.png`),
+]
+
+function pruneArchivedVercelAssets() {
+  return {
+    name: 'prune-archived-vercel-assets',
+    apply: 'build' as const,
+    closeBundle() {
+      if (process.env.VERCEL !== '1') return
+      for (const asset of vercelArchivedAssets) rmSync(resolve('dist', asset), { force: true, recursive: true })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), shopApiPlugin()],
+  plugins: [react(), shopApiPlugin(), pruneArchivedVercelAssets()],
   server: {
     port: 5173,
     strictPort: true,

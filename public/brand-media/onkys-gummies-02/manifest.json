@@ -1,8 +1,8 @@
 {
   "round": "onkys-gummies-02",
   "updatedAt": "2026-10-14T12:52:58.364Z",
-  "image": "/brand-media/onkys-gummies-02/start.png",
-  "video": "/brand-media/onkys-gummies-02/hero.mp4",
+  "image": "/brand-media/onkys-gummies-02/start.webp",
+  "video": "/brand-media/onkys-gummies-02/hero-web.mp4",
   "imageStatus": "completed",
   "videoStatus": "completed",
   "duration": 12,
@@ -18,17 +18,17 @@
   "frames": [
     {
       "name": "start",
-      "image": "/brand-media/onkys-gummies-02/start.png",
+      "image": "/brand-media/onkys-gummies-02/start.webp",
       "status": "completed"
     },
     {
       "name": "middle",
-      "image": "/brand-media/onkys-gummies-02/middle.png",
+      "image": "/brand-media/onkys-gummies-02/middle.webp",
       "status": "completed"
     },
     {
       "name": "end",
-      "image": "/brand-media/onkys-gummies-02/end.png",
+      "image": "/brand-media/onkys-gummies-02/end.webp",
       "status": "completed"
     }
   ],
