@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 // src/config/store.ts
 var store = {
   name: "Onky\u2019s",
-  demo: true,
+  demo: false,
   categories: { dessertsEnabled: false },
   // Reactivar cuando haya catálogo y fotografías reales.
   currency: { code: "CRC", locale: "es-CR", fractionDigits: 2 },
@@ -157,7 +157,7 @@ var store = {
       feeMinor: 0,
       coverage: null,
       pickupPoint: null,
-      conditions: "Punto y horario por coordinar con la tienda en Orotina Centro."
+      conditions: null
     }
   ]
 };

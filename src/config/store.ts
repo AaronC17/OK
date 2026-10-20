@@ -9,7 +9,7 @@ import type { StoreConfig } from '../types.ts'
  */
 export const store: StoreConfig = {
   name: 'Onky’s',
-  demo: true,
+  demo: false,
   categories: { dessertsEnabled: false }, // Reactivar cuando haya catálogo y fotografías reales.
   currency: { code: 'CRC', locale: 'es-CR', fractionDigits: 2 },
   contact: { email: null, instagramUrl: null },
@@ -111,7 +111,7 @@ export const store: StoreConfig = {
     {
       id: 'pickup', name: 'Recoger', description: 'Orotina Centro', enabled: true,
       requiresAddress: false, feeMinor: 0, coverage: null, pickupPoint: null,
-      conditions: 'Punto y horario por coordinar con la tienda en Orotina Centro.',
+      conditions: null,
     },
   ],
 }

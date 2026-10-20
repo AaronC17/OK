@@ -51,7 +51,7 @@ export interface DeliveryMethod {
   /** Envío gratis solo si el subtotal de productos SUPERA este importe. */
   freeAboveMinor?: number
   coverage: string | null
-  conditions: string
+  conditions?: string | null
   pickupPoint?: string | null
 }
 

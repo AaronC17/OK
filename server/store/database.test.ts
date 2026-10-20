@@ -30,7 +30,7 @@ test('store: server generates the code and freezes catalog prices, details and d
   assert.equal(order.code, 'ONK-1001')
   assert.equal(order.totalMinor, 120000)
   assert.equal(order.status, 'awaiting_payment')
-  assert.equal(order.demo, true)
+  assert.equal(order.demo, false)
   catalog.gummies.types[0].prices[100] = 999999
   db.configure({ enabled: true, phone: '81111111', beneficiary: 'Otro destino ficticio' }, 'test-admin')
   const saved = db.getOrder(order.id)
