@@ -150,7 +150,7 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
       <button className="icon-button modal-close" onClick={onClose} aria-label="Cerrar configuración"><Icon name="close" /></button>
       <div className="product-visual" data-weight={isGummy ? String(weight) : undefined}>
         <div className="product-visual-stage">
-          <ProductImage key={image} src={image} alt={imageAlt} />
+          <ProductImage key={image} src={image} alt={imageAlt} loading="eager" sizes="(max-width: 600px) 200px, 400px" />
         </div>
       </div>
       <div className="product-options">

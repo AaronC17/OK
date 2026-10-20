@@ -150,13 +150,13 @@ var store = {
     },
     {
       id: "pickup",
-      name: "Recoger Orotina Centro",
-      description: "Punto por coordinar",
+      name: "Recoger",
+      description: "Orotina Centro",
       enabled: true,
       requiresAddress: false,
       feeMinor: 0,
       coverage: null,
-      pickupPoint: "Orotina Centro",
+      pickupPoint: null,
       conditions: "Punto y horario por coordinar con la tienda en Orotina Centro."
     }
   ]

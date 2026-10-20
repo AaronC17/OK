@@ -1,10 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { store } from './config/store.ts'
-import { MAX_QUANTITY, resolveLine, selectionKey } from './lib/shop.ts'
+import { MAX_QUANTITY, selectionKey } from './lib/shop.ts'
 import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
 import { Icon } from './components/Icon.tsx'
-import { FreeShippingBar } from './components/FreeShippingBar.tsx'
 import { Lightbox, Modal } from './components/ui.tsx'
 import type { ProductTarget } from './components/ProductDialog.tsx'
 import { Header } from './components/Header.tsx'
@@ -26,13 +25,13 @@ export default function App() {
   const [productOpen, setProductOpen] = useState(false)
   const [zoom, setZoom] = useState<{ src: string; alt: string; name: string } | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
-  const [toast, setToast] = useState<{ text: string; id: number; initialSubtotal?: number; subtotal?: number } | null>(null)
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
 
   useEffect(() => { document.title = store.name }, [])
 
   useEffect(() => {
     if (!toast) return
-    const timeout = window.setTimeout(() => setToast(null), 6500)
+    const timeout = window.setTimeout(() => setToast(null), 4000)
     return () => window.clearTimeout(timeout)
   }, [toast])
 
@@ -46,21 +45,11 @@ export default function App() {
   const addProduct = (item: CartItem) => {
     const previous = cart.items.find(entry => selectionKey(entry.selection) === selectionKey(item.selection))?.quantity ?? 0
     const added = Math.min(MAX_QUANTITY - previous, item.quantity)
-    const prevSubtotal = cart.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0)
     cart.add(item)
     setProductOpen(false)
-    const line = resolveLine(item, store)
-    const addedMinor = line ? line.unitPriceMinor * added : 0
-    const newSubtotal = prevSubtotal + addedMinor
-    let isPickup = false
-    try {
-      isPickup = window.localStorage.getItem('onkys.delivery') === 'pickup'
-    } catch {}
     setToast({
       text: added > 0 ? added < item.quantity ? `Añadimos ${added}. Límite de ${MAX_QUANTITY} por variante.` : 'Un gusto más en tu carrito.' : `Ya tienes el máximo de ${MAX_QUANTITY} de esta variante.`,
       id: Date.now(),
-      initialSubtotal: prevSubtotal,
-      subtotal: isPickup ? undefined : newSubtotal,
     })
   }
 
@@ -96,7 +85,7 @@ export default function App() {
         <div className="questions-list">
           <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Registra el pedido desde el carrito. Cuando estén confirmados el total y el destino SINPE, recibirás instrucciones y un código para el detalle de tu transferencia. Adjunta el comprobante y la referencia bancaria. La tienda comprobará el abono antes de marcarlo como listo para preparar; subir una imagen no confirma el pago.</p></details>
           <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {weightList}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
-          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos de Costa Rica por ₡2.800. En compras de productos mayores a ₡15.000, el envío es gratis. El carrito calcula el costo automáticamente antes de pagar. También puedes elegir Recoger Orotina Centro y consultar el estado del pedido desde este navegador.{store.demo ? ' Los precios de productos siguen siendo de demostración; no envíes dinero real todavía.' : ''}</p></details>
+          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos de Costa Rica por ₡2.800. En compras de productos mayores a ₡15.000, el envío es gratis. El carrito calcula el costo automáticamente antes de pagar. También puedes elegir Recoger en Orotina Centro y consultar el estado del pedido desde este navegador.{store.demo ? ' Los precios de productos siguen siendo de demostración; no envíes dinero real todavía.' : ''}</p></details>
         </div>
       </section>
     </main>
@@ -137,9 +126,6 @@ export default function App() {
         <button className="toast-view-btn" onClick={() => { setToast(null); openCart() }}>Ver carrito <Icon name="arrow" size={15} /></button>
         <button className="toast-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button>
       </div>
-      {toast.subtotal !== undefined && (
-        <FreeShippingBar subtotal={toast.subtotal} initialSubtotal={toast.initialSubtotal} compact />
-      )}
     </div>}</div>
   </>
 }

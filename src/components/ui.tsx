@@ -2,10 +2,16 @@ import { useEffect, useId, useRef } from 'react'
 import type { ImgHTMLAttributes, ReactNode } from 'react'
 import { Icon } from './Icon.tsx'
 import { MAX_QUANTITY } from '../lib/shop.ts'
+import { productImages } from '../lib/product-images.ts'
 
-export function ProductImage({ decoding = 'async', ...props }: ImgHTMLAttributes<HTMLImageElement>) {
-  return <img decoding={decoding} {...props} onError={event => {
+export function ProductImage({ decoding = 'async', loading = 'lazy', src, srcSet, sizes, width, height, ...props }: ImgHTMLAttributes<HTMLImageElement>) {
+  const image = src ? productImages[src] : undefined
+  return <img decoding={decoding} loading={loading} src={src} srcSet={srcSet ?? image?.srcSet}
+    sizes={sizes ?? (image ? '100vw' : undefined)} width={width ?? image?.width} height={height ?? image?.height} {...props} onError={event => {
     const image = event.currentTarget
+    // A failed srcset candidate must not override the fallback src.
+    image.removeAttribute('srcset')
+    image.removeAttribute('sizes')
     if (!image.src.endsWith('/images/placeholder.svg')) image.src = '/images/placeholder.svg'
   }} />
 }

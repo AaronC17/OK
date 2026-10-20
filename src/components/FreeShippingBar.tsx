@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { store } from '../config/store.ts'
 import { freeShippingStatus, money } from '../lib/shop.ts'
 import { Icon } from './Icon.tsx'
+import { useVisibleAnimation } from '../hooks/useVisibleAnimation.ts'
 
 export interface FreeShippingBarProps {
   subtotal: number
@@ -11,6 +12,7 @@ export interface FreeShippingBarProps {
 }
 
 export function FreeShippingBar({ subtotal, initialSubtotal, className = '', compact = false }: FreeShippingBarProps) {
+  const root = useVisibleAnimation<HTMLDivElement>()
   const status = freeShippingStatus(subtotal, store)
   const targetPercent = status.percent
 
@@ -30,6 +32,7 @@ export function FreeShippingBar({ subtotal, initialSubtotal, className = '', com
 
   return (
     <div
+      ref={root}
       className={`free-shipping-card ${compact ? 'is-compact' : ''} ${status.isFree ? 'is-free' : ''} ${className}`}
       role="status"
       aria-live="polite"
@@ -65,7 +68,7 @@ export function FreeShippingBar({ subtotal, initialSubtotal, className = '', com
       >
         <div
           className={`shipping-progress-fill ${status.isFree ? 'is-complete' : ''}`}
-          style={{ width: `${animatedPercent}%` }}
+          style={{ transform: `scaleX(${animatedPercent / 100})` }}
         >
           <span className="shipping-progress-shine" />
         </div>

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "images:prepare": "node scripts/media/prepare-responsive-images.mjs",
     "prebuild": "node --experimental-strip-types scripts/media/bake-mix.ts",
     "dev": "node --env-file-if-exists=.env.store.local node_modules/vite/bin/vite.js --host 0.0.0.0",
     "build": "tsc -b && vite build && esbuild server/store/api-handler.ts --bundle --platform=node --target=node20 --format=esm --packages=external --outfile=api/index.js",

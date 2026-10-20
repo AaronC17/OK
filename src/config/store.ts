@@ -109,8 +109,8 @@ export const store: StoreConfig = {
       coverage: 'Todo Costa Rica', conditions: 'Correos de Costa Rica: ₡2.800. Envío gratis en compras mayores a ₡15.000, sin contar el envío.',
     },
     {
-      id: 'pickup', name: 'Recoger Orotina Centro', description: 'Punto por coordinar', enabled: true,
-      requiresAddress: false, feeMinor: 0, coverage: null, pickupPoint: 'Orotina Centro',
+      id: 'pickup', name: 'Recoger', description: 'Orotina Centro', enabled: true,
+      requiresAddress: false, feeMinor: 0, coverage: null, pickupPoint: null,
       conditions: 'Punto y horario por coordinar con la tienda en Orotina Centro.',
     },
   ],

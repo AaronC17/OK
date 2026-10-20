@@ -1,0 +1,32 @@
+{
+  "/images/bolsa-mix.webp": {
+    "width": 900,
+    "height": 1199,
+    "srcSet": "/images/responsive/bolsa-mix-160-17899bd8ceed.webp 160w, /images/responsive/bolsa-mix-320-ec1bf99ae83b.webp 320w, /images/responsive/bolsa-mix-480-67f5345eb6d5.webp 480w, /images/responsive/bolsa-mix-640-f83a166b03bc.webp 640w, /images/responsive/bolsa-mix-900-2605f7cf1a96.webp 900w"
+  },
+  "/images/ositos-bolsa.webp": {
+    "width": 700,
+    "height": 931,
+    "srcSet": "/images/responsive/ositos-bolsa-160-059a83f3d0f3.webp 160w, /images/responsive/ositos-bolsa-320-37b5e56b13b5.webp 320w, /images/responsive/ositos-bolsa-480-90624882d1d0.webp 480w, /images/responsive/ositos-bolsa-640-892a2740ce47.webp 640w, /images/responsive/ositos-bolsa-700-859d89e8db56.webp 700w"
+  },
+  "/images/uvarindas.webp": {
+    "width": 868,
+    "height": 1024,
+    "srcSet": "/images/responsive/uvarindas-160-a90e722866cf.webp 160w, /images/responsive/uvarindas-320-f2c425d4b30a.webp 320w, /images/responsive/uvarindas-480-467ca81a122e.webp 480w, /images/responsive/uvarindas-640-b700baf9792c.webp 640w, /images/responsive/uvarindas-868-43fbc0e6b43c.webp 868w"
+  },
+  "/images/mix/bottle-chamoy.webp": {
+    "width": 301,
+    "height": 768,
+    "srcSet": "/images/responsive/bottle-chamoy-64-92080c5dc1f2.webp 64w, /images/responsive/bottle-chamoy-128-519cd38a36e6.webp 128w, /images/responsive/bottle-chamoy-192-0dc2d0037efb.webp 192w"
+  },
+  "/images/mix/bottle-tajin.webp": {
+    "width": 334,
+    "height": 768,
+    "srcSet": "/images/responsive/bottle-tajin-64-84389e19ef91.webp 64w, /images/responsive/bottle-tajin-128-49191b17d137.webp 128w, /images/responsive/bottle-tajin-192-298fc3e68cc1.webp 192w"
+  },
+  "/images/mix/bottle-limon.webp": {
+    "width": 384,
+    "height": 529,
+    "srcSet": "/images/responsive/bottle-limon-64-bd5479e4d3b1.webp 64w, /images/responsive/bottle-limon-128-127384b7b0ab.webp 128w, /images/responsive/bottle-limon-192-d433b6da6923.webp 192w"
+  }
+}

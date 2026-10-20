@@ -3,6 +3,8 @@ import { rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { shopApiPlugin } from './server/store/vite-plugin.ts'
+import { store } from './src/config/store.ts'
+import { HERO_IMAGE_SIZES, productImages } from './src/lib/product-images.ts'
 
 const vercelArchivedAssets = [
   'brand-media/onkys-bag-01',
@@ -28,7 +30,14 @@ function pruneArchivedVercelAssets() {
 }
 
 export default defineConfig({
-  plugins: [react(), shopApiPlugin(), pruneArchivedVercelAssets()],
+  plugins: [react(), shopApiPlugin(), pruneArchivedVercelAssets(), {
+    name: 'responsive-hero-preload',
+    transformIndexHtml() {
+      const image = productImages[store.heroImage]
+      if (store.heroVideo || !image) return []
+      return [{ tag: 'link', attrs: { rel: 'preload', as: 'image', type: 'image/webp', href: store.heroImage, imagesrcset: image.srcSet, imagesizes: HERO_IMAGE_SIZES, fetchpriority: 'high' }, injectTo: 'head' as const }]
+    },
+  }],
   server: {
     port: 5173,
     strictPort: true,

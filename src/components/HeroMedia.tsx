@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { StoreConfig } from '../types.ts'
 import { Icon } from './Icon.tsx'
 import { ProductImage } from './ui.tsx'
+import { HERO_IMAGE_SIZES } from '../lib/product-images.ts'
 import './hero-media.css'
 
 function prefersStill() {
@@ -48,11 +49,11 @@ export function HeroMedia({ image, alt, video }: { image: string; alt: string; v
     if (player.current && ready) void player.current.play().catch(() => setIntent(false))
   }
 
-  if (!video) return <ProductImage src={image} alt={alt} fetchPriority="high" width={700} height={800} className="hero-photo" />
+  if (!video) return <ProductImage src={image} alt={alt} loading="eager" fetchPriority="high" sizes={HERO_IMAGE_SIZES} width={700} height={800} className="hero-photo" />
 
   return <div ref={root} className={`hero-media ${playing ? 'is-playing' : ''} ${ready && !failed ? 'is-ready' : ''}`}>
     <div className="hero-media-visual">
-      <ProductImage src={video.poster} alt={video.description} fetchPriority="high" width={1200} height={900} className="hero-media-poster" />
+      <ProductImage src={video.poster} alt={video.description} loading="eager" fetchPriority="high" width={1200} height={900} className="hero-media-poster" />
       {enabled && !failed && <video ref={player} className="hero-media-video" src={video.src} poster={video.poster} muted playsInline loop preload="metadata" aria-hidden="true"
         onCanPlay={() => setReady(true)} onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)}
         onError={() => { setFailed(true); setPlaying(false); setIntent(false) }} />}

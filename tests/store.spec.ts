@@ -85,7 +85,7 @@ test('gummies-only cart, variant prices, persistence, delivery and server-create
   await cart.getByLabel('Teléfono de contacto').fill('61551234')
   await cart.getByLabel('Dirección o punto de entrega').fill('Calle del Sol 12, 2º B')
   await cart.getByLabel(/Acepto que la tienda guarde/).check()
-  await cart.getByRole('radio', { name: /Recogida|Recoger Orotina Centro/ }).check()
+  await cart.getByRole('radio', { name: /Recogida|Recoger/ }).check()
   await expect(cart.getByLabel('Dirección o punto de entrega')).toHaveCount(0)
   await expect(cart.locator('.total-row')).toContainText('₡12 000')
   await cart.locator('.cart-line').first().getByRole('button', { name: /Aumentar cantidad/ }).click()
