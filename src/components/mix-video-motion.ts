@@ -6,29 +6,32 @@ export function animateMixVideo(video: HTMLVideoElement, container: HTMLElement,
   const animations = container.getAnimations({ subtree: true })
   let running = false
   let disposed = false
-  let buffering = true
   const sync = () => {
     const time = video.currentTime * 1000
-    const playing = running && !buffering && !video.paused && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
+    // Native readiness also recovers seeks/loop wraps that emit canplay without
+    // a new playing event. A separate buffering flag could remain stuck.
+    const playing = running && !video.paused && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
     animations.forEach(animation => {
-      if (Math.abs(Number(animation.currentTime) - time) > 80 || animation.playState !== (playing ? 'running' : 'paused')) animation.currentTime = time
-      if (playing) animation.play()
-      else animation.pause()
+      const stateChanged = animation.playState !== (playing ? 'running' : 'paused')
+      if (Math.abs(Number(animation.currentTime) - time) > 80 || stateChanged) animation.currentTime = time
+      // play()/pause() also enqueue animation updates. A media timeupdate is
+      // normally just a drift check, not a reason to resubmit every effect.
+      if (stateChanged) {
+        if (playing) animation.play()
+        else animation.pause()
+      }
     })
   }
   const playing = () => {
     if (!running || disposed) { video.pause(); return }
-    buffering = false
     onBlocked(false)
     sync()
   }
   const ready = () => { container.dataset.sceneReady = 'true' }
-  const waiting = () => { buffering = true; sync() }
-  const events = ['timeupdate', 'pause', 'seeking', 'seeked', 'ended'] as const
+  const events = ['timeupdate', 'pause', 'waiting', 'canplay', 'seeking', 'seeked', 'ended'] as const
   events.forEach(event => video.addEventListener(event, sync))
   video.addEventListener('playing', playing)
   video.addEventListener('loadeddata', ready)
-  video.addEventListener('waiting', waiting)
   if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) ready()
   sync()
   return {
@@ -49,7 +52,6 @@ export function animateMixVideo(video: HTMLVideoElement, container: HTMLElement,
       events.forEach(event => video.removeEventListener(event, sync))
       video.removeEventListener('playing', playing)
       video.removeEventListener('loadeddata', ready)
-      video.removeEventListener('waiting', waiting)
       animations.forEach(animation => animation.cancel())
     },
   }

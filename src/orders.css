@@ -443,8 +443,8 @@
   width: 100%;
   height: auto;
 }
-.transit-layer { position: absolute; inset: 0; pointer-events: none; will-change: transform, opacity; }
-.transit-layer > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.transit-layer { position: absolute; pointer-events: none; contain: layout paint; will-change: transform, opacity; }
+.transit-layer > svg { display: block; width: 100%; height: 100%; }
 .transit-wheel-arches { will-change: auto; }
 .transit-clouds {
   animation: transitCloudsDrift 14s linear infinite;
@@ -459,12 +459,10 @@
   animation: transitRoadMove 0.55s linear infinite;
 }
 .transit-truck-chassis {
-  transform-origin: 0 0;
   animation: transitTruckBounce 0.65s ease-in-out infinite alternate;
 }
 .transit-truck-shadow {
   opacity: .16;
-  transform-origin: 50% 80.985915%;
   animation: transitShadowScale 0.65s ease-in-out infinite alternate;
 }
 .transit-wheel {
@@ -559,11 +557,11 @@
 }
 @keyframes transitRoadMove {
   from { transform: translateX(0); }
-  to { transform: translateX(-10%); }
+  to { transform: translateX(calc(-3600% / var(--layer-width))); }
 }
 @keyframes transitTruckBounce {
   0% { transform: translateY(0px) rotate(0deg); }
-  100% { transform: translateY(-1.549296%) rotate(-0.35deg); }
+  100% { transform: translateY(calc(-220% / var(--layer-height))) rotate(-0.35deg); }
 }
 @keyframes transitShadowScale {
   0% { transform: scaleX(1); opacity: 0.17; }
@@ -571,20 +569,20 @@
 }
 @keyframes transitCloudsDrift {
   from { transform: translateX(0); }
-  to { transform: translateX(-100%); }
+  to { transform: translateX(-50%); }
 }
 @keyframes transitHorizonDrift {
   from { transform: translateX(0); }
-  to { transform: translateX(-100%); }
+  to { transform: translateX(-50%); }
 }
 @keyframes transitWindStreak {
-  0% { transform: translateX(5%); opacity: 0; }
+  0% { transform: translateX(calc(1800% / var(--layer-width))); opacity: 0; }
   35% { opacity: 0.85; }
-  100% { transform: translateX(-7.777778%); opacity: 0; }
+  100% { transform: translateX(calc(-2800% / var(--layer-width))); opacity: 0; }
 }
 @keyframes transitPuffPop {
-  0% { transform: translate(1.666667%, 1.408451%) scale(0.45); opacity: 0.75; }
-  100% { transform: translate(-6.666667%, -4.929577%) scale(1.45); opacity: 0; }
+  0% { transform: translate(calc(600% / var(--layer-width)), calc(200% / var(--layer-height))) scale(0.45); opacity: 0.75; }
+  100% { transform: translate(calc(-2400% / var(--layer-width)), calc(-700% / var(--layer-height))) scale(1.45); opacity: 0; }
 }
 @keyframes transitStepBlink {
   from { transform: scale(0.75); opacity: 0.65; }

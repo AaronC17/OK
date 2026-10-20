@@ -22,6 +22,9 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
   const video = useRef<HTMLVideoElement>(null)
   const shouldRun = useRef(false)
   const [useVideo, setUseVideo] = useState(() => window.matchMedia('(max-width: 700px), (pointer: coarse)').matches)
+  // 720 pixels cover the scene at native resolution on small 1×/2× phones.
+  // Keep 1080 for Retina 3× phones and larger displays.
+  const [videoSource] = useState(() => window.matchMedia('(max-width: 420px) and (max-resolution: 2dppx)').matches ? mixVideo.compact : mixVideo)
   const [playbackBlocked, setPlaybackBlocked] = useState(false)
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [motionRequested, setMotionRequested] = useState(!reduced)
@@ -38,7 +41,8 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
       if (entry.isIntersecting) { setNear(true); preload.disconnect() }
     }, { rootMargin: '1200px 0px' })
     if (film.current) observer.observe(film.current)
-    if (root.current) preload.observe(root.current)
+    // Prepare the scene by its own position, not the much taller copy beside it.
+    if (film.current) preload.observe(film.current)
     const visibility = () => setTabVisible(!document.hidden)
     document.addEventListener('visibilitychange', visibility)
     return () => { observer.disconnect(); preload.disconnect(); media.removeEventListener('change', preference); document.removeEventListener('visibilitychange', visibility) }
@@ -95,12 +99,12 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
       <p className="sr-only">Animación ilustrativa: se vierte chamoy, se espolvorea Tajín y se añade jugo de limón de una jarrita. Los ositos caen, se comprimen y se doblan suavemente al contacto. La cuchara barre los lados y pliega la mezcla hacia dentro; el chamoy espeso se adhiere y escurre lentamente. Al final aparece la bolsa terminada. No representa la preparación de un pedido real.</p>
       <div className="film-scene">
         <div className="film-ingredients" aria-hidden="true">{MIX_INGREDIENTS.map((item, index) => <div className={`film-ingredient ingredient-${index}`} key={item.id}>
-          <div className="ingredient-photo"><ProductImage src={item.image} alt={item.alt} loading="lazy" /><span className="ingredient-tick"><Icon name="check" size={13} /></span></div>
+          <div className="ingredient-photo">{useVideo && <span className="ingredient-highlight" />}<ProductImage src={item.image} alt={item.alt} loading="lazy" /><span className="ingredient-tick"><Icon name="check" size={13} /></span></div>
           <span>{item.name}</span>
         </div>)}</div>
         <div className="mix-stage">
           {useVideo ? <>
-            <video ref={video} className="mix-video" src={near && motionRequested ? mixVideo.url : undefined} poster={mixVideo.poster}
+            <video ref={video} className="mix-video" src={near && motionRequested ? videoSource.url : undefined} poster={mixVideo.poster}
               width={mixVideo.width} height={mixVideo.height} muted playsInline loop preload={near && motionRequested ? 'auto' : 'none'} aria-hidden="true"
               onError={() => { setPlaybackBlocked(false); setUseVideo(false) }} />
             {playbackBlocked && !reduced && <button type="button" className="mix-play-button" onClick={() => {

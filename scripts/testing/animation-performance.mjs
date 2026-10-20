@@ -38,6 +38,60 @@ const serve = async directory => {
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'msedge', headless: true })
 const results = { browser: browser.version(), conditions: { viewport: '390x844', dpr: 3, cpuSlowdown: 4, network: 'local, unthrottled', duration: 15000 }, runs: [] }
 const metrics = async cdp => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(item => [item.name, item.value]))
+// Inspect paint/compositor work separately so tracing does not distort timings.
+async function inspect(page, cdp, name) {
+  let layers = []
+  const changed = event => { layers = event.layers || [] }
+  cdp.on('LayerTree.layerTreeDidChange', changed)
+  await cdp.send('LayerTree.enable')
+  await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReturnAsStream' })
+  await page.waitForTimeout(2000)
+  const completed = new Promise(resolve => cdp.once('Tracing.tracingComplete', resolve))
+  await cdp.send('Tracing.end')
+  const { stream } = await completed
+  let raw = ''
+  for (;;) {
+    const chunk = await cdp.send('IO.read', { handle: stream })
+    raw += chunk.data
+    if (chunk.eof) break
+  }
+  await cdp.send('IO.close', { handle: stream })
+  await writeFile(join(output, `${name}-trace.json`), raw)
+  const work = {}
+  for (const event of JSON.parse(raw).traceEvents) {
+    if (!['UpdateLayoutTree', 'Paint', 'PrePaint', 'Layout', 'Layerize'].includes(event.name) || event.ph !== 'X') continue
+    const item = work[event.name] ||= { count: 0, ms: 0 }
+    item.count++; item.ms += (event.dur || 0) / 1000
+  }
+  const surfaces = []
+  for (const layer of layers.filter(layer => layer.drawsContent && layer.backendNodeId)) {
+    const { node } = await cdp.send('DOM.describeNode', { backendNodeId: layer.backendNodeId })
+    const attributes = Object.fromEntries((node.attributes || []).reduce((pairs, value, i, all) => i % 2 ? pairs : [...pairs, [value, all[i + 1]]], []))
+    const reasons = await cdp.send('LayerTree.compositingReasons', { layerId: layer.layerId }).catch(() => ({}))
+    surfaces.push({ node: node.nodeName, class: attributes.class || node.pseudoType, width: layer.width, height: layer.height, ...reasons })
+  }
+  await writeFile(join(output, `${name}-rendering.json`), JSON.stringify({ work, surfaces }, null, 2))
+  cdp.off('LayerTree.layerTreeDidChange', changed)
+  await cdp.send('LayerTree.disable')
+}
+
+async function captureTruck(page, directory) {
+  await mkdir(directory, { recursive: true })
+  for (const width of [320, 390, 600]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.locator('.transit-scene').scrollIntoViewIfNeeded()
+    for (const time of [0, 275, 800, 1600]) {
+      await page.evaluate(async time => {
+        document.getAnimations().forEach(animation => {
+          animation.pause()
+          animation.currentTime = animation.effect.getTiming().iterations === Infinity ? time : 1000
+        })
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      }, time)
+      await page.locator('.transit-scene').screenshot({ path: join(directory, `truck-${width}-${time}.png`), animations: 'allow' })
+    }
+  }
+}
 try {
   for (let run = 1; run <= Number(args.runs || 2); run++) {
     for (const version of ['before', 'after']) {
@@ -88,6 +142,11 @@ try {
           console.log(JSON.stringify(result))
           await writeFile(join(output, 'metrics.json'), JSON.stringify(results, null, 2))
           if (run === 1) await page.locator(scene === 'recipe' ? '.mix-film' : '.sinpe-transit-card').screenshot({ path: join(output, `${version}-${scene}.png`) })
+          if (args.inspect && run === 1) await inspect(page, cdp, `${version}-${scene}`)
+        }
+        if (args.capture && run === 1) {
+          await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+          await captureTruck(page, join(output, `${version}-visuals`))
         }
       } finally {
         await context.close()

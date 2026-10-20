@@ -128,9 +128,16 @@
 .mix-film[data-renderer="video"] .ingredient-1 .ingredient-photo { animation-name: border-two; }
 .mix-film[data-renderer="video"] .ingredient-2 .ingredient-photo { animation-name: border-three; }
 .mix-film[data-renderer="video"] .ingredient-3 .ingredient-photo { animation-name: border-four; }
-.mix-film[data-renderer="video"] :is(.film-step i, .film-captions > span, .ingredient-tick, .ingredient-photo) { animation-duration: var(--cycle); animation-timing-function: linear; animation-iteration-count: infinite; animation-fill-mode: both; animation-play-state: paused; }
+/* A prepainted border fades on the compositor; animating border-color kept
+   the whole recipe on the main-thread animation/style/paint path. */
+.ingredient-highlight { position: absolute; inset: -2px; border: 2px solid #9276a4; border-radius: inherit; opacity: 0; pointer-events: none; }
+.mix-film[data-renderer="video"] .ingredient-0 .ingredient-highlight { animation-name: highlight-one; }
+.mix-film[data-renderer="video"] .ingredient-1 .ingredient-highlight { animation-name: highlight-two; }
+.mix-film[data-renderer="video"] .ingredient-2 .ingredient-highlight { animation-name: highlight-three; }
+.mix-film[data-renderer="video"] .ingredient-3 .ingredient-highlight { animation-name: highlight-four; }
+.mix-film[data-renderer="video"] :is(.film-step i, .film-captions > span, .ingredient-tick, .ingredient-photo, .ingredient-highlight) { animation-duration: var(--cycle); animation-timing-function: linear; animation-iteration-count: infinite; animation-fill-mode: both; animation-play-state: paused; }
 
-.mix-film[data-static="true"] *, .mix-film[data-static="true"] *::after { animation: none !important; }
+.mix-film[data-static="true"] *, .mix-film[data-static="true"] *::before, .mix-film[data-static="true"] *::after { animation: none !important; }
 /* Same still frame that the previous paused WAAPI playhead displayed at 0ms,
    without calculating a simulation for a visitor who requested no motion. */
 .mix-film[data-static="true"] .mix-bowl-scene, .mix-film[data-static="true"] .caption-season { opacity: 1; }
@@ -144,10 +151,14 @@
 @keyframes ingredient-two { 0%,7.2%,100% { opacity: 0; transform: scale(.5); } 8.2% { opacity: 1; transform: scale(1.18); } 9.2%,94% { opacity: 1; transform: scale(1); } }
 @keyframes ingredient-three { 0%,13.8%,100% { opacity: 0; transform: scale(.5); } 14.8% { opacity: 1; transform: scale(1.18); } 15.8%,94% { opacity: 1; transform: scale(1); } }
 @keyframes ingredient-four { 0%,20.7%,100% { opacity: 0; transform: scale(.5); } 21.7% { opacity: 1; transform: scale(1.18); } 22.7%,94% { opacity: 1; transform: scale(1); } }
-@keyframes border-one { 0%,1.3%,100% { border-color: #e4dfe7; transform: translateY(0); } 2.3% { border-color: #9276a4; transform: translateY(-3px); } 3.3%,94% { border-color: #9276a4; transform: translateY(0); } }
-@keyframes border-two { 0%,7.2%,100% { border-color: #e4dfe7; transform: translateY(0); } 8.2% { border-color: #9276a4; transform: translateY(-3px); } 9.2%,94% { border-color: #9276a4; transform: translateY(0); } }
-@keyframes border-three { 0%,13.8%,100% { border-color: #e4dfe7; transform: translateY(0); } 14.8% { border-color: #9276a4; transform: translateY(-3px); } 15.8%,94% { border-color: #9276a4; transform: translateY(0); } }
-@keyframes border-four { 0%,20.7%,100% { border-color: #e4dfe7; transform: translateY(0); } 21.7% { border-color: #9276a4; transform: translateY(-3px); } 22.7%,94% { border-color: #9276a4; transform: translateY(0); } }
+@keyframes border-one { 0%,1.3%,3.3%,100% { transform: translateY(0); } 2.3% { transform: translateY(-3px); } }
+@keyframes border-two { 0%,7.2%,9.2%,100% { transform: translateY(0); } 8.2% { transform: translateY(-3px); } }
+@keyframes border-three { 0%,13.8%,15.8%,100% { transform: translateY(0); } 14.8% { transform: translateY(-3px); } }
+@keyframes border-four { 0%,20.7%,22.7%,100% { transform: translateY(0); } 21.7% { transform: translateY(-3px); } }
+@keyframes highlight-one { 0%,1.3%,100% { opacity: 0; } 2.3%,94% { opacity: 1; } }
+@keyframes highlight-two { 0%,7.2%,100% { opacity: 0; } 8.2%,94% { opacity: 1; } }
+@keyframes highlight-three { 0%,13.8%,100% { opacity: 0; } 14.8%,94% { opacity: 1; } }
+@keyframes highlight-four { 0%,20.7%,100% { opacity: 0; } 21.7%,94% { opacity: 1; } }
 @keyframes bowl-scene { 0%,64%,100% { opacity: 1; transform: translateY(0) scale(1); } 70%,95% { opacity: 0; transform: translateY(12px) scale(.96); } }
 @keyframes finished-mix { 0%,68%,100% { opacity: 0; transform: translateY(22px) rotate(-6deg) scale(.9); } 73% { opacity: 1; transform: translateY(-5px) rotate(2deg) scale(1.025); } 77% { opacity: 1; transform: translateY(1px) rotate(-.6deg) scale(.995); } 81%,93% { opacity: 1; transform: translateY(0) rotate(0) scale(1); } 87% { opacity: 1; transform: translateY(-3px) rotate(.5deg) scale(1); } 97% { opacity: 0; transform: translateY(-8px) rotate(2deg) scale(.98); } }
 @keyframes finish-tick { 0%,75%,100% { opacity: 0; transform: scale(.4); } 79% { opacity: 1; transform: scale(1.15); } 82%,96% { opacity: 1; transform: scale(1); } }

@@ -4,6 +4,7 @@ import { readFile, mkdir, writeFile, stat, cp, mkdtemp } from 'node:fs/promises'
 import { extname, resolve, sep, join } from 'node:path'
 import { networkInterfaces } from 'node:os'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { animationOrder } from '../../tests/helpers/animation-order.ts'
 
 // Read-only LAN audit. Never imports the shop server, credentials or database.
 const args = Object.fromEntries(process.argv.slice(2).map(arg => arg.replace(/^--/, '').split('=')))
@@ -16,7 +17,7 @@ await mkdir(output, { recursive: true })
 const snapshots = await mkdtemp(join(output, 'sites-'))
 if (args.token && !/^[a-f0-9]{16}$/.test(args.token)) throw new Error('The preview token must contain 16 lowercase hexadecimal characters.')
 const token = args.token || randomBytes(8).toString('hex')
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json' }
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.woff2': 'font/woff2', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.mp4': 'video/mp4' }
 const probe = await readFile(new URL('./phone-probe.js', import.meta.url), 'utf8')
 const variants = [{ name: 'optimized', site: resolve(args.site || 'dist'), port: Number(args.port || 4174) }]
 if (args.baseline) variants.push({ name: 'baseline', site: resolve(args.baseline), port: Number(args.baselinePort || 4175) })
@@ -60,7 +61,8 @@ for (const variant of variants) {
       if (url.pathname.startsWith('/api/')) {
         response.setHeader('Content-Type', 'application/json')
         if (url.pathname === '/api/checkout') response.end(JSON.stringify({ csrfToken: 'read-only-phone-test', sinpe: null, demo: true, maxReceiptBytes: 8_000_000 }))
-        else if (url.pathname === '/api/orders/current') response.end('{"order":null}')
+        else if (url.pathname === '/api/orders/current') response.end(JSON.stringify({ order: args.order === 'true' ? animationOrder : null }))
+        else if (args.order === 'true' && url.pathname === `/api/orders/${animationOrder.id}`) response.end(JSON.stringify(animationOrder))
         else response.writeHead(403).end('{"error":"Prueba de solo lectura: pedidos desactivados."}')
         return
       }
@@ -75,10 +77,23 @@ for (const variant of variants) {
         return
       }
       const file = resolve(variant.site, `.${decodeURIComponent(url.pathname)}`)
-      if (!file.startsWith(`${variant.site}${sep}`) || !(await stat(file).catch(() => null))?.isFile()) { response.writeHead(404).end(); return }
+      const info = file.startsWith(`${variant.site}${sep}`) ? await stat(file).catch(() => null) : null
+      if (!info?.isFile()) { response.writeHead(404).end(); return }
       response.setHeader('Content-Type', mime[extname(file)] || 'application/octet-stream')
+      response.setHeader('Accept-Ranges', 'bytes')
+      // Safari's native media loader probes byte ranges before playback/seeks.
+      const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range || '')
+      let start = 0, end = info.size - 1
+      if (range) {
+        start = range[1] ? Number(range[1]) : Math.max(0, info.size - Number(range[2]))
+        end = range[1] && range[2] ? Math.min(Number(range[2]), end) : end
+        if (start > end || start >= info.size) { response.writeHead(416, { 'Content-Range': `bytes */${info.size}` }).end(); return }
+        response.statusCode = 206
+        response.setHeader('Content-Range', `bytes ${start}-${end}/${info.size}`)
+      }
+      response.setHeader('Content-Length', end - start + 1)
       if (request.method === 'HEAD') response.end()
-      else createReadStream(file).on('error', () => response.destroy()).pipe(response)
+      else createReadStream(file, { start, end }).on('error', () => response.destroy()).pipe(response)
     } catch { if (!response.headersSent) response.writeHead(400); response.end('Solicitud no válida.') }
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(variant.port, host, resolve) })

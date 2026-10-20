@@ -6,6 +6,7 @@ import { once } from 'node:events'
 import { resolve, join, extname } from 'node:path'
 import { chromium } from 'playwright'
 import sharp from 'sharp'
+import { resizeMixVideo } from './resize-mix-video.mjs'
 
 // Bake the original desktop SVG, including its full deformation/contact effects.
 // Run explicitly when the illustration changes; normal builds use the checked-in MP4.
@@ -96,6 +97,7 @@ try {
   await completed
   const bytes = (await stat(resolve(`public${url}`))).size
   await writeFile('src/config/mix-video.json', `${JSON.stringify({ url, poster, hash, fps, duration, width, height, bytes }, null, 2)}\n`)
+  await resizeMixVideo(args.ffmpeg || process.env.FFMPEG_PATH || 'ffmpeg')
   console.log(`Baked ${fps} fps mobile recipe: ${bytes} bytes, ${width} × ${height}.`)
 } finally {
   encoder?.kill()

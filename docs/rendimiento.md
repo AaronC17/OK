@@ -1,5 +1,33 @@
 # Rendimiento de la tienda
 
+## Ajuste adicional: indicadores, capas y carga — 20/10/2026
+
+Se afinó la versión `2ec7340` ya publicada:
+
+- Los indicadores del video animan únicamente **transformación y opacidad**. El borde de color se pinta una vez y se revela por opacidad; ya no obliga a recalcular/pintar colores durante el ciclo. El controlador comprueba la deriva del reloj sin volver a llamar a `play()`/`pause()` para efectos que ya están en el estado correcto.
+- Las capas del camión están recortadas a su dibujo y margen de antialiasing, conservando posiciones, pivotes y desplazamientos en unidades de la escena. En la inspección de Chromium a 390 px/DPR 3, sus superficies bajan de **865.713 a 66.874 unidades de área de capa (−92,3 %)**. Es superficie reportada por el compositor, no una lectura de memoria GPU total. Incluye el recorte del horizonte por la carretera; la rasterización de los bordes puede variar ligeramente.
+- Pantallas de hasta 420 px y densidad máxima 2× cargan una variante **720 × 612 a 60 fps, 1.475.408 bytes**, suficiente para el tamaño del dibujo en esos teléfonos. Supone **36,5 % menos descarga y 55,6 % menos píxeles por fotograma**. Las pantallas 3× y las grandes conservan el MP4 1080 × 918. La variante compacta compara con SSIM 0,9970 frente al original reducido al mismo tamaño; no se presenta como compresión sin pérdida.
+- `scripts/media/resize-mix-video.mjs` reproduce esa variante; también se ejecuta al regenerar el video maestro. Los MP4 tienen sus índices al principio para reproducción progresiva.
+
+### Verificación y variabilidad
+
+TypeScript/producción y los casos de animaciones, sincronización, recuperación, movimiento reducido y checkout se comprobaron en Chromium/Edge y WebKit. Se añadió un caso que verifica que DPR 3 elige el maestro y que los keyframes móviles no incluyen propiedades que requieran pintar. WebKit en Windows usa un decodificador simulado, así que la validación del video real se hizo en Chromium.
+
+La nueva comparación incluye dos ciclos por versión, CPU ×4 y DPR 3. **Los tiempos de CPU y rAF fueron muy variables y no permiten atribuir una mejora adicional de FPS**: en una pareja de muestras la versión anterior tuvo p95 de 16,8 ms en receta y camión; la nueva, 16,8 ms y 33,4 ms. En la primera comparación diagnóstica el camión nuevo obtuvo 16,8 ms frente a 66,6 ms. No se selecciona esa muestra favorable como resultado general. La reducción de superficies, bytes y propiedades de pintura sí es verificable. En una traza de 2 s, las actualizaciones de estilo de receta pasaron de 122 a 17 y las operaciones de pintura de 59 a 19; los tiempos absolutos también variaron.
+
+Se revisaron 12 capturas del camión, a 320/390/600 px y cuatro instantes, manteniendo el dibujo y la legibilidad. Los cambios de antialiasing/alineación fraccional y el recorte de las colinas producen diferencias; no son capturas idénticas. Artefactos en `%LOCALAPPDATA%\Temp\opencode\onkys-animation-fine-final` y `onkys-animation-fine-visual-diff`.
+
+### Prueba física preparada
+
+El preview local admite rangos HTTP para Safari y un pedido ficticio (`--order=true`) que muestra el camión al abrir el carrito. El recolector identifica receta/camión, cuenta esperas del video, fotogramas descartados y callbacks de presentación cuando el navegador lo permite. Descarta muestras interrumpidas por pestaña oculta, sección tapada o salida del viewport. Sus resultados se guardan localmente, sin añadir instrumentación al sitio publicado.
+
+```powershell
+node scripts/testing/phone-preview.mjs --host=<IPv4-LAN> --site=dist --order=true --output=<informes>
+node scripts/testing/animation-performance.mjs --before=<build-2ec7340> --after=dist --output=<resultados> --runs=2 --inspect=true --capture=true
+```
+
+La medición del teléfono físico con estos cambios está pendiente.
+
 ## Ositos y camión en móvil — 20/10/2026
 
 La receta usa reproducción nativa de video en pantallas de hasta 700 px o con puntero táctil. Se capturaron **900 fotogramas de la animación SVG original**, con todas sus deformaciones, líquidos y transiciones: H.264 sin audio, **60 fps, 1080 × 918, 15 s y 2.323.661 bytes**. Los textos, ingredientes y progreso siguen siendo HTML; su reloj se sincroniza con el video al reproducir, pausar, buscar, cargar y reiniciar el bucle. El fondo móvil pasa a un color uniforme y la escena mantiene la proporción del material capturado.
