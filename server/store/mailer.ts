@@ -99,7 +99,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     headline = 'Un antojo<br>bien elegido.'
     status = 'Pedido recibido'
     const awaitingDetails = order.status === 'pending_details' || !order.destination || order.totalMinor === null
-    preheader = awaitingDetails ? 'Tu pedido está guardado. Estamos por confirmar los datos de pago.' : 'Tu selección está guardada. Solo falta completar el pago con SINPE Móvil.'
+    preheader = awaitingDetails ? 'Tu pedido está guardado. Estamos por confirmar los datos de pago para continuar.' : 'Tu pedido está guardado. Solo falta completar el pago con SINPE Móvil para prepararlo.'
     lead = `¡Hola, ${name}! ${awaitingDetails ? 'Tu pedido quedó registrado. La tienda debe confirmar los datos de pago para continuar.' : 'Recibimos tu pedido. Completa el pago con SINPE Móvil para que podamos preparar tus gomitas.'}`
     body = sinpeBox(order)
     detailText = awaitingDetails ? 'Estado: pedido registrado. Consulta las indicaciones de pago desde la tienda.' : `Estado: pedido registrado. Realiza tu SINPE al ${order.destination!.phone}, a nombre de ${order.destination!.beneficiary} (${order.destination!.bank}), por ${money(order.totalMinor!, store)}. Incluye ${order.code} en la descripción y sube el comprobante desde la tienda.`
@@ -108,7 +108,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     title = 'Tu pedido está en revisión'
     headline = 'Tu pedido,<br>en revisión.'
     status = 'En revisión'
-    preheader = 'Revisaremos tu pago. Una vez confirmado, prepararemos tu pedido para la entrega.'
+    preheader = 'Recibimos tu comprobante. Estamos revisando tu abono y te avisaremos en cuanto quede confirmado.'
     lead = `¡Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago para confirmar tu pedido.`
     body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. <strong>En cuanto confirmemos el pago, prepararemos tu pedido para la entrega</strong> y te avisaremos por este correo.</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
     detailText = `Estado: en revisión. Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
@@ -116,7 +116,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     title = '¡Pago confirmado!'
     headline = 'Tu antojo,<br>confirmado.'
     status = 'Pago confirmado'
-    preheader = 'Verificamos tu pago. Tu pedido ya está confirmado y entra a preparación.'
+    preheader = 'Verificamos tu pago con éxito. Tu pedido ya está confirmado y entra a preparación para la entrega.'
     const confirmed = order.paymentConfirmedAt ? totalDate.format(new Date(order.paymentConfirmedAt)) : ''
     lead = `¡Gracias por elegir Onky’s, ${name}! Verificamos tu pago y tu pedido ya entra a preparación.`
     const next = order.delivery.requiresAddress
@@ -128,7 +128,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     title = 'Revisemos tu comprobante'
     headline = 'Un detalle<br>por revisar.'
     status = 'Revisa tu comprobante'
-    preheader = 'Necesitamos revisar tu comprobante antes de confirmar el pago de tu pedido.'
+    preheader = 'Revisamos tu comprobante pero necesitamos un detalle adicional para poder confirmar tu pedido.'
     const reason = order.customerMessage
     lead = `Hola, ${name}. Aún no pudimos confirmar el pago. Revisemos el comprobante para continuar con tu pedido.`
     body = noteBox('Un paso más y seguimos', `${reason ? `<p style="margin:0 0 10px;color:#382448;"><strong>Motivo:</strong> ${esc(reason)}</p>` : ''}<p style="margin:0;">Abre tu pedido en la tienda y adjunta el comprobante corregido. Conserva el mismo código de pedido: <strong style="word-break:break-word;">${code}</strong>.</p>`)
@@ -163,7 +163,8 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   </style>
 </head>
 <body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}${'&#847; &zwnj; &nbsp; '.repeat(24)}</div>
+  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>
+  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${'&zwnj;&nbsp;'.repeat(80)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
   <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
     <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
