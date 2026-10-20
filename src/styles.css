@@ -318,6 +318,20 @@ summary::-webkit-details-marker { display: none; }
 .modal[open]::backdrop { opacity: 1; }
 @starting-style { .modal[open] { opacity: 0; transform: translateY(12px); } .modal[open]::backdrop { opacity: 0; } }
 .modal-close { position: absolute; top: 13px; right: 13px; z-index: 2; background: #fbfaf9e8; }
+.modal-close:hover { background: #eee8f0; }
+.modal-close:focus,
+.modal-close:focus-visible,
+.drawer-header .icon-button:focus,
+.drawer-header .icon-button:focus-visible,
+.lightbox-heading .icon-button:focus,
+.lightbox-heading .icon-button:focus-visible,
+.admin-order-dialog .icon-button:focus,
+.admin-order-dialog .icon-button:focus-visible,
+.brand-preview-top .icon-button:focus,
+.brand-preview-top .icon-button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
 .product-dialog { width: 900px; }
 .product-dialog-inner { position: relative; display: grid; grid-template-columns: .95fr 1.05fr; }
 .product-visual { position: relative; min-height: 610px; background: var(--paper); overflow: hidden; }
