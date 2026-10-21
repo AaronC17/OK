@@ -319,16 +319,21 @@ summary::-webkit-details-marker { display: none; }
 .modal[open]::backdrop { opacity: 1; }
 @starting-style { .modal[open] { opacity: 0; transform: translateY(12px); } .modal[open]::backdrop { opacity: 0; } }
 .modal-close { position: absolute; top: 13px; right: 13px; z-index: 2; background: transparent; }
-.cart-toggle:focus-visible {
-  outline: 2px solid #75548e;
-  outline-offset: 3px;
-}
 .modal-close:focus,
 .modal-close:focus-visible,
 .account-close:focus,
 .account-close:focus-visible,
+.account-toggle,
 .account-toggle:focus,
 .account-toggle:focus-visible,
+.account-toggle:active,
+.account-toggle:focus-within,
+.account-toggle svg,
+.account-toggle .icon,
+.cart-toggle,
+.cart-toggle:focus,
+.cart-toggle:focus-visible,
+.cart-toggle:active,
 .drawer-header .icon-button:focus,
 .drawer-header .icon-button:focus-visible,
 .lightbox-heading .icon-button:focus,
