@@ -126,13 +126,18 @@ export class ShopDatabase implements ShopRepository {
   private accountFromRow(row: Row): CustomerAccount {
     const id = row.id as string
     const balance = this.database.prepare('SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?').get(id) as { balance: number | bigint } | undefined
+    let referralCode = (row.referral_code as string) || undefined
+    if (!referralCode) {
+      referralCode = this.generateReferralCode()
+      this.database.prepare('UPDATE customers SET referral_code = ? WHERE id = ?').run(referralCode, id)
+    }
     return {
       id,
       name: row.name as string,
       email: row.email as string,
       createdAt: row.created_at as string,
       welcomeAvailable: row.welcome_order_id === null,
-      referralCode: (row.referral_code as string) ?? undefined,
+      referralCode,
       creditBalanceMinor: Number(balance?.balance ?? 0),
     }
   }
@@ -494,8 +499,14 @@ export class ShopDatabase implements ShopRepository {
 
   referrals(session: Session): CustomerReferralsData {
     const customerId = requireAccount(session)
-    const customer = this.database.prepare('SELECT referral_code FROM customers WHERE id = ?').get(customerId) as { referral_code: string } | undefined
-    if (!customer?.referral_code) throw new StoreError(404, 'No se encontró la cuenta.')
+    const customer = this.database.prepare('SELECT id, referral_code FROM customers WHERE id = ?').get(customerId) as { id: string; referral_code: string | null } | undefined
+    if (!customer) throw new StoreError(404, 'No se encontró la cuenta.')
+    let referralCode = customer.referral_code
+    if (!referralCode) {
+      referralCode = this.generateReferralCode()
+      this.database.prepare('UPDATE customers SET referral_code = ? WHERE id = ?').run(referralCode, customerId)
+      customer.referral_code = referralCode
+    }
 
     const balanceRow = this.database.prepare('SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?').get(customerId) as { balance: number | bigint }
     const creditBalanceMinor = Number(balanceRow?.balance ?? 0)
@@ -537,8 +548,8 @@ export class ShopDatabase implements ShopRepository {
     }
 
     return {
-      referralCode: customer.referral_code,
-      shareUrl: `https://onkys.cr/?ref=${customer.referral_code}`,
+      referralCode,
+      shareUrl: `https://onkys.cr/?ref=${referralCode}`,
       creditBalanceMinor,
       summary: {
         pendingCount: pendingRows.length,

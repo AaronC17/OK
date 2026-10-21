@@ -25,7 +25,19 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
   const [password, setPassword] = useState('')
   const [referralCode, setReferralCode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return new URLSearchParams(window.location.search).get('ref') || ''
+      const fromUrl = new URLSearchParams(window.location.search).get('ref')
+      if (fromUrl) {
+        const clean = fromUrl.trim().toUpperCase()
+        try {
+          sessionStorage.setItem('onky_referral_code', clean)
+          localStorage.setItem('onky_referral_code', clean)
+        } catch {}
+        return clean
+      }
+      try {
+        const stored = sessionStorage.getItem('onky_referral_code') || localStorage.getItem('onky_referral_code')
+        if (stored) return stored.trim().toUpperCase()
+      } catch {}
     }
     return ''
   })
@@ -40,6 +52,7 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
   const [historyLoading, setHistoryLoading] = useState(false)
   const [referralsData, setReferralsData] = useState<CustomerReferralsData | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
   const [page, setPage] = useState(1)
   const [revision, setRevision] = useState(0)
   const form = useRef<HTMLFormElement>(null)
@@ -69,7 +82,13 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
   useEffect(() => {
     setMode(initialMode); setErrors({}); setError(''); setPassword(''); setShowPassword(false)
     if (!open) { setCreated(false); setName(''); setEmail(''); setPrivacy(false) }
-  }, [open, initialMode])
+    else if (!referralCode && typeof window !== 'undefined') {
+      const stored = new URLSearchParams(window.location.search).get('ref') ||
+        sessionStorage.getItem('onky_referral_code') ||
+        localStorage.getItem('onky_referral_code') || ''
+      if (stored) setReferralCode(stored.trim().toUpperCase())
+    }
+  }, [open, initialMode, referralCode])
 
   useEffect(() => {
     if (Object.keys(errors).length) form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
@@ -178,48 +197,108 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
                     {isComplete
                       ? '🎉 ¡Felicidades! Ganaste tu gomita de regalo para tu próximo pedido de ₡3.000 o más.'
                       : remaining === 1
-                      ? 'Te falta 1 compra para ganar tu gomita'
-                      : `Te faltan ${remaining} compras para ganar tu gomita`}
+                      ? 'Falta 1 compra para ganar tu gomita'
+                      : `Faltan ${remaining} compras para ganar tu gomita`}
                   </p>
                 </div>
               )
             })()}
 
-            <div className="referral-share-actions">
-              <button
-                type="button"
-                className="button button-primary referral-share-btn"
-                onClick={() => {
-                  const url = referralsData?.shareUrl || (user.referralCode ? `${window.location.origin}/?ref=${user.referralCode}` : '')
-                  const text = `¡Mae, te regalo 10% en tu primer pedido de gomitas Onky's! 🌶️ Pedí con mi enlace: ${url}`
-                  if (typeof navigator !== 'undefined' && navigator.share) {
-                    void navigator.share({ title: "Onky's Gomitas", text, url }).catch(() => {})
-                  } else {
-                    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
-                    window.open(waUrl, '_blank', 'noopener,noreferrer')
-                  }
-                }}
-              >
-                <Icon name="arrow-up" size={15} />
-                <span>Compartir enlace</span>
-              </button>
+            {(() => {
+              const code = user.referralCode || referralsData?.referralCode || ''
+              const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://onkys.cr'
+              const url = code ? `${origin}/?ref=${code}` : ''
 
-              <button
-                type="button"
-                className="referral-copy-btn"
-                onClick={() => {
-                  const url = referralsData?.shareUrl || (user.referralCode ? `${window.location.origin}/?ref=${user.referralCode}` : '')
-                  if (url) {
-                    void navigator.clipboard.writeText(url)
-                    setCopiedLink(true)
-                    setTimeout(() => setCopiedLink(false), 2000)
-                  }
-                }}
-              >
-                <Icon name={copiedLink ? 'check' : 'copy'} size={15} />
-                <span>{copiedLink ? '¡Copiado!' : 'Copiar'}</span>
-              </button>
-            </div>
+              const shareLink = () => {
+                if (!url) return
+                const text = `¡Mae, te regalo 10% en tu primer pedido de gomitas Onky's! 🌶️ Pedí con mi enlace: ${url}`
+                if (typeof navigator !== 'undefined' && navigator.share) {
+                  void navigator.share({ title: "Onky's Gomitas", text, url }).catch(() => {})
+                } else {
+                  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
+                  window.open(waUrl, '_blank', 'noopener,noreferrer')
+                }
+              }
+
+              const copyLink = () => {
+                if (!url) return
+                void navigator.clipboard.writeText(url)
+                setCopiedLink(true)
+                setTimeout(() => setCopiedLink(false), 2000)
+              }
+
+              const shareCode = () => {
+                if (!code) return
+                const text = `¡Mae! Usá mi código de referido *${code}* al registrarte en Onky's y recibí 10% de descuento en tu primer pedido de gomitas 🌶️ ${origin}`
+                if (typeof navigator !== 'undefined' && navigator.share) {
+                  void navigator.share({ title: "Código de referido Onky's", text }).catch(() => {})
+                } else {
+                  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
+                  window.open(waUrl, '_blank', 'noopener,noreferrer')
+                }
+              }
+
+              const copyCode = () => {
+                if (!code) return
+                void navigator.clipboard.writeText(code)
+                setCopiedCode(true)
+                setTimeout(() => setCopiedCode(false), 2000)
+              }
+
+              return (
+                <div className="referral-sharing-block">
+                  {code && (
+                    <div className="referral-code-card">
+                      <div className="referral-code-info">
+                        <span className="referral-code-label">Tu código de referido:</span>
+                        <strong className="referral-code-badge">{code}</strong>
+                      </div>
+                      <div className="referral-code-actions">
+                        <button
+                          type="button"
+                          className="referral-action-btn"
+                          onClick={copyCode}
+                          title="Copiar solo el código de referido"
+                        >
+                          <Icon name={copiedCode ? 'check' : 'copy'} size={14} />
+                          <span>{copiedCode ? '¡Código copiado!' : 'Copiar código'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="referral-action-btn"
+                          onClick={shareCode}
+                          title="Compartir solo el código de referido"
+                        >
+                          <Icon name="arrow-up" size={14} />
+                          <span>Compartir código</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="referral-share-actions">
+                    <button
+                      type="button"
+                      className="button button-primary referral-share-btn"
+                      onClick={shareLink}
+                    >
+                      <Icon name="arrow-up" size={15} />
+                      <span>Compartir enlace</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="referral-copy-btn"
+                      onClick={copyLink}
+                      title="Copiar enlace con código incluido"
+                    >
+                      <Icon name={copiedLink ? 'check' : 'copy'} size={15} />
+                      <span>{copiedLink ? '¡Enlace copiado!' : 'Copiar enlace'}</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
 
             {referralsData && (referralsData.validReferrals.length > 0 || referralsData.pendingReferrals.length > 0) && (
               <div className="referral-details">
@@ -307,18 +386,56 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
             {registering && (
               <div className="form-field">
                 <label htmlFor="account-referral">Código de referido <small style={{ fontWeight: 400, color: '#7a6b82' }}>(opcional)</small></label>
-                <div className="account-input">
+                <div className="account-input account-referral-input">
                   <Icon name="gift" size={17} />
                   <input
                     id="account-referral"
                     autoCapitalize="characters"
                     spellCheck={false}
-                    maxLength={20}
+                    maxLength={40}
                     placeholder="ONKY-XXXX"
                     value={referralCode}
-                    onChange={event => setReferralCode(event.target.value.toUpperCase())}
+                    onChange={event => {
+                      const val = event.target.value
+                      const match = val.match(/ref=([A-Za-z0-9-]+)/i)
+                      setReferralCode((match ? match[1] : val).toUpperCase())
+                    }}
                   />
+                  {referralCode ? (
+                    <button
+                      type="button"
+                      className="account-input-action"
+                      title="Quitar código"
+                      aria-label="Quitar código de referido"
+                      onClick={() => setReferralCode('')}
+                    >
+                      <Icon name="close" size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="account-input-action"
+                      title="Pegar código copiado"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText()
+                          if (text) {
+                            const match = text.match(/ref=([A-Za-z0-9-]+)/i)
+                            const codeToSet = match ? match[1] : text.trim()
+                            setReferralCode(codeToSet.toUpperCase())
+                          }
+                        } catch {}
+                      }}
+                    >
+                      Pegar
+                    </button>
+                  )}
                 </div>
+                {referralCode && (
+                  <p className="account-referral-note">
+                    ✓ Código listo para vincular a tu amigo y recibir tu beneficio.
+                  </p>
+                )}
               </div>
             )}
             {registering && <div className="account-consent"><label><input type="checkbox" checked={privacy} onChange={event => { setPrivacy(event.target.checked); setErrors(current => ({ ...current, privacy: undefined })) }} aria-invalid={!!errors.privacy} aria-describedby={errors.privacy ? 'account-privacy-error' : undefined} /><span>Acepto que Onky’s guarde mi nombre, correo y pedidos para gestionar mi cuenta.</span></label>{errors.privacy && <p id="account-privacy-error" className="field-error">{errors.privacy}</p>}</div>}

@@ -231,11 +231,108 @@
   margin: 0;
   line-height: 1.4;
 }
+.referral-sharing-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.referral-code-card {
+  background: #fbf7fc;
+  border: 1px solid #ebdfee;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.referral-code-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.referral-code-label {
+  font-size: 11.5px;
+  color: #584164;
+  font-weight: 600;
+}
+.referral-code-badge {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 800;
+  color: #391e4b;
+  background: #ffffff;
+  border: 1px solid #d9c7e0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  letter-spacing: 1px;
+}
+.referral-code-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.referral-action-btn {
+  min-height: 34px;
+  padding: 0 10px;
+  background: #ffffff;
+  border: 1px solid #decfe3;
+  border-radius: 8px;
+  color: #432557;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background .15s, border-color .15s;
+}
+.referral-action-btn:hover {
+  background: #f2eaf5;
+  border-color: #cfbfd5;
+}
 .referral-share-actions {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
-  margin-top: 12px;
+}
+.account-referral-input {
+  position: relative;
+}
+.account-referral-input input {
+  padding-right: 68px;
+}
+.account-input-action {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #f2ebf5;
+  border: 1px solid #decfe3;
+  color: #4a2e5d;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background .15s, border-color .15s;
+}
+.account-input-action:hover {
+  background: #e7dbe9;
+  border-color: #cbbed0;
+}
+.account-referral-note {
+  font-size: 11px;
+  color: #1f6b3b;
+  margin: 5px 0 0 2px;
+  font-weight: 550;
+  line-height: 1.35;
 }
 .referral-share-btn {
   min-height: 40px;

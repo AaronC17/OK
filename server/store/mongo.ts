@@ -187,14 +187,44 @@ export class MongoShopDatabase implements ShopRepository {
     await this.collection('sessions').deleteOne({ token_hash: session.hash })
   }
 
-  private accountFromDoc(row: Record<string, any>): CustomerAccount {
-    return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at, welcomeAvailable: !row.welcome_order_id }
+  private async generateReferralCode(session?: ClientSession): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let attempts = 0
+    while (attempts++ < 10) {
+      let code = 'ONKY-'
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      const existing = await this.collection('customers').findOne({ referral_code: code }, { session })
+      if (!existing) return code
+    }
+    return `ONKY-${Date.now().toString(36).toUpperCase().slice(-4)}`
+  }
+
+  private accountFromDoc(row: Record<string, any>, creditBalanceMinor = 0): CustomerAccount {
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.created_at,
+      welcomeAvailable: !row.welcome_order_id,
+      referralCode: row.referral_code || undefined,
+      creditBalanceMinor,
+    }
   }
 
   async account(session: Session): Promise<CustomerAccount | null> {
     if (!session.accountId) return null
     const row = await this.collection('customers').findOne({ id: session.accountId }, { projection: { password_hash: 0 } })
-    return row ? this.accountFromDoc(row) : null
+    if (!row) return null
+    if (!row.referral_code) {
+      const code = await this.generateReferralCode()
+      row.referral_code = code
+      await this.collection('customers').updateOne({ id: row.id }, { $set: { referral_code: code } })
+    }
+    const ledgerDocs = await this.collection('customer_credit_ledger').find({ customer_id: row.id }).toArray()
+    const balance = ledgerDocs.reduce((acc: number, cur: any) => acc + (cur.amount_minor || 0), 0)
+    return this.accountFromDoc(row, balance)
   }
 
   private async signInCustomer(id: string, previous: Session, session: ClientSession) {
@@ -214,9 +244,40 @@ export class MongoShopDatabase implements ShopRepository {
     try {
       return await this.transaction(async session => {
         if (await this.collection('customers').findOne({ email: data.email }, { session })) throw new StoreError(409, 'Ya existe una cuenta con este correo. Inicia sesión.')
+        let referrerId: string | null = null
+        if (data.referralCode) {
+          const referrer = await this.collection('customers').findOne({ referral_code: data.referralCode }, { session })
+          if (!referrer) throw new StoreError(422, 'El código de referido no existe.')
+          if (referrer.email.toLowerCase() === data.email.toLowerCase()) throw new StoreError(422, 'No puedes usar tu propio código de referido.')
+          referrerId = referrer.id
+        }
         const id = randomUUID()
+        const referralCode = await this.generateReferralCode(session)
         const now = timestamp()
-        await this.collection('customers').insertOne({ _id: id, id, name: data.name, email: data.email, password_hash: hash, created_at: now, welcome_order_id: null, privacy_version: 'customer-account-v1', privacy_accepted_at: now }, { session })
+        await this.collection('customers').insertOne({
+          _id: id,
+          id,
+          name: data.name,
+          email: data.email,
+          password_hash: hash,
+          referral_code: referralCode,
+          created_at: now,
+          welcome_order_id: null,
+          privacy_version: 'customer-account-v1',
+          privacy_accepted_at: now,
+        }, { session })
+        if (referrerId) {
+          const refId = randomUUID()
+          await this.collection('referrals').insertOne({
+            _id: refId,
+            id: refId,
+            referrer_id: referrerId,
+            referred_id: id,
+            status: 'pending',
+            created_at: now,
+          }, { session })
+          await this.audit(null, 'customer.referral_pending', id, `Referido por ${referrerId}. Pendiente de primera compra.`, session)
+        }
         const result = await this.signInCustomer(id, previous, session)
         await this.audit(null, 'customer.registered', id, 'Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.', session)
         return result
@@ -248,7 +309,11 @@ export class MongoShopDatabase implements ShopRepository {
     const customerId = requireAccount(session)
     const customer = await this.collection('customers').findOne({ id: customerId })
     if (!customer) throw new StoreError(404, 'No se encontró la cuenta.')
-    const referralCode = customer.referral_code || `ONKY-${customerId.slice(0, 6).toUpperCase()}`
+    let referralCode = customer.referral_code
+    if (!referralCode) {
+      referralCode = await this.generateReferralCode()
+      await this.collection('customers').updateOne({ id: customerId }, { $set: { referral_code: referralCode } })
+    }
 
     const ledgerDocs = await this.collection('customer_credit_ledger')
       .find({ customer_id: customerId })
@@ -262,6 +327,16 @@ export class MongoShopDatabase implements ShopRepository {
     const validDocs = await this.collection('referrals').find({ referrer_id: customerId, status: 'rewarded' }).sort({ rewarded_at: -1 }).toArray()
     const totalEarnedMinor = validDocs.reduce((acc: number, cur: any) => acc + (cur.reward_minor || 0), 0)
 
+    const anonymize = (fullName: string) => {
+      const parts = fullName.trim().split(/\s+/)
+      return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0]}.`
+    }
+    const customerIds = [...new Set([...pendingDocs.map((r: any) => r.referred_id), ...validDocs.map((r: any) => r.referred_id)])]
+    const referredCustomers = customerIds.length > 0
+      ? await this.collection('customers').find({ id: { $in: customerIds } }).toArray()
+      : []
+    const namesMap = new Map(referredCustomers.map((c: any) => [c.id, anonymize(c.name || 'Invitado')]))
+
     return {
       referralCode,
       shareUrl: `https://onkys.cr/?ref=${referralCode}`,
@@ -273,7 +348,7 @@ export class MongoShopDatabase implements ShopRepository {
       },
       pendingReferrals: pendingDocs.map((r: any) => ({
         id: r.id,
-        referredName: r.referred_name || 'Invitado',
+        referredName: namesMap.get(r.referred_id) || r.referred_name || 'Invitado',
         status: 'pending',
         createdAt: r.created_at,
         firstOrderCode: null,
@@ -282,7 +357,7 @@ export class MongoShopDatabase implements ShopRepository {
       })),
       validReferrals: validDocs.map((r: any) => ({
         id: r.id,
-        referredName: r.referred_name || 'Invitado',
+        referredName: namesMap.get(r.referred_id) || r.referred_name || 'Invitado',
         status: 'rewarded',
         createdAt: r.rewarded_at,
         firstOrderCode: r.first_order_code || null,
@@ -298,6 +373,79 @@ export class MongoShopDatabase implements ShopRepository {
         createdAt: l.created_at,
       })),
     }
+  }
+
+  private async rewardReferralIfEligible(order: ShopOrder, session: ClientSession): Promise<void> {
+    if (!order.customerAccountId || !order.totalMinor || order.totalMinor <= 0) return
+    const buyerId = order.customerAccountId
+    const referral = await this.collection('referrals').findOne(
+      { referred_id: buyerId, status: 'pending' },
+      { session }
+    )
+    if (!referral) return
+
+    const priorPaidCount = await this.collection('shop_orders').countDocuments(
+      { account_id: buyerId, status: 'ready', id: { $ne: order.id } },
+      { session }
+    )
+    if (priorPaidCount > 0) {
+      await this.collection('referrals').updateOne(
+        { id: referral.id },
+        { $set: { status: 'revoked' } },
+        { session }
+      )
+      return
+    }
+
+    const MAX_REWARD_MINOR = 500_000
+    const rewardMinor = Math.min(Math.round(order.totalMinor * 0.10), MAX_REWARD_MINOR)
+    const now = timestamp()
+    const idempotencyKey = `reward:order:${order.id}:ref:${referral.id}`
+
+    const existing = await this.collection('customer_credit_ledger').findOne(
+      { idempotency_key: idempotencyKey },
+      { session }
+    )
+    if (existing) return
+
+    const ledgerDocs = await this.collection('customer_credit_ledger').find(
+      { customer_id: referral.referrer_id },
+      { session }
+    ).toArray()
+    const currentBalance = ledgerDocs.reduce((acc: number, cur: any) => acc + (cur.amount_minor || 0), 0)
+    const balanceAfter = currentBalance + rewardMinor
+
+    await this.collection('referrals').updateOne(
+      { id: referral.id, status: 'pending' },
+      {
+        $set: {
+          status: 'rewarded',
+          first_order_id: order.id,
+          order_total_minor: order.totalMinor,
+          reward_minor: rewardMinor,
+          rewarded_at: now,
+        },
+      },
+      { session }
+    )
+
+    await this.collection('customer_credit_ledger').insertOne(
+      {
+        _id: randomUUID(),
+        customer_id: referral.referrer_id,
+        type: 'referral_reward',
+        amount_minor: rewardMinor,
+        balance_after_minor: balanceAfter,
+        order_id: order.id,
+        referral_id: referral.id,
+        idempotency_key: idempotencyKey,
+        description: `Crédito del 10% por la primera compra de tu referido (Pedido ${order.code})`,
+        created_at: now,
+      },
+      { session }
+    )
+
+    await this.audit(order.id, 'referral.rewarded', 'system', `Crédito de recompensa de ₡${(rewardMinor / 100).toLocaleString('es-CR')} registrado para el referente ${referral.referrer_id}`, session)
   }
 
   async customers(query: URLSearchParams): Promise<AdminCustomers> {
@@ -625,6 +773,7 @@ export class MongoShopDatabase implements ShopRepository {
       )
       await this.audit(id, 'payment.confirmed_manual', actor, note, session)
       const updated = await this.getOrder(id, session)
+      await this.rewardReferralIfEligible(updated, session)
       await this.event(updated, 'payment.confirmed_manual', session)
       return updated
     })

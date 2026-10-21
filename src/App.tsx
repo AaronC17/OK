@@ -47,8 +47,31 @@ export default function App() {
     return () => window.clearTimeout(timeout)
   }, [toast])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) {
+      const cleanRef = ref.trim().toUpperCase()
+      try {
+        sessionStorage.setItem('onky_referral_code', cleanRef)
+        localStorage.setItem('onky_referral_code', cleanRef)
+      } catch {}
+    }
+  }, [])
+
   const openCart = useCallback(() => { setSelectedOrderId(null); setCartRequested(true); setCartOpen(true) }, [])
   const openAccount = useCallback((mode: AccountMode = 'login') => { setAccountMode(mode); setAccountRequested(true); setCartOpen(false); setAccountOpen(true) }, [])
+
+  useEffect(() => {
+    if (customer.loading) return
+    if (!customer.user) {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      if (params?.has('ref')) {
+        openAccount('register')
+      }
+    }
+  }, [customer.loading, customer.user, openAccount])
   const viewAccountOrder = (id: string) => { setSelectedOrderId(id); setAccountOpen(false); setCartRequested(true); setCartOpen(true) }
   const shopFromAccount = () => {
     setAccountOpen(false)

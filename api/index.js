@@ -757,13 +757,18 @@ var ShopDatabase = class {
   accountFromRow(row) {
     const id = row.id;
     const balance = this.database.prepare("SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?").get(id);
+    let referralCode = row.referral_code || void 0;
+    if (!referralCode) {
+      referralCode = this.generateReferralCode();
+      this.database.prepare("UPDATE customers SET referral_code = ? WHERE id = ?").run(referralCode, id);
+    }
     return {
       id,
       name: row.name,
       email: row.email,
       createdAt: row.created_at,
       welcomeAvailable: row.welcome_order_id === null,
-      referralCode: row.referral_code ?? void 0,
+      referralCode,
       creditBalanceMinor: Number(balance?.balance ?? 0)
     };
   }
@@ -1134,8 +1139,14 @@ var ShopDatabase = class {
   }
   referrals(session) {
     const customerId = requireAccount(session);
-    const customer = this.database.prepare("SELECT referral_code FROM customers WHERE id = ?").get(customerId);
-    if (!customer?.referral_code) throw new StoreError(404, "No se encontr\xF3 la cuenta.");
+    const customer = this.database.prepare("SELECT id, referral_code FROM customers WHERE id = ?").get(customerId);
+    if (!customer) throw new StoreError(404, "No se encontr\xF3 la cuenta.");
+    let referralCode = customer.referral_code;
+    if (!referralCode) {
+      referralCode = this.generateReferralCode();
+      this.database.prepare("UPDATE customers SET referral_code = ? WHERE id = ?").run(referralCode, customerId);
+      customer.referral_code = referralCode;
+    }
     const balanceRow = this.database.prepare("SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?").get(customerId);
     const creditBalanceMinor = Number(balanceRow?.balance ?? 0);
     const pendingRows = this.database.prepare(`
@@ -1170,8 +1181,8 @@ var ShopDatabase = class {
       return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0]}.`;
     };
     return {
-      referralCode: customer.referral_code,
-      shareUrl: `https://onkys.cr/?ref=${customer.referral_code}`,
+      referralCode,
+      shareUrl: `https://onkys.cr/?ref=${referralCode}`,
       creditBalanceMinor,
       summary: {
         pendingCount: pendingRows.length,
@@ -1370,13 +1381,42 @@ var MongoShopDatabase = class {
   async logout(session) {
     await this.collection("sessions").deleteOne({ token_hash: session.hash });
   }
-  accountFromDoc(row) {
-    return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at, welcomeAvailable: !row.welcome_order_id };
+  async generateReferralCode(session) {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let attempts = 0;
+    while (attempts++ < 10) {
+      let code = "ONKY-";
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const existing = await this.collection("customers").findOne({ referral_code: code }, { session });
+      if (!existing) return code;
+    }
+    return `ONKY-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+  }
+  accountFromDoc(row, creditBalanceMinor = 0) {
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.created_at,
+      welcomeAvailable: !row.welcome_order_id,
+      referralCode: row.referral_code || void 0,
+      creditBalanceMinor
+    };
   }
   async account(session) {
     if (!session.accountId) return null;
     const row = await this.collection("customers").findOne({ id: session.accountId }, { projection: { password_hash: 0 } });
-    return row ? this.accountFromDoc(row) : null;
+    if (!row) return null;
+    if (!row.referral_code) {
+      const code = await this.generateReferralCode();
+      row.referral_code = code;
+      await this.collection("customers").updateOne({ id: row.id }, { $set: { referral_code: code } });
+    }
+    const ledgerDocs = await this.collection("customer_credit_ledger").find({ customer_id: row.id }).toArray();
+    const balance = ledgerDocs.reduce((acc, cur) => acc + (cur.amount_minor || 0), 0);
+    return this.accountFromDoc(row, balance);
   }
   async signInCustomer(id, previous, session) {
     const removed = await this.collection("sessions").deleteOne({ token_hash: previous.hash, role: "customer", account_id: null, expires_at: { $gt: Date.now() } }, { session });
@@ -1394,9 +1434,40 @@ var MongoShopDatabase = class {
     try {
       return await this.transaction(async (session) => {
         if (await this.collection("customers").findOne({ email: data.email }, { session })) throw new StoreError(409, "Ya existe una cuenta con este correo. Inicia sesi\xF3n.");
+        let referrerId = null;
+        if (data.referralCode) {
+          const referrer = await this.collection("customers").findOne({ referral_code: data.referralCode }, { session });
+          if (!referrer) throw new StoreError(422, "El c\xF3digo de referido no existe.");
+          if (referrer.email.toLowerCase() === data.email.toLowerCase()) throw new StoreError(422, "No puedes usar tu propio c\xF3digo de referido.");
+          referrerId = referrer.id;
+        }
         const id = randomUUID2();
+        const referralCode = await this.generateReferralCode(session);
         const now = timestamp2();
-        await this.collection("customers").insertOne({ _id: id, id, name: data.name, email: data.email, password_hash: hash, created_at: now, welcome_order_id: null, privacy_version: "customer-account-v1", privacy_accepted_at: now }, { session });
+        await this.collection("customers").insertOne({
+          _id: id,
+          id,
+          name: data.name,
+          email: data.email,
+          password_hash: hash,
+          referral_code: referralCode,
+          created_at: now,
+          welcome_order_id: null,
+          privacy_version: "customer-account-v1",
+          privacy_accepted_at: now
+        }, { session });
+        if (referrerId) {
+          const refId = randomUUID2();
+          await this.collection("referrals").insertOne({
+            _id: refId,
+            id: refId,
+            referrer_id: referrerId,
+            referred_id: id,
+            status: "pending",
+            created_at: now
+          }, { session });
+          await this.audit(null, "customer.referral_pending", id, `Referido por ${referrerId}. Pendiente de primera compra.`, session);
+        }
         const result = await this.signInCustomer(id, previous, session);
         await this.audit(null, "customer.registered", id, "Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.", session);
         return result;
@@ -1425,12 +1496,23 @@ var MongoShopDatabase = class {
     const customerId = requireAccount(session);
     const customer = await this.collection("customers").findOne({ id: customerId });
     if (!customer) throw new StoreError(404, "No se encontr\xF3 la cuenta.");
-    const referralCode = customer.referral_code || `ONKY-${customerId.slice(0, 6).toUpperCase()}`;
+    let referralCode = customer.referral_code;
+    if (!referralCode) {
+      referralCode = await this.generateReferralCode();
+      await this.collection("customers").updateOne({ id: customerId }, { $set: { referral_code: referralCode } });
+    }
     const ledgerDocs = await this.collection("customer_credit_ledger").find({ customer_id: customerId }).sort({ created_at: -1 }).limit(50).toArray();
     const creditBalanceMinor = ledgerDocs.reduce((acc, cur) => acc + (cur.amount_minor || 0), 0);
     const pendingDocs = await this.collection("referrals").find({ referrer_id: customerId, status: "pending" }).sort({ created_at: -1 }).toArray();
     const validDocs = await this.collection("referrals").find({ referrer_id: customerId, status: "rewarded" }).sort({ rewarded_at: -1 }).toArray();
     const totalEarnedMinor = validDocs.reduce((acc, cur) => acc + (cur.reward_minor || 0), 0);
+    const anonymize = (fullName) => {
+      const parts = fullName.trim().split(/\s+/);
+      return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    };
+    const customerIds = [.../* @__PURE__ */ new Set([...pendingDocs.map((r) => r.referred_id), ...validDocs.map((r) => r.referred_id)])];
+    const referredCustomers = customerIds.length > 0 ? await this.collection("customers").find({ id: { $in: customerIds } }).toArray() : [];
+    const namesMap = new Map(referredCustomers.map((c) => [c.id, anonymize(c.name || "Invitado")]));
     return {
       referralCode,
       shareUrl: `https://onkys.cr/?ref=${referralCode}`,
@@ -1442,7 +1524,7 @@ var MongoShopDatabase = class {
       },
       pendingReferrals: pendingDocs.map((r) => ({
         id: r.id,
-        referredName: r.referred_name || "Invitado",
+        referredName: namesMap.get(r.referred_id) || r.referred_name || "Invitado",
         status: "pending",
         createdAt: r.created_at,
         firstOrderCode: null,
@@ -1451,7 +1533,7 @@ var MongoShopDatabase = class {
       })),
       validReferrals: validDocs.map((r) => ({
         id: r.id,
-        referredName: r.referred_name || "Invitado",
+        referredName: namesMap.get(r.referred_id) || r.referred_name || "Invitado",
         status: "rewarded",
         createdAt: r.rewarded_at,
         firstOrderCode: r.first_order_code || null,
@@ -1467,6 +1549,71 @@ var MongoShopDatabase = class {
         createdAt: l.created_at
       }))
     };
+  }
+  async rewardReferralIfEligible(order, session) {
+    if (!order.customerAccountId || !order.totalMinor || order.totalMinor <= 0) return;
+    const buyerId = order.customerAccountId;
+    const referral = await this.collection("referrals").findOne(
+      { referred_id: buyerId, status: "pending" },
+      { session }
+    );
+    if (!referral) return;
+    const priorPaidCount = await this.collection("shop_orders").countDocuments(
+      { account_id: buyerId, status: "ready", id: { $ne: order.id } },
+      { session }
+    );
+    if (priorPaidCount > 0) {
+      await this.collection("referrals").updateOne(
+        { id: referral.id },
+        { $set: { status: "revoked" } },
+        { session }
+      );
+      return;
+    }
+    const MAX_REWARD_MINOR = 5e5;
+    const rewardMinor = Math.min(Math.round(order.totalMinor * 0.1), MAX_REWARD_MINOR);
+    const now = timestamp2();
+    const idempotencyKey = `reward:order:${order.id}:ref:${referral.id}`;
+    const existing = await this.collection("customer_credit_ledger").findOne(
+      { idempotency_key: idempotencyKey },
+      { session }
+    );
+    if (existing) return;
+    const ledgerDocs = await this.collection("customer_credit_ledger").find(
+      { customer_id: referral.referrer_id },
+      { session }
+    ).toArray();
+    const currentBalance = ledgerDocs.reduce((acc, cur) => acc + (cur.amount_minor || 0), 0);
+    const balanceAfter = currentBalance + rewardMinor;
+    await this.collection("referrals").updateOne(
+      { id: referral.id, status: "pending" },
+      {
+        $set: {
+          status: "rewarded",
+          first_order_id: order.id,
+          order_total_minor: order.totalMinor,
+          reward_minor: rewardMinor,
+          rewarded_at: now
+        }
+      },
+      { session }
+    );
+    await this.collection("customer_credit_ledger").insertOne(
+      {
+        _id: randomUUID2(),
+        customer_id: referral.referrer_id,
+        type: "referral_reward",
+        amount_minor: rewardMinor,
+        balance_after_minor: balanceAfter,
+        order_id: order.id,
+        referral_id: referral.id,
+        idempotency_key: idempotencyKey,
+        description: `Cr\xE9dito del 10% por la primera compra de tu referido (Pedido ${order.code})`,
+        created_at: now
+      },
+      { session }
+    );
+    await this.audit(order.id, "referral.rewarded", "system", `Cr\xE9dito de recompensa de \u20A1${(rewardMinor / 100).toLocaleString("es-CR")} registrado para el referente ${referral.referrer_id}`, session);
   }
   async customers(query) {
     const page = accountPage(query);
@@ -1771,6 +1918,7 @@ var MongoShopDatabase = class {
       );
       await this.audit(id, "payment.confirmed_manual", actor, note, session);
       const updated = await this.getOrder(id, session);
+      await this.rewardReferralIfEligible(updated, session);
       await this.event(updated, "payment.confirmed_manual", session);
       return updated;
     });
