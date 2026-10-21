@@ -268,19 +268,15 @@
   padding: 3px 8px;
   letter-spacing: 1px;
 }
-.referral-code-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
 .referral-action-btn {
-  min-height: 34px;
-  padding: 0 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
   background: #ffffff;
   border: 1px solid #decfe3;
   border-radius: 8px;
   color: #432557;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
@@ -294,9 +290,20 @@
   border-color: #cfbfd5;
 }
 .referral-share-actions {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: block;
+}
+.referral-share-btn {
+  width: 100%;
+  min-height: 42px;
+  font-size: 13px;
+  font-weight: 650;
   gap: 8px;
+  border-radius: 12px;
+  background: #391e4b;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .account-referral-input {
   position: relative;

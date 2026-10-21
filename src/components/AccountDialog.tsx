@@ -51,7 +51,6 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(false)
   const [referralsData, setReferralsData] = useState<CustomerReferralsData | null>(null)
-  const [copiedLink, setCopiedLink] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
   const [page, setPage] = useState(1)
   const [revision, setRevision] = useState(0)
@@ -168,8 +167,8 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
               <span className="milestone-badge"><Icon name="gift" size={13} /> GOMITA DE REGALO</span>
               <span className="milestone-rule">En compras de ₡3.000 o más</span>
             </header>
-            <h3 className="milestone-title">Invitá a 3 amigos y llevate una gomita</h3>
-            <p className="milestone-subtext">Ellos reciben 10% en su primer pedido. Cuando completen su compra, sumás progreso para tu gomita gratis.</p>
+            <h3 className="milestone-title">Invitá a 3 amigos y llevate unas gomitas</h3>
+            <p className="milestone-subtext">Ellos reciben 10% en su primer pedido. Cuando completen su compra, sumás progreso para tus gomitas gratis.</p>
 
             {(() => {
               const validCount = referralsData?.summary.validCount ?? 0
@@ -195,10 +194,10 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
                   </div>
                   <p className="milestone-status-message">
                     {isComplete
-                      ? '🎉 ¡Felicidades! Ganaste tu gomita de regalo para tu próximo pedido de ₡3.000 o más.'
+                      ? '🎉 ¡Felicidades! Ganaste tus gomitas de regalo para tu próximo pedido de ₡3.000 o más.'
                       : remaining === 1
-                      ? 'Falta 1 compra para ganar tu gomita'
-                      : `Faltan ${remaining} compras para ganar tu gomita`}
+                      ? 'Falta 1 compra para ganar tus gomitas'
+                      : `Faltan ${remaining} compras para ganar tus gomitas`}
                   </p>
                 </div>
               )
@@ -220,24 +219,6 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
                 }
               }
 
-              const copyLink = () => {
-                if (!url) return
-                void navigator.clipboard.writeText(url)
-                setCopiedLink(true)
-                setTimeout(() => setCopiedLink(false), 2000)
-              }
-
-              const shareCode = () => {
-                if (!code) return
-                const text = `¡Mae! Usá mi código de referido *${code}* al registrarte en Onky's y recibí 10% de descuento en tu primer pedido de gomitas 🌶️ ${origin}`
-                if (typeof navigator !== 'undefined' && navigator.share) {
-                  void navigator.share({ title: "Código de referido Onky's", text }).catch(() => {})
-                } else {
-                  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
-                  window.open(waUrl, '_blank', 'noopener,noreferrer')
-                }
-              }
-
               const copyCode = () => {
                 if (!code) return
                 void navigator.clipboard.writeText(code)
@@ -253,26 +234,15 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
                         <span className="referral-code-label">Tu código de referido:</span>
                         <strong className="referral-code-badge">{code}</strong>
                       </div>
-                      <div className="referral-code-actions">
-                        <button
-                          type="button"
-                          className="referral-action-btn"
-                          onClick={copyCode}
-                          title="Copiar solo el código de referido"
-                        >
-                          <Icon name={copiedCode ? 'check' : 'copy'} size={14} />
-                          <span>{copiedCode ? '¡Código copiado!' : 'Copiar código'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="referral-action-btn"
-                          onClick={shareCode}
-                          title="Compartir solo el código de referido"
-                        >
-                          <Icon name="arrow-up" size={14} />
-                          <span>Compartir código</span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="referral-action-btn"
+                        onClick={copyCode}
+                        title="Copiar solo el código de referido"
+                      >
+                        <Icon name={copiedCode ? 'check' : 'copy'} size={14} />
+                        <span>{copiedCode ? '¡Código copiado!' : 'Copiar código'}</span>
+                      </button>
                     </div>
                   )}
 
@@ -284,16 +254,6 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
                     >
                       <Icon name="arrow-up" size={15} />
                       <span>Compartir enlace</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="referral-copy-btn"
-                      onClick={copyLink}
-                      title="Copiar enlace con código incluido"
-                    >
-                      <Icon name={copiedLink ? 'check' : 'copy'} size={15} />
-                      <span>{copiedLink ? '¡Enlace copiado!' : 'Copiar enlace'}</span>
                     </button>
                   </div>
                 </div>
