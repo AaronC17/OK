@@ -32,23 +32,46 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
 
       <DeliveryTruck />
 
-      <div className="transit-steps" aria-label="Progreso del pedido">
-        <div className="transit-step is-done">
-          <span className="transit-step-dot"><Icon name="check" size={12} /></span>
-           <span>{order.receipt ? 'Comprobante recibido' : 'Pedido recibido'}</span>
+      <div className="transit-stepper" aria-label="Progreso del pedido">
+        <div className="transit-track">
+          <div className="transit-step-col is-done">
+            <span className="transit-step-dot is-done" aria-hidden="true">
+              <Icon name="check" size={12} />
+            </span>
+            <span className="transit-step-label is-done">
+              {order.receipt ? 'Comprobante recibido' : 'Pedido recibido'}
+            </span>
+          </div>
+
+          <div className={`transit-step-connector ${order.receipt ? 'is-filled' : ''}`} />
+
+          <div className={`transit-step-col ${isReady ? 'is-done' : 'is-active'}`}>
+            <span className={`transit-step-dot ${isReady ? 'is-done' : 'is-active'}`} aria-hidden="true">
+              {isReady ? <Icon name="check" size={12} /> : <span className="step-inner-pulse" />}
+            </span>
+            <span className={`transit-step-label ${isReady ? 'is-done' : 'is-active'}`}>
+              {isReady ? 'Pago verificado' : 'Revisando pago'}
+            </span>
+          </div>
+
+          <div className={`transit-step-connector ${isReady ? 'is-filled' : ''}`} />
+
+          <div className={`transit-step-col ${isReady ? 'is-active' : ''}`}>
+            <span className={`transit-step-dot ${isReady ? 'is-active' : ''}`} aria-hidden="true">
+              <Icon name={isPickup ? 'pin' : 'truck'} size={12} />
+            </span>
+            <span className={`transit-step-label ${isReady ? 'is-active' : ''}`}>
+              {isReady ? (isPickup ? 'Listo para retirar' : 'En camino') : 'En preparación'}
+            </span>
+          </div>
         </div>
-        <div className="transit-step-line is-filled" />
-        <div className={`transit-step ${isReady ? 'is-done' : 'is-active'}`}>
-          <span className="transit-step-dot">{isReady ? <Icon name="check" size={12} /> : <span className="step-inner-pulse" />}</span>
-           <span>{isReady ? 'Pago verificado' : 'Revisando pago'}</span>
-        </div>
-        <div className={`transit-step-line ${isReady ? 'is-filled' : ''}`} />
-        <div className={`transit-step ${isReady ? 'is-active' : ''}`}>
-          <span className="transit-step-dot"><Icon name={isPickup ? 'pin' : 'truck'} size={12} /></span>
-           <span>Preparación</span>
-        </div>
+
+        <p className="small-note">
+          {isReady
+            ? (isPickup ? 'La tienda coordinará contigo la recogida cuando esté preparado.' : 'La tienda preparará tu pedido para enviarlo por el método elegido.')
+            : 'La tienda debe verificar el abono antes de preparar tu pedido.'}
+        </p>
       </div>
-      <p className="small-note">{isReady ? (isPickup ? 'La tienda coordinará contigo la recogida cuando esté preparado.' : 'La tienda preparará tu pedido para enviarlo por el método elegido.') : 'La tienda debe verificar el abono antes de preparar tu pedido.'}</p>
     </div>
   )
 }
