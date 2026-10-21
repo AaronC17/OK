@@ -111,7 +111,7 @@ export const store: StoreConfig = {
     {
       id: 'pickup', name: 'Recoger', description: 'Orotina Centro', enabled: true,
       requiresAddress: false, feeMinor: 0, coverage: null, pickupPoint: null,
-      conditions: null,
+      conditions: 'Al completar el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.',
     },
   ],
 }

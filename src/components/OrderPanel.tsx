@@ -68,8 +68,8 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
 
         <p className="small-note">
           {isReady
-            ? (isPickup ? 'La tienda coordinará contigo la recogida cuando esté preparado.' : 'La tienda preparará tu pedido para enviarlo por el método elegido.')
-            : 'La tienda debe verificar el abono antes de preparar tu pedido.'}
+            ? (isPickup ? '¡Pago verificado! Nuestro equipo te contactará por WhatsApp para coordinar la entrega.' : 'La tienda preparará tu pedido para enviarlo por el método elegido.')
+            : (isPickup ? 'La tienda debe verificar el abono. Al completarse el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.' : 'La tienda debe verificar el abono antes de preparar tu pedido.')}
         </p>
       </div>
     </div>
@@ -145,13 +145,21 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
           ? 'Actualiza tu comprobante'
           : 'Completa tu pago'
 
+  const isPickup = !order.delivery.requiresAddress
+
   const subtitle = order.status === 'pending_review'
-    ? 'Recibimos tu comprobante. La tienda revisará el abono y te avisará cuando confirme el pago.'
+    ? (isPickup
+        ? 'Recibimos tu comprobante. La tienda revisará el abono y al completarse el pago te contactará por WhatsApp para coordinar la entrega.'
+        : 'Recibimos tu comprobante. La tienda revisará el abono y te avisará cuando confirme el pago.')
     : order.status === 'ready'
-      ? 'La tienda verificó tu pago. Tu pedido está listo para preparar.'
+      ? (isPickup
+          ? '¡Pago verificado! Nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
+          : 'La tienda verificó tu pago. Tu pedido está listo para preparar.')
       : order.status === 'pending_details'
         ? 'Tu pedido está guardado. Consulta de nuevo cuando estén confirmados el total y los datos SINPE.'
-        : 'Realiza el SINPE Móvil con el código en la descripción y envía tu comprobante para revisión.'
+        : (isPickup
+            ? 'Realiza el SINPE Móvil con el código en la descripción y envía tu comprobante. Al completar el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
+            : 'Realiza el SINPE Móvil con el código en la descripción y envía tu comprobante para revisión.')
 
   const formattedPhone = order.destination
     ? `${order.destination.phone.slice(0, 4)}-${order.destination.phone.slice(4)}`

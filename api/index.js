@@ -157,7 +157,7 @@ var store = {
       feeMinor: 0,
       coverage: null,
       pickupPoint: null,
-      conditions: null
+      conditions: "Al completar el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega."
     }
   ]
 };
@@ -2232,8 +2232,9 @@ function orderEmailMessage(event, order, origin = storeOrigin) {
     status = "En revisi\xF3n";
     preheader = "Recibimos tu comprobante. Estamos revisando tu abono y te avisaremos en cuanto quede confirmado.";
     lead = `\xA1Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago para confirmar tu pedido.`;
-    body2 = noteBox("\xBFQu\xE9 sigue?", `<p style="margin:0;">Por ahora no necesitas hacer nada m\xE1s. <strong>En cuanto confirmemos el pago, prepararemos tu pedido para la entrega</strong> y te avisaremos por este correo.</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ""}`);
-    detailText = `Estado: en revisi\xF3n. Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.${order.receipt?.bankReference ? `
+    const reviewNext = order.delivery.requiresAddress ? "En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo." : "En cuanto confirmemos el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
+    body2 = noteBox("\xBFQu\xE9 sigue?", `<p style="margin:0;">Por ahora no necesitas hacer nada m\xE1s. <strong>${reviewNext}</strong></p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ""}`);
+    detailText = `Estado: en revisi\xF3n. ${order.delivery.requiresAddress ? "Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo." : "Una vez confirmado el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega."}${order.receipt?.bankReference ? `
 Referencia del comprobante: ${order.receipt.bankReference}` : ""}`;
   } else if (paid) {
     title = "\xA1Pago confirmado!";
@@ -2242,11 +2243,11 @@ Referencia del comprobante: ${order.receipt.bankReference}` : ""}`;
     preheader = "Verificamos tu pago con \xE9xito. Tu pedido ya est\xE1 confirmado y entra a preparaci\xF3n para la entrega.";
     const confirmed = order.paymentConfirmedAt ? totalDate.format(new Date(order.paymentConfirmedAt)) : "";
     lead = `\xA1Gracias por elegir Onky\u2019s, ${name}! Verificamos tu pago y tu pedido ya entra a preparaci\xF3n.`;
-    const next = order.delivery.requiresAddress ? "Prepararemos tu selecci\xF3n y la enviaremos a la direcci\xF3n registrada, con el m\xE9todo de entrega que elegiste." : "Prepararemos tu selecci\xF3n. Coordina con la tienda el punto y horario de recogida antes de pasar por ella.";
+    const next = order.delivery.requiresAddress ? "Prepararemos tu selecci\xF3n y la enviaremos a la direcci\xF3n registrada, con el m\xE9todo de entrega que elegiste." : "Prepararemos tu selecci\xF3n. Nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
     body2 = noteBox("Ahora viene lo bueno", `<p style="margin:0;">${next}</p>${confirmed ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;">Pago verificado el ${esc(confirmed)}</p>` : ""}`);
     detailText = `Estado: pago confirmado. Tu pedido entra a preparaci\xF3n.${confirmed ? `
 Pago verificado el ${confirmed}` : ""}
-${order.delivery.requiresAddress ? `M\xE9todo de entrega: ${order.delivery.name}. Usaremos la direcci\xF3n registrada.` : "Coordina con la tienda el punto y horario de recogida antes de pasar."}`;
+${order.delivery.requiresAddress ? `M\xE9todo de entrega: ${order.delivery.name}. Usaremos la direcci\xF3n registrada.` : "Nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega."}`;
   } else {
     title = "Revisemos tu comprobante";
     headline = "Un detalle<br>por revisar.";

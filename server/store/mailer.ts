@@ -111,8 +111,11 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     status = 'En revisión'
     preheader = 'Recibimos tu comprobante. Estamos revisando tu abono y te avisaremos en cuanto quede confirmado.'
     lead = `¡Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago para confirmar tu pedido.`
-    body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. <strong>En cuanto confirmemos el pago, prepararemos tu pedido para la entrega</strong> y te avisaremos por este correo.</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
-    detailText = `Estado: en revisión. Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
+    const reviewNext = order.delivery.requiresAddress
+      ? 'En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo.'
+      : 'En cuanto confirmemos el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
+    body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. <strong>${reviewNext}</strong></p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
+    detailText = `Estado: en revisión. ${order.delivery.requiresAddress ? 'Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.' : 'Una vez confirmado el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
   } else if (paid) {
     title = '¡Pago confirmado!'
     headline = 'Tu antojo,<br>confirmado.'
@@ -122,9 +125,9 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     lead = `¡Gracias por elegir Onky’s, ${name}! Verificamos tu pago y tu pedido ya entra a preparación.`
     const next = order.delivery.requiresAddress
       ? 'Prepararemos tu selección y la enviaremos a la dirección registrada, con el método de entrega que elegiste.'
-      : 'Prepararemos tu selección. Coordina con la tienda el punto y horario de recogida antes de pasar por ella.'
+      : 'Prepararemos tu selección. Nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
     body = noteBox('Ahora viene lo bueno', `<p style="margin:0;">${next}</p>${confirmed ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;">Pago verificado el ${esc(confirmed)}</p>` : ''}`)
-    detailText = `Estado: pago confirmado. Tu pedido entra a preparación.${confirmed ? `\nPago verificado el ${confirmed}` : ''}\n${order.delivery.requiresAddress ? `Método de entrega: ${order.delivery.name}. Usaremos la dirección registrada.` : 'Coordina con la tienda el punto y horario de recogida antes de pasar.'}`
+    detailText = `Estado: pago confirmado. Tu pedido entra a preparación.${confirmed ? `\nPago verificado el ${confirmed}` : ''}\n${order.delivery.requiresAddress ? `Método de entrega: ${order.delivery.name}. Usaremos la dirección registrada.` : 'Nuestro equipo te contactará por WhatsApp para coordinar la entrega.'}`
   } else {
     title = 'Revisemos tu comprobante'
     headline = 'Un detalle<br>por revisar.'
