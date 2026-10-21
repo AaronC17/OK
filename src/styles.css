@@ -1028,34 +1028,32 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .how-section { contain-intrinsic-block-size: auto 366px; }
   .questions-section { contain-intrinsic-block-size: auto 257px; }
   .container { width: calc(100% - 32px); }
-  .announcement { height: 28px; font-size: 8px; gap: 11px; }
+  .announcement { height: 26px; font-size: 7.5px; gap: 9px; }
   .announcement > span { gap: 5px; }
-  .site-header { padding-block: 6px; }
-  .header-inner { width: calc(100% - 20px); height: 62px; padding-inline: 12px; border-radius: 19px; }
+  .site-header { padding-block: 4px; }
+  .header-inner { width: calc(100% - 20px); height: 56px; padding-inline: 12px; border-radius: 18px; }
   /* A nearly opaque surface keeps the floating header without sampling every
      moving pixel behind it during touch scrolling. */
   .site-header.is-scrolled .header-inner { background: #fbfaf9f5; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .hero-catalog-cta, .button.experience-cta, .hero-photo-label, .premium-badge { -webkit-backdrop-filter: none; backdrop-filter: none; }
   .premium-badge { background: #382448e8; }
-  .wordmark { font-size: 31px; letter-spacing: -2.3px; }
+  .wordmark { font-size: 29px; letter-spacing: -2px; }
   .header-inner nav { gap: 0; }
   .header-inner nav a { font-size: 11px; padding-inline: 10px; }
   .cart-label { display: none; }
   .cart-toggle { gap: 7px; padding: 9px; }
   .cart-toggle > svg { width: 18px; height: 18px; }
   .cart-count { width: 19px; height: 19px; font-size: 9px; }
-  /* Keep the whole pouch above the fold, even with Safari's toolbars open.
-     The 124px reserve covers the announcement (including a wrapped line),
-     the 74px header and breathing room below the photo. */
-  .hero { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 4px; margin-top: 0; min-height: 0; height: min(570px, calc(100vh - 124px)); height: min(570px, calc(100svh - 124px)); border-radius: 9px; }
-  .hero-copy { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px; }
+  /* Keep both the hero pouch and the 10% welcome marquee visible above the fold on mobile. */
+  .hero { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 2px; margin-top: 0; min-height: 0; height: min(480px, calc(100vh - 156px)); height: min(480px, calc(100svh - 156px)); border-radius: 9px; }
+  .hero-copy { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 4px 6px 2px; }
   .hero-copy > .eyebrow { font-size: 7px; letter-spacing: 1.5px; justify-content: center; margin-bottom: 0; }
-  .hero h1 { font-family: 'DM Serif Hero', 'DM Serif Display', Georgia, serif; font-size: clamp(39px,10.8vw,45px); font-weight: 400; letter-spacing: -.8px; line-height: 1.14; margin: 8px 0 10px; }
+  .hero h1 { font-family: 'DM Serif Hero', 'DM Serif Display', Georgia, serif; font-size: clamp(33px,9.2vw,39px); font-weight: 400; letter-spacing: -.7px; line-height: 1.1; margin: 4px 0 6px; }
   .hero h1 > span { font-style: italic; display: inline-block; padding-bottom: 0.25em; margin-bottom: -0.25em; padding-right: 0.12em; filter: url(#onkys-liquid-glass); }
-  .hero-copy > p { font-size: 12px; line-height: 1.7; margin-bottom: 12px; }
-  .hero .button { min-height: 44px; font-size: 11px; padding: 11px 17px; gap: 20px; }
-  .hero-secondary { max-width: none; font-size: 10px; margin-top: 9px; justify-content: center; }
-  .hero-visual { height: 100%; min-height: 0; aspect-ratio: auto; margin: 0 auto; width: calc(100% - 53px); max-width: 350px; }
+  .hero-copy > p { font-size: 11.5px; line-height: 1.45; margin-bottom: 8px; }
+  .hero .button { min-height: 38px; font-size: 11px; padding: 8px 16px; gap: 14px; }
+  .hero-secondary { max-width: none; font-size: 9.5px; margin-top: 6px; justify-content: center; }
+  .hero-visual { height: 100%; min-height: 0; aspect-ratio: auto; margin: 0 auto; width: calc(100% - 40px); max-width: 310px; }
   /* Paint the soft shadow once. Chained alpha drop-shadows repeatedly rasterize
      the large pouch on WebKit, including while a product dialog is open. */
   .hero-visual:not(.has-video)::before { content: ''; position: absolute; top: 6%; left: 50%; height: 115%; aspect-ratio: 3 / 4; max-width: 125%; transform: translateX(-50%); background: radial-gradient(ellipse, #2a16364d 15%, #2a163629 44%, transparent 70%); pointer-events: none; }
@@ -1252,10 +1250,12 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .configuration-bottom { margin: 10px 0 8px; padding-top: 10px; }
   .add-button { min-height: 46px; }
 }
-@media (max-width: 600px) and (max-height: 620px) {
-  .hero-copy { padding-block: 4px 6px; }
-  .hero h1 { font-size: clamp(34px, 10vw, 39px); line-height: 1.1; margin-block: 6px 8px; }
-  .hero-copy > p { font-size: 11px; line-height: 1.5; margin-bottom: 10px; }
+@media (max-width: 600px) and (max-height: 640px) {
+  .hero { height: min(420px, calc(100svh - 146px)); }
+  .hero-copy { padding-block: 2px 4px; }
+  .hero h1 { font-size: clamp(28px, 8.5vw, 34px); line-height: 1.08; margin-block: 3px 5px; }
+  .hero-copy > p { font-size: 11px; line-height: 1.4; margin-bottom: 6px; }
+  .hero .button { min-height: 36px; padding: 7px 14px; font-size: 10.5px; }
 }
 @media (max-width: 360px) {
   .header-inner { padding-inline: 10px; }

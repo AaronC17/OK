@@ -70,8 +70,8 @@
 @keyframes brand-marquee-scroll { to { transform: translate3d(-50%, 0, 0); } }
 
 @media (max-width: 600px) {
-  .brand-marquee { height: 44px; }
-  .brand-marquee::before, .brand-marquee::after { width: 18px; }
+  .brand-marquee { height: 38px; }
+  .brand-marquee::before, .brand-marquee::after { width: 16px; }
   .brand-marquee-item { gap: 18px; padding-right: 18px; }
   .brand-marquee-item > span { font-size: 9px; letter-spacing: .055em; }
   .brand-marquee-item .brand-marquee-name, .brand-marquee-item .brand-marquee-product { font-size: 9px; }

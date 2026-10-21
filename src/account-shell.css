@@ -10,7 +10,7 @@
 .account-toggle .icon { outline: none !important; border: 0 !important; box-shadow: none !important; }
 .account-toggle i { width: 5px; height: 5px; border-radius: 50%; background: #64816b; position: absolute; top: 10px; left: 25px; box-shadow: 0 0 0 2px var(--paper); }
 .header-actions-divider { height: 18px; width: 1px; background: var(--line); }
-.welcome-marquee { justify-content: center; }
+.welcome-marquee { justify-content: center; background: linear-gradient(90deg, #fbf7fd, #f2e9f6 50%, #fbf7fd); border-block: 1px solid #e7dcec; }
 .welcome-marquee-link { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 13px; padding: 0 24px; background: transparent; color: var(--purple); font-size: 12px; letter-spacing: .12px; }
 .welcome-marquee-link strong { font-weight: 750; }
 .welcome-marquee-link:hover { background: #eee6f4; }
@@ -28,9 +28,10 @@
   .header-actions { gap: 6px; }
   .account-toggle { padding-inline: 10px; }
   .account-toggle > span, .header-actions-divider { display: none; }
-  .welcome-marquee-link { padding-inline: 14px; gap: 9px; font-size: 10px; }
+  .welcome-marquee-link { padding-inline: 12px; gap: 8px; font-size: 10.5px; }
+  .welcome-marquee-link strong { font-weight: 800; color: #2c123d; }
   .welcome-marquee-link > .icon:first-child { width: 15px; height: 15px; }
-  .welcome-marquee-link > .icon:last-child { width: 14px; height: 14px; }
+  .welcome-marquee-link > .icon:last-child { width: 13px; height: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .welcome-marquee-link > .icon:last-child { transition: none; }
