@@ -1,6 +1,6 @@
-import type { AnchorHTMLAttributes, MouseEvent } from 'react'
+import { useEffect, type AnchorHTMLAttributes, type MouseEvent } from 'react'
 
-export function navigateToSection(id: string) {
+export function navigateToSection(id: string, behavior: ScrollBehavior = 'auto') {
   const section = document.getElementById(id)
   if (!section) return
   const url = new URL(window.location.href)
@@ -11,7 +11,23 @@ export function navigateToSection(id: string) {
   // CSS defines smooth scrolling and the reduced-motion override.
   if (!section.hasAttribute('tabindex')) section.tabIndex = -1
   section.focus({ preventScroll: true })
-  section.scrollIntoView({ block: 'start', behavior: 'auto' })
+  section.scrollIntoView({ block: 'start', behavior })
+}
+
+/** The initial HTML has no sections yet. Restore deep links after React and
+ * fonts are ready, including when the destination is in a deferred section. */
+export function useSectionNavigation() {
+  useEffect(() => {
+    let disposed = false
+    const restore = () => {
+      if (disposed || !window.location.hash) return
+      try { navigateToSection(decodeURIComponent(window.location.hash.slice(1)), 'instant') }
+      catch { /* Malformed external fragments should not break the storefront. */ }
+    }
+    if (window.location.hash) void document.fonts.ready.then(() => { if (!disposed) restore() })
+    window.addEventListener('hashchange', restore)
+    return () => { disposed = true; window.removeEventListener('hashchange', restore) }
+  }, [])
 }
 
 /** Keep section navigation inside the current document, including LAN preview

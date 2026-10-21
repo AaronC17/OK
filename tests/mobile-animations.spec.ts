@@ -103,6 +103,24 @@ test('mobile recipe offers a working tap-to-play recovery when autoplay is block
   await expect.poll(() => page.locator('.mix-video').evaluate((element: HTMLVideoElement) => !element.paused && element.currentTime > 0)).toBe(true)
 })
 
+test('a slow connection uses the compact recipe even on a 3× phone', async ({ browser, baseURL, isMobile }) => {
+  test.skip(!isMobile)
+  const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 })
+  try {
+    const page = await context.newPage()
+    await page.addInitScript(() => {
+      const connection = new EventTarget()
+      Object.defineProperty(connection, 'effectiveType', { value: '3g' })
+      Object.defineProperty(navigator, 'connection', { value: connection, configurable: true })
+    })
+    await page.goto('/')
+    await page.locator('.mix-film').scrollIntoViewIfNeeded()
+    const video = page.locator('.mix-video')
+    await expect(video).toHaveAttribute('src', mixVideo.compact.url)
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => !element.paused && element.currentTime > 0)).toBe(true)
+  } finally { await context.close() }
+})
+
 test('reduced-motion mobile does not request the animation movie or physics', async ({ page, isMobile }) => {
   test.skip(!isMobile)
   const resources: string[] = []

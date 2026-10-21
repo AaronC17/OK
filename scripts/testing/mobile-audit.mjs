@@ -4,8 +4,10 @@ import { resolve } from 'node:path'
 
 // Run against a production preview, not Vite's development server.
 // node scripts/testing/mobile-audit.mjs http://127.0.0.1:4173 test-results/mobile-audit
+// Append --sections to measure a full down-and-back scroll after the cold load.
 const url = process.argv[2] || 'http://127.0.0.1:4173'
 const output = resolve(process.argv[3] || 'test-results/mobile-audit')
+const measureSections = process.argv.includes('--sections')
 const runs = 3
 await mkdir(output, { recursive: true })
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || 'msedge' })
@@ -22,6 +24,7 @@ try {
       cdp.on('Network.dataReceived', event => transfers.set(event.requestId, (transfers.get(event.requestId) || 0) + event.encodedDataLength))
       cdp.on('Network.loadingFinished', event => transfers.set(event.requestId, event.encodedDataLength))
       await cdp.send('Network.enable')
+      await cdp.send('Performance.enable')
       await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 150, downloadThroughput: 1_600_000 / 8, uploadThroughput: 750_000 / 8, connectionType: 'cellular4g' })
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
@@ -67,8 +70,40 @@ try {
           resources,
         }
       })
-      results.push({ ...result, networkBytes: [...transfers.values()].reduce((sum, bytes) => sum + bytes, 0), errors })
+      const measured = { ...result, networkBytes: [...transfers.values()].reduce((sum, bytes) => sum + bytes, 0), errors }
+      results.push(measured)
       if (run === 0) await page.screenshot({ path: resolve(output, 'mobile-first-screen.png') })
+      if (measureSections) {
+        const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(metric => [metric.name, metric.value]))
+        const before = await metrics()
+        // Main-thread rAF cadence is a lab diagnostic, not physical screen FPS.
+        measured.sections = await page.evaluate(async () => {
+          const start = performance.now(), gaps = [], tasksBefore = window.__mobileAudit.longTasks.length
+          const distance = document.documentElement.scrollHeight - innerHeight
+          let previous = start
+          await new Promise(resolve => {
+            const tick = now => {
+              gaps.push(now - previous)
+              previous = now
+              const progress = Math.min((now - start) / 8000, 1)
+              const position = progress < .5 ? progress * 2 : (1 - progress) * 2
+              window.scrollTo({ top: Math.round(distance * position), behavior: 'instant' })
+              if (progress < 1) requestAnimationFrame(tick)
+              else resolve()
+            }
+            requestAnimationFrame(tick)
+          })
+          gaps.sort((a, b) => a - b)
+          return {
+            p95FrameGapMs: Math.round(gaps[Math.floor(gaps.length * .95)]),
+            gapsOver50Ms: gaps.filter(gap => gap > 50).length,
+            blockingMs: Math.round(window.__mobileAudit.longTasks.slice(tasksBefore).reduce((sum, duration) => sum + Math.max(0, duration - 50), 0)),
+            overflow: document.documentElement.scrollWidth > innerWidth,
+          }
+        })
+        const after = await metrics()
+        measured.sections.cpuMs = Object.fromEntries(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration'].map(key => [key, Math.round((after[key] - before[key]) * 1000)]))
+      }
     } finally { await context.close() }
   }
 } finally { await browser.close() }

@@ -82,6 +82,29 @@ test('data saving skips speculative dialogs but still opens them on demand', asy
   await expect(page.getByRole('dialog', { name: 'Iniciar sesión', exact: true })).toBeVisible()
 })
 
+test('a slow dialog download gives immediate feedback and can be cancelled', async ({ page }) => {
+  let release!: () => void
+  const download = new Promise<void>(resolve => { release = resolve })
+  await page.route(/\/assets\/AccountDialog-.*\.js$/, async route => { await download; await route.continue() })
+  try {
+    await page.goto('/')
+    const button = page.locator('.site-header').getByRole('button', { name: 'Iniciar sesión', exact: true })
+    await button.click()
+    const loading = page.getByRole('dialog', { name: 'Un momento…' })
+    await expect(loading).toBeVisible()
+    await loading.getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await expect(loading).not.toBeVisible()
+    release()
+    await expect(button).toBeFocused()
+    await button.click()
+    const account = page.getByRole('dialog', { name: 'Iniciar sesión', exact: true })
+    await expect(account).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(account).not.toBeVisible()
+    await expect(button).toBeFocused()
+  } finally { release() }
+})
+
 test('SVG recipe and mobile media fallback synchronize and pause offscreen', async ({ page, isMobile, browserName }) => {
   if (isMobile) await page.route('**/images/mix/preview-*.mp4', route => route.abort())
   const workers: string[] = []

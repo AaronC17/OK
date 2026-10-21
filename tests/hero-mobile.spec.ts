@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
-test('hero shows the real product photo without video or AI labels', async ({ page }) => {
+test('hero shows the real product photo without video or AI labels', async ({ page, isMobile }) => {
   const generationRequests: string[] = []
   page.on('request', request => {
     if (new URL(request.url()).hostname.includes('higgsfield')) generationRequests.push(request.url())
@@ -21,7 +21,8 @@ test('hero shows the real product photo without video or AI labels', async ({ pa
     return { background: style.backgroundImage, backdrop: style.backdropFilter, color: style.color }
   })
   expect(glassButton.background).toContain('linear-gradient')
-  expect(glassButton.backdrop).toContain('blur(16px)')
+  if (isMobile) expect(glassButton.backdrop).toBe('none')
+  else expect(glassButton.backdrop).toContain('blur(16px)')
   expect(glassButton.color).toBe('rgb(255, 255, 255)')
   expect(generationRequests).toEqual([])
 })

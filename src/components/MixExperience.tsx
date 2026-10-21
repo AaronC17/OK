@@ -31,7 +31,11 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
   const [useVideo, setUseVideo] = useState(() => window.matchMedia('(max-width: 700px), (pointer: coarse)').matches)
   // 720 pixels cover the scene at native resolution on small 1×/2× phones.
   // Keep 1080 for Retina 3× phones and larger displays.
-  const [videoSource] = useState(() => savesData() || window.matchMedia('(max-width: 420px) and (max-resolution: 2dppx)').matches ? mixVideo.compact : mixVideo)
+  const [videoSource] = useState(() => {
+    const connection = (navigator as Navigator & { connection?: { effectiveType?: string } }).connection
+    const slowConnection = /(^|-)2g$|^3g$/.test(connection?.effectiveType ?? '')
+    return savesData() || slowConnection || window.matchMedia('(max-width: 420px) and (max-resolution: 2dppx)').matches ? mixVideo.compact : mixVideo
+  })
   const [playbackBlocked, setPlaybackBlocked] = useState(false)
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [motionRequested, setMotionRequested] = useState(!reduced && !saveData)
@@ -139,7 +143,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
       </div>
       <button className="button experience-cta" {...productDialog.intent} onClick={onCustomize}>Crear mi combinación <Icon name="arrow" size={19} /></button>
     </div>
-    <div ref={film} className="mix-film" style={{ '--cycle': `${mixVideo.duration}ms` } as CSSProperties} data-static={!motionRequested} data-paused={!visible || !tabVisible || !motionRequested || paused || suspended || playbackBlocked} data-scene-ready="false" data-renderer={useVideo ? 'video' : undefined}>
+    <div ref={film} className="mix-film" style={{ '--cycle': `${mixVideo.duration}ms` } as CSSProperties} data-static={!near || !motionRequested} data-paused={!visible || !tabVisible || !motionRequested || paused || suspended || playbackBlocked} data-scene-ready="false" data-renderer={useVideo ? 'video' : undefined}>
       <div className="film-top"><div><span>Preparación<small>Vista previa</small></span></div>{!playbackBlocked && <button type="button" className="film-playback" onClick={togglePlayback} aria-label={motionRequested && !paused ? 'Pausar animación' : 'Reproducir animación'}><Icon name={motionRequested && !paused ? 'pause' : 'play'} size={16} /><span>{motionRequested && !paused ? 'Pausar' : 'Reproducir'}</span></button>}</div>
       <p className="sr-only">Animación ilustrativa: se vierte chamoy, se espolvorea Tajín y se añade jugo de limón de una jarrita. Los ositos caen, se comprimen y se doblan suavemente al contacto. La cuchara barre los lados y pliega la mezcla hacia dentro; el chamoy espeso se adhiere y escurre lentamente. Al final aparece la bolsa terminada. No representa la preparación de un pedido real.</p>
       <div className="film-scene">
@@ -150,7 +154,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
         <div className="mix-stage">
           {useVideo ? <>
             <video ref={video} className="mix-video" src={near && motionRequested ? videoSource.url : undefined} poster={near ? mixVideo.poster : undefined}
-              width={mixVideo.width} height={mixVideo.height} muted playsInline loop preload={near && motionRequested ? 'auto' : 'none'} aria-hidden="true"
+              width={mixVideo.width} height={mixVideo.height} muted playsInline loop preload={near && motionRequested ? 'metadata' : 'none'} aria-hidden="true"
               onError={() => { setPlaybackBlocked(false); setUseVideo(false) }} />
             {playbackBlocked && motionRequested && <button type="button" className="mix-play-button" onClick={togglePlayback}><Icon name="play" size={16} />Reproducir animación</button>}
           </> : <>

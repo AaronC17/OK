@@ -6,14 +6,14 @@ import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
 import { useCustomer } from './hooks/useCustomer.ts'
 import { Icon } from './components/Icon.tsx'
-import { Lightbox, Modal } from './components/ui.tsx'
+import { Lightbox, LoadingDialog, Modal } from './components/ui.tsx'
 import type { ProductTarget } from './components/ProductDialog.tsx'
 import { Header } from './components/Header.tsx'
 import { Catalog } from './components/Catalog.tsx'
 import { MixExperience } from './components/MixExperience.tsx'
 import { HeroMedia } from './components/HeroMedia.tsx'
 import { BrandMarquee } from './components/BrandMarquee.tsx'
-import { navigateToSection, SectionLink } from './components/SectionLink.tsx'
+import { navigateToSection, SectionLink, useSectionNavigation } from './components/SectionLink.tsx'
 import type { AccountMode } from './components/AccountDialog.tsx'
 import './account-shell.css'
 
@@ -23,6 +23,7 @@ const AccountDialog = lazy(accountDialog.load)
 const weightList = new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))
 
 export default function App() {
+  useSectionNavigation()
   const cart = useCart()
   const customer = useCustomer()
   const [accountOpen, setAccountOpen] = useState(false)
@@ -121,13 +122,13 @@ export default function App() {
       </div>
       <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span><a href="/admin">Administración</a>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
     </div></footer>
-    <Suspense fallback={null}>
+    <Suspense fallback={<LoadingDialog open={productOpen} onClose={() => setProductOpen(false)} />}>
       {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
     </Suspense>
-    <Suspense fallback={null}>
+    <Suspense fallback={<LoadingDialog open={cartOpen} onClose={() => setCartOpen(false)} />}>
       {cartRequested && <CartDrawer key={`${customer.user?.id ?? 'guest'}:${selectedOrderId ?? 'cart'}`} open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} customerAccount={customer.user} selectedOrderId={selectedOrderId} onRegister={() => openAccount('register')} onOrderCreated={customer.orderCreated} />}
     </Suspense>
-    <Suspense fallback={null}>
+    <Suspense fallback={<LoadingDialog open={accountOpen} onClose={() => setAccountOpen(false)} />}>
       {accountRequested && <AccountDialog open={accountOpen} initialMode={accountMode} customer={customer} onClose={() => setAccountOpen(false)} onOrder={viewAccountOrder} onShop={shopFromAccount} />}
     </Suspense>
     <Lightbox image={zoom} onClose={() => setZoom(null)} />

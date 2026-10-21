@@ -24,6 +24,10 @@ Se han optimizado en JPEG. Las gomitas de las fotografías no tienen necesariame
 
 **DM Serif Display**, normal e italic, para el titular de la portada en teléfono. Archivos locales `dm-serif-display-latin.woff2` y `dm-serif-display-latin-italic.woff2`, de [Fontsource](https://fontsource.org/fonts/dm-serif-display), con licencia en `public/fonts/DM-SERIF-OFL.txt`.
 
+La portada precarga subconjuntos locales `hero-{normal,italic}-<hash>.woff2` (7.488 bytes entre ambos, frente a 49.316 bytes de las caras completas). Se obtienen de los mismos originales con `npm run fonts:prepare`, usando Python y `fonttools[woff]`; no se modifican los glifos. Los caracteres adicionales recurren automáticamente a la fuente completa. Si cambia el titular, actualizar los textos en `scripts/media/prepare-hero-fonts.py` y regenerar `src/config/hero-fonts.{css,json}` y los WOFF2.
+
+Las fotografías de producto y miniaturas de ingredientes tienen versiones AVIF y WebP con transparencia en `public/images/responsive/`. `npm run images:prepare` regenera ambos formatos y `src/config/responsive-images.json`; los nombres incluyen un hash del contenido para permitir caché permanente. AVIF reduce aproximadamente un 30% el peso frente a WebP; el navegador conserva WebP como alternativa.
+
 ## Iconos e ilustraciones
 
 - **Lucide React**: [Lucide](https://lucide.dev/), licencia ISC incluida con el paquete. Se importan únicamente los iconos utilizados.

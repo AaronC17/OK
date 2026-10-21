@@ -1,19 +1,44 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ImgHTMLAttributes, ReactNode } from 'react'
 import { Icon } from './Icon.tsx'
 import { MAX_QUANTITY } from '../lib/shop.ts'
 import { productImages } from '../lib/product-images.ts'
 
-export function ProductImage({ decoding = 'async', loading = 'lazy', src, srcSet, sizes, width, height, ...props }: ImgHTMLAttributes<HTMLImageElement>) {
+export function ProductImage({ decoding = 'async', loading = 'lazy', defer = false, src, srcSet, sizes, width, height, ...props }: ImgHTMLAttributes<HTMLImageElement> & { defer?: boolean }) {
   const image = src ? productImages[src] : undefined
-  return <img decoding={decoding} loading={loading} src={src} srcSet={srcSet ?? image?.srcSet}
-    sizes={sizes ?? (image ? '100vw' : undefined)} width={width ?? image?.width} height={height ?? image?.height} {...props} onError={event => {
-    const image = event.currentTarget
-    // A failed srcset candidate must not override the fallback src.
-    image.removeAttribute('srcset')
-    image.removeAttribute('sizes')
-    if (!image.src.endsWith('/images/placeholder.svg')) image.src = '/images/placeholder.svg'
+  const ref = useRef<HTMLImageElement>(null)
+  const [near, setNear] = useState(false)
+  const [failed, setFailed] = useState<{ src: string | undefined; format: 'avif' | 'all' } | null>(null)
+  const enabled = !defer || loading === 'eager' || near
+  const failure = failed?.src === src ? failed?.format : undefined
+  const avif = !srcSet && image?.avifSrcSet && !failure
+  const imageSizes = sizes ?? (image ? '100vw' : undefined)
+
+  useEffect(() => {
+    if (enabled) return
+    // Native lazy loading can fetch images several screens ahead on mobile.
+    // Reserve their geometry, but let visible products use the connection first.
+    if (!('IntersectionObserver' in window)) { setNear(true); return }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setNear(true); observer.disconnect() }
+    }, { rootMargin: '200px 0px' })
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [enabled])
+
+  const photo = <img ref={ref} decoding={decoding} loading={loading}
+    src={enabled ? failure === 'all' ? '/images/placeholder.svg' : src : undefined}
+    srcSet={enabled && failure !== 'all' ? srcSet ?? image?.srcSet : undefined}
+    sizes={failure === 'all' ? undefined : imageSizes} width={width ?? image?.width} height={height ?? image?.height} {...props} onError={event => {
+    // Remove the failed <source> before falling back, otherwise <picture>
+    // keeps selecting it even after the img's src has changed.
+    if (!enabled || failure === 'all') return
+    setFailed({ src, format: avif && /\.avif(?:$|\?)/.test(event.currentTarget.currentSrc) ? 'avif' : 'all' })
   }} />
+  return image?.avifSrcSet && !srcSet ? <picture className="product-picture">
+    {avif && <source type="image/avif" srcSet={enabled ? image.avifSrcSet : undefined} sizes={imageSizes} />}
+    {photo}
+  </picture> : photo
 }
 
 let scrollLocks = 0

@@ -114,7 +114,9 @@ Las tarjetas usan proporciones uniformes y `object-fit: cover`; el ampliador mue
 
 Iconos de **Lucide**, con relación 1:1 y trazo consistente. Fuentes y atribuciones en **`ASSETS.md`**.
 
-Las fotos de bolsas, Uvarindas y miniaturas de ingredientes tienen versiones WebP adaptadas al tamaño de pantalla. Después de sustituir sus originales, ejecutar `npm run images:prepare` y conservar tanto `public/images/responsive/` como `src/config/responsive-images.json`. El nombre de cada archivo incluye su contenido para renovar la caché correctamente. La portada comparte `srcset` y `sizes` con su precarga HTML.
+Las fotos de bolsas, Uvarindas y miniaturas de ingredientes tienen versiones AVIF y WebP adaptadas al tamaño de pantalla. Después de sustituir sus originales, ejecutar `npm run images:prepare` y conservar tanto `public/images/responsive/` como `src/config/responsive-images.json`. El nombre de cada archivo incluye su contenido para renovar la caché correctamente. La portada comparte `srcset` y `sizes` con una única precarga HTML; el navegador elige el formato compatible. Las imágenes de catálogo se solicitan al acercarse a 200 px de la pantalla.
+
+El titular móvil usa subconjuntos de las mismas fuentes locales. Si cambia su texto, `npm run fonts:prepare` los regenera (Python con `fonttools[woff]`); los caracteres nuevos tienen como alternativa las fuentes completas. Detalles en `ASSETS.md`.
 
 Medición y optimizaciones móviles: **[`docs/rendimiento-movil.md`](docs/rendimiento-movil.md)**.
 

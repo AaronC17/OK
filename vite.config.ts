@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import { shopApiPlugin } from './server/store/vite-plugin.ts'
 import { store } from './src/config/store.ts'
 import { HERO_IMAGE_SIZES, productImages } from './src/lib/product-images.ts'
+import heroFonts from './src/config/hero-fonts.json'
 import deployment from './vercel.json'
 
 const vercelArchivedAssets = [
@@ -36,8 +37,11 @@ export default defineConfig({
     name: 'responsive-hero-preload',
     transformIndexHtml() {
       const image = productImages[store.heroImage]
-      if (store.heroVideo || !image) return []
-      return [{ tag: 'link', attrs: { rel: 'preload', as: 'image', type: 'image/webp', href: store.heroImage, imagesrcset: image.srcSet, imagesizes: HERO_IMAGE_SIZES, fetchpriority: 'high' }, injectTo: 'head' as const }]
+      const fonts = heroFonts.map(font => ({ tag: 'link', attrs: { rel: 'preload', href: font.url, as: 'font', type: 'font/woff2', crossorigin: '', media: '(max-width: 600px)' }, injectTo: 'head' as const }))
+      if (store.heroVideo || !image) return fonts
+      // Preload only the preferred format. Preloading both would download two
+      // copies on browsers that support AVIF as well as WebP.
+      return [...fonts, { tag: 'link', attrs: { rel: 'preload', as: 'image', type: image.avifSrcSet ? 'image/avif' : 'image/webp', imagesrcset: image.avifSrcSet ?? image.srcSet, imagesizes: HERO_IMAGE_SIZES, fetchpriority: 'high' }, injectTo: 'head' as const }]
     },
   }],
   server: {

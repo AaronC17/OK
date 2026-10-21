@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import './styles.css'
+import './config/hero-fonts.css'
 
 const view = new URLSearchParams(window.location.search).get('vista')
 const AdminDashboard = lazy(() => import('./components/AdminDashboard.tsx'))
