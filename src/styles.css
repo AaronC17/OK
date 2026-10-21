@@ -190,10 +190,10 @@ button, a, input, textarea { outline-offset: 4px; }
   display: inline-block;
   background: linear-gradient(
     180deg,
-    #9c58c6 0%,
-    #613182 42%,
-    #3d1854 82%,
-    #250b33 100%
+    #6a2d8a 0%,
+    #451d60 45%,
+    #2c0f3f 80%,
+    #180624 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -405,10 +405,10 @@ summary::-webkit-details-marker { display: none; }
   margin: 12px 0 calc(10px - 0.18em);
   background: linear-gradient(
     180deg,
-    #9c58c6 0%,
-    #613182 42%,
-    #3d1854 82%,
-    #250b33 100%
+    #6a2d8a 0%,
+    #451d60 45%,
+    #2c0f3f 80%,
+    #180624 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
