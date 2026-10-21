@@ -107,32 +107,66 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
     {user ? <div className="member-content">
       <header className="member-heading">
         <div className="member-profile">
-          <div><span className="member-eyebrow">QUÉ BUENO VERTE</span><h2 id="account-title">Hola, {user.name.trim().split(/\s+/)[0]}.</h2><p>{user.email}</p></div>
-          <span className="member-avatar" aria-hidden="true">{user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toLocaleUpperCase('es')}<span><GummyBearMark size={14} /></span></span>
+          <div className="member-info">
+            <span className="member-eyebrow">MI CUENTA</span>
+            <h2 id="account-title">Hola, {user.name.trim().split(/\s+/)[0]}.</h2>
+            <p className="member-email">{user.email}</p>
+          </div>
+          <span className="member-avatar" aria-hidden="true">
+            {user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toLocaleUpperCase('es')}
+          </span>
         </div>
-        <div className="member-since"><span>Tu cuenta. Tus antojos.</span><span>Desde <time dateTime={user.createdAt}>{memberSince.format(new Date(user.createdAt))}</time></span></div>
+        <div className="member-since">
+          <span>Miembro desde <time dateTime={user.createdAt}>{memberSince.format(new Date(user.createdAt))}</time></span>
+          <span>{user.name}</span>
+        </div>
       </header>
       <div className="member-body">
         {created && <p className="account-success" role="status"><Icon name="check" size={16} />Tu cuenta está lista. Qué gusto tenerte aquí.</p>}
         {user.welcomeAvailable && <aside className="member-welcome" aria-label="Tu beneficio de bienvenida">
-          <div className="member-welcome-amount"><span>10<small>%</small></span><span>DE REGALO</span></div>
-          <div className="member-welcome-copy"><span className="member-benefit-label"><Icon name="gift" size={13} />TU BIENVENIDA</span><strong>Tu primer antojo, con 10% menos.</strong><p>Automático en tu primer pedido de productos. No incluye el envío.</p></div>
+          <div className="member-welcome-pill" aria-hidden="true">
+            <span>10<small>%</small></span>
+            <small>DESC</small>
+          </div>
+          <div className="member-welcome-copy">
+            <span className="member-benefit-label"><Icon name="gift" size={13} />TU BIENVENIDA</span>
+            <strong>Tu primer antojo, con 10% menos.</strong>
+            <p>Automático en tu primer pedido de productos. No incluye el envío.</p>
+          </div>
         </aside>}
         <section className="member-orders" aria-labelledby="member-orders-title" aria-busy={historyLoading}>
-          <div className="member-section-heading"><div><h3 id="member-orders-title">Mis pedidos {history && <span>{history.total}</span>}</h3><p>Cada antojo, en un solo lugar.</p></div><button className="icon-button member-refresh" aria-label="Actualizar mis pedidos" disabled={historyLoading} onClick={() => setRevision(value => value + 1)}><Icon name="refresh" size={16} /></button></div>
+          <div className="member-section-heading">
+            <div>
+              <h3 id="member-orders-title">Mis pedidos {history && <span className="member-order-badge">{history.total}</span>}</h3>
+              <p>Historial y seguimiento de tus compras</p>
+            </div>
+            <button className="icon-button member-refresh" aria-label="Actualizar mis pedidos" disabled={historyLoading} onClick={() => setRevision(value => value + 1)}>
+              <Icon name="refresh" size={15} />
+            </button>
+          </div>
           {historyError && <div className="account-history-error"><Icon name="receipt" size={24} /><p role="alert">{historyError}</p><button className="text-button" onClick={() => setRevision(value => value + 1)}>Reintentar <Icon name="refresh" size={14} /></button></div>}
           {(!historyError || history) && (!history || (historyLoading && history.page !== page) ? <div className="member-orders-loading" role="status"><span className="sr-only">Buscando tus pedidos…</span>{[0, 1].map(index => <div className="member-order-skeleton" key={index} aria-hidden="true"><span /><div><i /><i /></div><span /></div>)}</div>
             : history.orders.length ? <div className="member-order-list">{history.orders.map(order => <button className="member-order" key={order.id} {...cartDrawer.intent} onClick={() => onOrder(order.id)} aria-label={`Ver pedido ${order.code}`}>
-              <span className="member-order-icon"><Icon name="bag" size={19} /></span>
-              <span className="member-order-info"><strong>{order.code}</strong><small>{orderDate(order.createdAt)}</small><span className={`member-order-status is-${order.status}`}>{orderStatusLabels[order.status]}</span></span>
-              <span className="member-order-total"><strong>{order.totalMinor === null ? 'Por confirmar' : money(order.totalMinor, store)}</strong><span>Ver pedido <Icon name="arrow" size={14} /></span></span>
+              <div className="member-order-main">
+                <span className="member-order-code">{order.code}</span>
+                <span className="member-order-date">{orderDate(order.createdAt)}</span>
+                <span className={`member-order-status is-${order.status}`}>{orderStatusLabels[order.status]}</span>
+              </div>
+              <div className="member-order-side">
+                <strong className="member-order-price">{order.totalMinor === null ? 'Por confirmar' : money(order.totalMinor, store)}</strong>
+                <span className="member-order-action">Ver pedido <Icon name="arrow" size={13} /></span>
+              </div>
             </button>)}</div>
-            : <div className="member-empty"><div className="member-empty-art" aria-hidden="true"><span className="member-empty-orbit" /><span className="member-empty-bag"><span /><GummyBearMark size={27} /></span><span className="member-empty-spark">✦</span></div><h4>Tu próximo antojo empieza aquí.</h4><p>Elige algo que te encante.<br />Nosotros guardamos aquí tus pedidos.</p></div>)}
+            : <div className="member-empty">
+              <div className="member-empty-icon" aria-hidden="true"><Icon name="bag" size={22} /></div>
+              <h4>Tu próximo antojo empieza aquí.</h4>
+              <p>Aún no tienes pedidos registrados.<br />Explora nuestro catálogo para armar tu mezcla favorita.</p>
+            </div>)}
           {history && history.total > history.pageSize && <div className="member-pagination"><button className="text-button" disabled={page === 1 || historyLoading} onClick={() => setPage(value => value - 1)}>Anterior</button><span>{page} / {Math.ceil(history.total / history.pageSize)}</span><button className="text-button" disabled={page * history.pageSize >= history.total || historyLoading} onClick={() => setPage(value => value + 1)}>Siguiente</button></div>}
         </section>
-        <button className="button member-shop" onClick={onShop}><span>Seguir comprando</span><span className="member-shop-arrow"><Icon name="arrow" size={18} /></span></button>
+        <button className="button button-primary member-shop" onClick={onShop}><span>Seguir comprando</span><Icon name="arrow" size={16} /></button>
         {error && <p ref={errorRef} tabIndex={-1} className="account-error" role="alert">{error}</p>}
-        <footer className="member-footer"><span>Hecho para tus antojos.</span><button className="text-button member-logout" disabled={busy} onClick={() => { void logout() }}><Icon name="logout" size={15} />{busy ? 'Cerrando…' : 'Cerrar sesión'}</button></footer>
+        <footer className="member-footer"><span>Onky’s · Gomitas enchiladas</span><button className="text-button member-logout" disabled={busy} onClick={() => { void logout() }}><Icon name="logout" size={14} />{busy ? 'Cerrando…' : 'Cerrar sesión'}</button></footer>
       </div>
     </div> : <div className="account-layout">
       <aside className="account-story" aria-hidden="true">

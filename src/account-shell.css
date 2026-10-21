@@ -1,8 +1,9 @@
 /* Shared account entry points stay in the landing bundle; forms load on demand. */
 .header-actions { display: flex; align-items: center; gap: 16px; }
 .account-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 10px; border-radius: 24px; background: transparent; color: var(--purple); font-size: 12px; font-weight: 550; position: relative; }
-.account-toggle:hover { background: #eee8f180; }
-.account-toggle:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.account-toggle:hover { background: transparent; color: #53306b; opacity: 0.8; }
+.account-toggle:focus,
+.account-toggle:focus-visible { outline: none !important; box-shadow: none !important; }
 .account-toggle i { width: 5px; height: 5px; border-radius: 50%; background: #64816b; position: absolute; top: 10px; left: 25px; box-shadow: 0 0 0 2px var(--paper); }
 .header-actions-divider { height: 18px; width: 1px; background: var(--line); }
 .welcome-marquee { justify-content: center; }

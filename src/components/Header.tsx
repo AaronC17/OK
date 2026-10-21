@@ -27,7 +27,7 @@ export function Header({ count, onCart, signedIn = false, onAccount }: { count: 
         <SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink>
         <div className="header-actions">
           {/* Safari does not focus tapped buttons; the dialog needs a return-focus target. */}
-          <button className={`account-toggle ${signedIn ? 'is-signed-in' : ''}`} {...accountDialog.intent} onClick={event => { event.currentTarget.focus({ preventScroll: true }); onAccount() }} aria-label={signedIn ? 'Abrir mi cuenta' : 'Iniciar sesión'}><Icon name="user" size={19} /><span>{signedIn ? 'Mi cuenta' : 'Iniciar sesión'}</span>{signedIn && <i aria-hidden="true" />}</button>
+          <button className={`account-toggle ${signedIn ? 'is-signed-in' : ''}`} {...accountDialog.intent} onClick={onAccount} aria-label={signedIn ? 'Abrir mi cuenta' : 'Iniciar sesión'}><Icon name="user" size={19} /><span>{signedIn ? 'Mi cuenta' : 'Iniciar sesión'}</span>{signedIn && <i aria-hidden="true" />}</button>
           <span className="header-actions-divider" aria-hidden="true" />
           <button className="cart-toggle" {...cartDrawer.intent} onClick={onCart} aria-label={`Abrir carrito, ${count} artículos`}><Icon name="bag" size={20} /><span className="cart-label">Carrito</span><span className="cart-count" key={count}>{count}</span></button>
         </div>

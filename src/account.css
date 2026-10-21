@@ -22,8 +22,9 @@
 .account-brand .wordmark { font-size: 25px; letter-spacing: -1.7px; }
 .account-brand-caption { border-left: 1px solid #e1d7e7; padding-left: 9px; font-size: 11px; color: #76657e; white-space: nowrap; }
 .account-close { border: 0; color: #705e7c; background: transparent; box-shadow: none; }
-.account-close:hover { background: #eee8f0; }
-.account-close:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+.account-close:hover { background: transparent; color: var(--ink); opacity: 0.7; }
+.account-close:focus,
+.account-close:focus-visible { outline: none !important; box-shadow: none !important; }
 .account-layout { display: block; }
 .account-story { display: none; }
 .account-form-panel { display: grid; gap: var(--account-gap); min-width: 0; padding: 0 var(--account-gutter) 28px; }
@@ -72,63 +73,59 @@
 .account-spinner { width: 15px; height: 15px; border: 1.5px solid #ffffff50; border-top-color: #fff; border-radius: 50%; animation: account-spin .8s linear infinite; }
 .account-error { font-size: 12px; line-height: 1.7; color: #9b3345; padding: 12px 14px; background: #f9eff0; border: 1px solid #ead6db; border-radius: 14px; margin-top: 15px; }
 .account-form .field-error { font-size: 11px; line-height: 1.65; margin-top: 6px; }
-/* The signed-in space is a personal card, with the same plum as the storefront. */
-.modal.account-dialog.is-member { width: 560px; background: #fcfaf8; border-color: #f7f2f8; border-radius: 28px; }
-.is-member .account-topbar { padding-inline: 24px 16px; background: #fcfaf8; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.is-member .account-brand-caption { font-size: 10px; }
-.is-member .account-close { width: 44px; height: 44px; background: #f0ebf1; }
-.member-content { padding: 0 10px; }
-.member-heading { position: relative; isolation: isolate; overflow: hidden; padding: 25px 24px 17px; border: 1px solid #745b82; border-radius: 20px; color: #fff8f3; background: radial-gradient(ellipse at 100% 0, #79558280, transparent 70%), linear-gradient(115deg, #382448, #291a35); }
-.member-heading::before, .member-heading::after { content: ''; position: absolute; z-index: -1; width: 240px; height: 240px; border: 1px solid #ead7f113; border-radius: 50%; pointer-events: none; right: -85px; top: -110px; }
-.member-heading::after { width: 320px; height: 320px; right: -125px; top: -150px; }
-.member-profile { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.member-profile > div { min-width: 0; }
-.member-eyebrow { display: block; font-size: 8px; font-weight: 600; letter-spacing: 2px; line-height: 1.6; color: #d9c8e3; margin-bottom: 8px; }
-.member-profile h2 { font-family: 'DM Sans', sans-serif; font-size: clamp(27px, 7vw, 35px); font-weight: 650; letter-spacing: -1.3px; line-height: 1.2; overflow-wrap: anywhere; }
-.member-profile p { margin-top: 7px; color: #d8c8e0; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
-.member-avatar { position: relative; display: grid; place-items: center; width: 62px; height: 62px; flex-shrink: 0; border: 1px solid #e4c8f15c; border-radius: 50%; background: linear-gradient(145deg, #c1a1d23b, #a483bb0a); box-shadow: inset 0 1px 0 #fff2, 0 0 0 6px #ffffff04; color: #f3e4ef; font-size: 23px; font-weight: 450; letter-spacing: -1px; }
-.member-avatar > span { position: absolute; bottom: -3px; right: -2px; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid #3e2a4c; border-radius: 50%; background: #e4d1ea; color: #51365f; }
-.member-since { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; border-top: 1px solid #ffffff20; padding-top: 14px; margin-top: 22px; font-size: 9px; line-height: 1.5; color: #d4c2dc; }
-.member-since > span:first-child { color: #f3e8f4; }
-.member-body { padding: 18px 16px 0; }
-.account-success { display: flex; align-items: center; gap: 8px; padding: 0 0 14px; font-size: 11px; color: #3f654d; line-height: 1.6; }
-.member-welcome { display: flex; align-items: center; gap: 17px; border: 1px solid #e5d9e8; background: linear-gradient(115deg, #f2eaf5, #faf5f9); border-radius: 16px; padding: 16px; }
-.member-welcome-amount { display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: stretch; flex-shrink: 0; border-right: 1px dashed #cdb9d5; padding-right: 17px; color: var(--purple); }
-.member-welcome-amount > span:first-child { font-size: 42px; line-height: 1; font-weight: 600; letter-spacing: -3px; }
-.member-welcome-amount small { font-size: 22px; font-weight: 450; letter-spacing: -1px; margin-left: 2px; }
-.member-welcome-amount > span:last-child { font-size: 7px; font-weight: 650; letter-spacing: 1.2px; margin-top: 7px; }
+/* The signed-in space is a personal space: clean, minimal, human, and modern. */
+.modal.account-dialog.is-member { width: 520px; max-width: calc(100% - 24px); background: #ffffff; border: 1px solid #ebe5ee; border-radius: 24px; box-shadow: 0 20px 60px -15px rgba(35, 18, 48, 0.15); }
+.is-member .account-topbar { padding: 18px 20px 14px; background: #ffffff; border-bottom: 1px solid #f2edf4; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.is-member .account-brand-caption { font-size: 11px; color: #7a6b82; }
+.is-member .account-close { width: 36px; height: 36px; background: transparent !important; color: #6d5b78; border-radius: 8px; display: grid; place-items: center; }
+.is-member .account-close:hover { background: #f5f0f7 !important; color: #20132a; }
+.member-content { padding: 16px 18px 12px; }
+.member-heading { position: relative; padding: 18px 20px; border: 1px solid #ebe4ee; border-radius: 18px; background: #faf8fb; }
+.member-heading::before, .member-heading::after { display: none !important; }
+.member-profile { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.member-info { min-width: 0; }
+.member-eyebrow { display: block; font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #8c729b; margin-bottom: 4px; text-transform: uppercase; }
+.member-profile h2 { font-family: 'DM Sans', -apple-system, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.25; color: #1f1228; margin: 0; }
+.member-profile .member-email { margin-top: 4px; color: #5c4c66; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.member-avatar { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border: 1px solid #ded1e4; border-radius: 50%; background: #ede4f3; color: #432457; font-size: 17px; font-weight: 700; letter-spacing: 0; box-shadow: none; }
+.member-since { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #ece4f0; padding-top: 12px; margin-top: 14px; font-size: 11px; color: #756281; }
+.member-since > span:first-child { color: #634f71; font-weight: 500; }
+.member-body { padding: 14px 2px 0; }
+.account-success { display: flex; align-items: center; gap: 8px; padding: 0 0 14px; font-size: 11px; color: #2d6645; line-height: 1.6; }
+.member-welcome { display: flex; align-items: center; gap: 14px; border: 1px solid #e7ddec; background: #fbf9fd; border-radius: 14px; padding: 13px 16px; margin-top: 12px; }
+.member-welcome-pill { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 52px; padding: 6px 8px; background: #391e4b; color: #ffffff; border-radius: 10px; flex-shrink: 0; line-height: 1; }
+.member-welcome-pill > span { font-size: 18px; font-weight: 750; letter-spacing: -0.5px; }
+.member-welcome-pill small { font-size: 11px; font-weight: 600; }
+.member-welcome-pill > small:last-child { font-size: 8px; font-weight: 700; letter-spacing: 0.8px; margin-top: 3px; opacity: 0.85; }
 .member-welcome-copy { min-width: 0; }
-.member-benefit-label { display: flex; align-items: center; gap: 5px; font-size: 7px; font-weight: 650; letter-spacing: 1.2px; color: #755581; margin-bottom: 5px; }
-.member-welcome strong { display: block; color: #442e52; font-size: 12px; font-weight: 650; line-height: 1.4; }
-.member-welcome p { font-size: 10px; line-height: 1.6; color: #75637e; margin-top: 5px; }
-.member-orders { margin-top: 22px; }
+.member-benefit-label { display: flex; align-items: center; gap: 5px; font-size: 8px; font-weight: 700; letter-spacing: 1.2px; color: #795788; margin-bottom: 3px; }
+.member-welcome strong { display: block; color: #1f1228; font-size: 12.5px; font-weight: 650; line-height: 1.35; }
+.member-welcome p { font-size: 11px; line-height: 1.5; color: #675572; margin-top: 3px; }
+.member-orders { margin-top: 20px; }
 .member-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
-.member-section-heading h3 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 650; letter-spacing: -.5px; color: var(--purple); }
-.member-section-heading h3 > span { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding-inline: 5px; border: 1px solid #e8dfeb; border-radius: 7px; color: #786481; font-size: 10px; font-weight: 500; letter-spacing: 0; }
-.member-section-heading p { font-size: 10px; line-height: 1.5; color: #7c707f; margin-top: 3px; }
-.member-refresh { border: 1px solid #e8e0e9; border-radius: 12px; background: #fffdfa; color: #76617f; }
-.member-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 16px 12px 20px; border: 1px solid #ede5ed; border-radius: 17px; background: #fffdfb; }
-.member-empty-art { position: relative; display: grid; place-items: center; width: 86px; height: 72px; }
-.member-empty-orbit { position: absolute; width: 69px; height: 69px; border: 1px solid #e9dfec; border-radius: 50%; background: #f8f3f9; }
-.member-empty-bag { position: relative; display: grid; place-items: center; width: 42px; height: 43px; margin-top: 9px; color: #9c7cad; border: 1px solid #dac9e2; border-radius: 5px 5px 10px 10px; background: linear-gradient(145deg, #fdfaff, #ede1f2); box-shadow: 3px 5px 8px #53305f10, inset 0 1px 0 #fff; transform: rotate(-9deg); }
-.member-empty-bag > span { position: absolute; top: -10px; width: 17px; height: 15px; border: 1.5px solid #a78bb7; border-bottom: 0; border-radius: 10px 10px 0 0; }
-.member-empty-spark { position: absolute; top: 6px; right: 5px; color: #ab8bb8; font-size: 18px; }
-.member-empty h4 { margin: 9px 0 0; font-size: 13px; font-weight: 600; letter-spacing: -.25px; color: #493652; }
-.member-empty p { font-size: 11px; color: #7a6b80; line-height: 1.65; margin-top: 5px; }
-.member-order-list { display: grid; gap: 8px; }
-.member-order { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 15px 12px; border: 1px solid #e8e0e9; border-radius: 14px; background: #fffdfb; transition: background .15s, border-color .15s; }
-.member-order:hover { background: #f7f1f9; border-color: #d5c3df; }
-.member-order-icon { display: grid; place-items: center; width: 38px; height: 42px; border-radius: 10px; background: #f2eaf5; color: #876394; flex-shrink: 0; }
-.member-order-info { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
-.member-order-info > strong { font-size: 12px; font-weight: 650; color: var(--purple); overflow-wrap: anywhere; }
-.member-order-info > small { font-size: 10px; color: #7a6b80; }
-.member-order-status { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 5px; font-size: 9px; line-height: 1.2; color: #795b28; background: #f8f0df; }
+.member-section-heading h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; letter-spacing: -0.3px; color: #1e1227; margin: 0; }
+.member-order-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #ede5f1; color: #4b2d5f; font-size: 10.5px; font-weight: 650; }
+.member-section-heading p { font-size: 11px; line-height: 1.4; color: #72627c; margin-top: 2px; }
+.member-refresh { width: 34px; height: 34px; border: 1px solid #ebe3ee; border-radius: 10px; background: #faf8fb; color: #675373; display: grid; place-items: center; transition: background .15s, color .15s; }
+.member-refresh:hover:not(:disabled) { background: #f1e9f4; color: #23142e; }
+.member-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 18px 24px; border: 1px dashed #e2d6e6; border-radius: 16px; background: #faf8fb; }
+.member-empty-icon { width: 44px; height: 44px; border-radius: 12px; background: #ede4f2; color: #5d3b73; display: grid; place-items: center; margin-bottom: 10px; }
+.member-empty h4 { margin: 0; font-size: 13.5px; font-weight: 650; letter-spacing: -0.2px; color: #21132b; }
+.member-empty p { font-size: 11.5px; color: #6b5a74; line-height: 1.6; margin-top: 6px; max-width: 320px; }
+.member-order-list { display: grid; gap: 9px; }
+.member-order { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 13px 15px; border: 1px solid #eae2ee; border-radius: 14px; background: #faf8fc; transition: background .15s, border-color .15s; text-align: left; }
+.member-order:hover { background: #f5eff8; border-color: #d6c5de; }
+.member-order-main { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.member-order-code { font-size: 12.5px; font-weight: 700; color: #1f1228; }
+.member-order-date { font-size: 10.5px; color: #71607a; }
+.member-order-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 6px; font-size: 9.5px; font-weight: 600; line-height: 1.2; }
 .member-order-status::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-.member-order-status.is-ready { color: #3e6650; background: #edf4eb; }
-.member-order-status.is-rejected { color: #974456; background: #f9edf0; }
-.member-order-total { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; margin-left: auto; flex-shrink: 0; }
-.member-order-total > strong { font-size: 12px; font-weight: 600; color: var(--purple); }
-.member-order-total > span { display: flex; align-items: center; gap: 5px; font-size: 9px; color: #7a6187; }
+.member-order-status.is-pending { color: #6e4e13; background: #fbf3e2; border: 1px solid #ebdcb8; }
+.member-order-status.is-ready { color: #185a35; background: #e9f5ed; border: 1px solid #c8e7d2; }
+.member-order-status.is-rejected { color: #822234; background: #fcecef; border: 1px solid #f2cfd7; }
+.member-order-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.member-order-price { font-size: 13px; font-weight: 700; color: #1f1228; }
+.member-order-action { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600; color: #6a497f; }
 .member-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 11px; color: #74617e; }
 .member-pagination .text-button { min-height: 44px; font-size: 11px; }
 .member-orders-loading { display: grid; gap: 10px; min-height: 174px; }
@@ -138,12 +135,11 @@
 .member-order-skeleton i { display: block; width: 70%; height: 9px; border-radius: 4px; background: #eee7f1; }
 .member-order-skeleton i + i { width: 50%; margin-top: 9px; background: #f3edf5; }
 .member-order-skeleton > span:last-child { width: 42px; height: 12px; border-radius: 4px; }
-.member-shop.button { display: flex; width: 100%; min-height: 50px; margin-top: 16px; padding: 8px 12px 8px 18px; justify-content: space-between; border: 1px solid #654775; border-radius: 13px; color: #fffafc; background: linear-gradient(110deg, #50345f, #382448); box-shadow: inset 0 1px 0 #ffffff1a, 0 4px 10px #38244812; font-size: 12px; }
-.member-shop:hover { background: #563768; }
-.member-shop-arrow { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #ffffff24; border-radius: 50%; background: #ffffff08; }
-.member-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 61px; }
-.member-footer > span { color: #76657d; font-size: 9px; }
-.member-logout { min-height: 44px; color: #75627e; font-size: 10px; text-decoration: none; }
+.member-shop.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin-top: 20px; margin-bottom: 14px; border-radius: 12px; background: #2e183b; color: #ffffff; font-size: 13px; font-weight: 600; border: 0; cursor: pointer; box-shadow: 0 4px 14px rgba(46, 24, 59, 0.15); transition: background .18s; }
+.member-shop:hover { background: #422354; }
+.member-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 4px 6px; border-top: 1px solid #f1ecf3; font-size: 10.5px; color: #796883; }
+.member-logout { min-height: 38px; color: #6d5879; font-size: 11px; font-weight: 550; display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 4px 8px; border-radius: 6px; cursor: pointer; text-decoration: none; }
+.member-logout:hover { color: #1f1228; background: #f4edf6; text-decoration: none; }
 .account-history-error { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 16px; border: 1px solid #eddee4; border-radius: 14px; background: #fff9f9; color: #8d4255; text-align: center; }
 .account-history-error p { font-size: 12px; line-height: 1.6; }
 .account-history-error .text-button { min-height: 44px; font-size: 12px; }
@@ -175,29 +171,29 @@
 }
 @media (max-width: 600px) {
   .modal.account-dialog::backdrop { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
-  .member-heading { padding: 22px 18px 16px; }
-  .member-body { padding: 16px 10px 0; }
-  .member-welcome { padding: 14px 12px; gap: 12px; }
-  .member-welcome-amount { padding-right: 12px; }
-  .member-welcome-amount > span:first-child { font-size: 37px; }
-  .member-welcome strong { font-size: 11px; }
-  .member-order { gap: 9px; }
-  .member-order-total > strong { font-size: 11px; }
-  .member-order-icon { width: 31px; height: 36px; }
+  .modal.account-dialog.is-member { width: 100%; border-radius: 22px; }
+  .member-content { padding: 14px 14px 10px; }
+  .member-heading { padding: 16px; border-radius: 16px; }
+  .member-profile h2 { font-size: 20px; }
+  .member-profile .member-email { font-size: 12px; }
+  .member-avatar { width: 42px; height: 42px; font-size: 15px; }
+  .member-welcome { padding: 12px 14px; gap: 12px; }
+  .member-welcome strong { font-size: 12px; }
+  .member-order { padding: 12px; gap: 10px; }
+  .member-order-price { font-size: 12.5px; }
 }
 @media (max-width: 360px) {
-  .modal.account-dialog { --account-gutter: 16px; max-width: calc(100% - 16px); border-radius: 25px; }
+  .modal.account-dialog { --account-gutter: 16px; max-width: calc(100% - 16px); border-radius: 20px; }
   .account-brand-caption { padding-left: 9px; font-size: 10px; }
   .account-form-heading h2 { font-size: 27px; }
   .account-welcome { padding-inline: 12px; gap: 10px; }
   .account-welcome-amount { padding-right: 11px; }
   .account-welcome > .icon { display: none; }
-  .member-avatar { width: 46px; height: 46px; font-size: 19px; }
+  .member-avatar { width: 38px; height: 38px; font-size: 14px; }
   .member-profile { gap: 10px; }
-  .member-heading { padding-inline: 14px; }
-  .member-body { padding-inline: 6px; }
-  .member-order-info > small { font-size: 9px; }
-  .member-order-icon { display: none; }
+  .member-heading { padding: 12px; }
+  .member-body { padding-inline: 2px; }
+  .member-order-date { font-size: 9.5px; }
 }
 /* Use the available browser height, including Safari's expanded toolbars. */
 @media (max-width: 760px) and (max-height: 680px) {

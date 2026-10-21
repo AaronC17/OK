@@ -805,10 +805,18 @@
   place-items: center;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  background: #f0eaf5;
+  background: transparent;
   color: #655074;
   flex-shrink: 0;
+}
+.admin-search-clear:focus,
+.admin-search-clear:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.admin-search-clear:hover {
+  background: transparent !important;
+  opacity: 0.7;
 }
 
 .admin-orders-section { min-width: 0; }

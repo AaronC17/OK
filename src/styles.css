@@ -317,18 +317,40 @@ summary::-webkit-details-marker { display: none; }
 .modal::backdrop { background: #21142e66; backdrop-filter: blur(4px); opacity: 0; transition: opacity .2s, overlay .2s allow-discrete, display .2s allow-discrete; }
 .modal[open]::backdrop { opacity: 1; }
 @starting-style { .modal[open] { opacity: 0; transform: translateY(12px); } .modal[open]::backdrop { opacity: 0; } }
-.modal-close { position: absolute; top: 13px; right: 13px; z-index: 2; background: #fbfaf9e8; }
-.modal-close:hover { background: #eee8f0; }
-.modal-close:focus-visible,
-.account-close:focus-visible,
-.account-toggle:focus-visible,
-.cart-toggle:focus-visible,
-.drawer-header .icon-button:focus-visible,
-.lightbox-heading .icon-button:focus-visible,
-.admin-order-dialog .icon-button:focus-visible,
-.brand-preview-top .icon-button:focus-visible {
+.modal-close { position: absolute; top: 13px; right: 13px; z-index: 2; background: transparent; }
+.cart-toggle:focus-visible {
   outline: 2px solid #75548e;
   outline-offset: 3px;
+}
+.modal-close:focus,
+.modal-close:focus-visible,
+.account-close:focus,
+.account-close:focus-visible,
+.account-toggle:focus,
+.account-toggle:focus-visible,
+.drawer-header .icon-button:focus,
+.drawer-header .icon-button:focus-visible,
+.lightbox-heading .icon-button:focus,
+.lightbox-heading .icon-button:focus-visible,
+.admin-order-dialog .icon-button:focus,
+.admin-order-dialog .icon-button:focus-visible,
+.brand-preview-top .icon-button:focus,
+.brand-preview-top .icon-button:focus-visible,
+.toast-close:focus,
+.toast-close:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.modal-close:hover,
+.account-close:hover,
+.drawer-header .icon-button:hover,
+.lightbox-heading .icon-button:hover,
+.admin-order-dialog .icon-button:hover,
+.brand-preview-top .icon-button:hover,
+.toast-close:hover {
+  background: transparent !important;
+  color: var(--ink);
+  opacity: 0.7;
 }
 .product-dialog { width: 900px; }
 .product-dialog-inner { position: relative; display: grid; grid-template-columns: .95fr 1.05fr; }
