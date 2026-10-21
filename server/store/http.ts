@@ -126,6 +126,10 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         json(response, 200, await store.accountOrders(await requireSession('customer'), url.searchParams))
         return
       }
+      if (path === '/api/account/referrals' && method === 'GET') {
+        json(response, 200, await store.referrals(await requireSession('customer')))
+        return
+      }
       if (path === '/api/admin/session' && method === 'GET') {
         json(response, 200, await authReply(await store.session(cookie(request, ADMIN_COOKIE), 'admin')))
         return

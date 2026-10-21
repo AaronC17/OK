@@ -10,7 +10,7 @@ import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { shippingFee } from '../../src/lib/shop.ts'
 import type { ShopRepository } from './repository.ts'
-import type { AdminCustomers, CustomerAccount, CustomerOrders } from '../../src/account-types.ts'
+import type { AdminCustomers, CustomerAccount, CustomerOrders, CustomerReferralsData } from '../../src/account-types.ts'
 import { accountIdFromOwner, accountOwner, accountPage, accountPasswordHash, accountPasswordMatches, parseAccountLogin, parseRegistration, requireAccount, requireGuest } from './accounts.ts'
 import { welcomeDiscount } from '../../src/lib/welcome.ts'
 
@@ -28,11 +28,17 @@ export class ShopDatabase implements ShopRepository {
     this.database.exec(schema)
     // Additive migrations preserve existing orders, sessions and payment instructions.
     for (const [table, name, definition] of [
+      ['customers', 'referral_code', 'TEXT UNIQUE'],
       ['sessions', 'account_id', 'TEXT REFERENCES customers(id)'],
       ['shop_orders', 'account_id', 'TEXT REFERENCES customers(id)'],
       ['shop_orders', 'discount_minor', 'INTEGER NOT NULL DEFAULT 0 CHECK (discount_minor >= 0)'],
     ]) {
       if (!this.database.prepare(`SELECT name FROM pragma_table_info('${table}') WHERE name = ?`).get(name)) this.database.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`)
+    }
+    const nullCodes = this.database.prepare('SELECT id FROM customers WHERE referral_code IS NULL').all() as Array<{ id: string }>
+    for (const c of nullCodes) {
+      const code = this.generateReferralCode()
+      this.database.prepare('UPDATE customers SET referral_code = ? WHERE id = ?').run(code, c.id)
     }
     this.database.exec('CREATE INDEX IF NOT EXISTS shop_orders_customer ON shop_orders(account_id, created_at)')
     const receiptCol = this.database.prepare("SELECT \"notnull\" FROM pragma_table_info('manual_payments') WHERE name = 'receipt_id'").get()
@@ -108,12 +114,31 @@ export class ShopDatabase implements ShopRepository {
   }
   logout(session: Session) { this.database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(session.hash) }
 
+  private generateReferralCode(): string {
+    for (let i = 0; i < 20; i++) {
+      const code = `ONKY-${randomUUID().slice(0, 6).toUpperCase()}`
+      const exists = this.database.prepare('SELECT id FROM customers WHERE referral_code = ?').get(code)
+      if (!exists) return code
+    }
+    return `ONKY-${randomUUID().slice(0, 8).toUpperCase()}`
+  }
+
   private accountFromRow(row: Row): CustomerAccount {
-    return { id: row.id as string, name: row.name as string, email: row.email as string, createdAt: row.created_at as string, welcomeAvailable: row.welcome_order_id === null }
+    const id = row.id as string
+    const balance = this.database.prepare('SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?').get(id) as { balance: number | bigint } | undefined
+    return {
+      id,
+      name: row.name as string,
+      email: row.email as string,
+      createdAt: row.created_at as string,
+      welcomeAvailable: row.welcome_order_id === null,
+      referralCode: (row.referral_code as string) ?? undefined,
+      creditBalanceMinor: Number(balance?.balance ?? 0),
+    }
   }
   account(session: Session): CustomerAccount | null {
     if (!session.accountId) return null
-    const row = this.database.prepare('SELECT id, name, email, created_at, welcome_order_id FROM customers WHERE id = ?').get(session.accountId)
+    const row = this.database.prepare('SELECT id, name, email, created_at, welcome_order_id, referral_code FROM customers WHERE id = ?').get(session.accountId)
     return row ? this.accountFromRow(row) : null
   }
   private signInCustomer(id: string, previous: Session) {
@@ -130,9 +155,21 @@ export class ShopDatabase implements ShopRepository {
     const hash = await accountPasswordHash(data.password)
     return this.transaction(() => {
       if (this.database.prepare('SELECT id FROM customers WHERE email = ?').get(data.email)) throw new StoreError(409, 'Ya existe una cuenta con este correo. Inicia sesión.')
+      let referrerId: string | null = null
+      if (data.referralCode) {
+        const referrer = this.database.prepare('SELECT id, email FROM customers WHERE referral_code = ?').get(data.referralCode) as { id: string; email: string } | undefined
+        if (!referrer) throw new StoreError(422, 'El código de referido no existe.')
+        if (referrer.email.toLowerCase() === data.email.toLowerCase()) throw new StoreError(422, 'No puedes usar tu propio código de referido.')
+        referrerId = referrer.id
+      }
       const id = randomUUID()
+      const referralCode = this.generateReferralCode()
       const now = timestamp()
-      this.database.prepare("INSERT INTO customers (id, name, email, password_hash, created_at, privacy_version, privacy_accepted_at) VALUES (?, ?, ?, ?, ?, 'customer-account-v1', ?)").run(id, data.name, data.email, hash, now, now)
+      this.database.prepare("INSERT INTO customers (id, name, email, password_hash, referral_code, created_at, privacy_version, privacy_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 'customer-account-v1', ?)").run(id, data.name, data.email, hash, referralCode, now, now)
+      if (referrerId) {
+        this.database.prepare("INSERT INTO referrals (id, referrer_id, referred_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)").run(randomUUID(), referrerId, id, now)
+        this.audit(null, 'customer.referral_pending', id, `Referido por ${referrerId}. Pendiente de primera compra.`)
+      }
       const result = this.signInCustomer(id, previous)
       this.audit(null, 'customer.registered', id, 'Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.')
       return result
@@ -353,6 +390,7 @@ export class ShopDatabase implements ShopRepository {
       this.database.prepare("UPDATE shop_orders SET status = 'ready', payment_confirmed_at = ?, customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(now, now, id)
       this.audit(id, 'payment.confirmed_manual', actor, note)
       const updated = this.getOrder(id)
+      this.rewardReferralIfEligible(updated)
       this.event(updated, 'payment.confirmed_manual')
       return updated
     })
@@ -396,5 +434,143 @@ export class ShopDatabase implements ShopRepository {
     const counts = Object.fromEntries(statuses.map(status => [status, 0])) as Record<ShopOrderStatus, number>
     for (const row of this.database.prepare(`SELECT status, count(*) AS count FROM shop_orders ${customerId ? 'WHERE account_id = ?' : ''} GROUP BY status`).all(...(customerId ? [customerId.slice(0, 36)] : []))) counts[row.status as ShopOrderStatus] = Number(row.count)
     return { orders, counts, total, page, pageSize: 50 }
+  }
+
+  private rewardReferralIfEligible(order: ShopOrder): void {
+    if (!order.customerAccountId || !order.totalMinor || order.totalMinor <= 0) return
+    const buyerId = order.customerAccountId
+    const referral = this.database.prepare(
+      "SELECT id, referrer_id, status FROM referrals WHERE referred_id = ? AND status = 'pending'"
+    ).get(buyerId) as { id: string; referrer_id: string; status: string } | undefined
+    if (!referral) return
+
+    // Verify it is strictly their FIRST paid order
+    const priorPaid = this.database.prepare(
+      "SELECT count(*) AS count FROM shop_orders WHERE account_id = ? AND status = 'ready' AND id != ?"
+    ).get(buyerId, order.id) as { count: number | bigint }
+
+    if (Number(priorPaid.count) > 0) {
+      this.database.prepare("UPDATE referrals SET status = 'revoked' WHERE id = ?").run(referral.id)
+      return
+    }
+
+    // 10% of total paid with a cap of ₡5.000 CRC (500_000 minor cents)
+    const MAX_REWARD_MINOR = 500_000
+    const rewardMinor = Math.min(Math.round(order.totalMinor * 0.10), MAX_REWARD_MINOR)
+    const now = timestamp()
+    const idempotencyKey = `reward:order:${order.id}:ref:${referral.id}`
+
+    const existing = this.database.prepare('SELECT id FROM customer_credit_ledger WHERE idempotency_key = ?').get(idempotencyKey)
+    if (existing) return
+
+    const currentBalanceRow = this.database.prepare(
+      'SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?'
+    ).get(referral.referrer_id) as { balance: number | bigint }
+    const balanceAfter = Number(currentBalanceRow?.balance ?? 0) + rewardMinor
+
+    this.database.prepare(`
+      UPDATE referrals
+      SET status = 'rewarded', first_order_id = ?, order_total_minor = ?, reward_minor = ?, rewarded_at = ?
+      WHERE id = ? AND status = 'pending'
+    `).run(order.id, order.totalMinor, rewardMinor, now, referral.id)
+
+    this.database.prepare(`
+      INSERT INTO customer_credit_ledger (
+        customer_id, type, amount_minor, balance_after_minor, order_id, referral_id, idempotency_key, description, created_at
+      ) VALUES (?, 'referral_reward', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      referral.referrer_id,
+      rewardMinor,
+      balanceAfter,
+      order.id,
+      referral.id,
+      idempotencyKey,
+      `Crédito del 10% por la primera compra de tu referido (Pedido ${order.code})`,
+      now
+    )
+
+    this.audit(order.id, 'referral.rewarded', 'system', `Crédito de recompensa de ₡${(rewardMinor / 100).toLocaleString('es-CR')} registrado para el referente ${referral.referrer_id}`)
+  }
+
+  referrals(session: Session): CustomerReferralsData {
+    const customerId = requireAccount(session)
+    const customer = this.database.prepare('SELECT referral_code FROM customers WHERE id = ?').get(customerId) as { referral_code: string } | undefined
+    if (!customer?.referral_code) throw new StoreError(404, 'No se encontró la cuenta.')
+
+    const balanceRow = this.database.prepare('SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?').get(customerId) as { balance: number | bigint }
+    const creditBalanceMinor = Number(balanceRow?.balance ?? 0)
+
+    const pendingRows = this.database.prepare(`
+      SELECT r.id, c.name, r.created_at
+      FROM referrals r
+      JOIN customers c ON c.id = r.referred_id
+      WHERE r.referrer_id = ? AND r.status = 'pending'
+      ORDER BY r.created_at DESC
+    `).all(customerId) as Array<{ id: string; name: string; created_at: string }>
+
+    const validRows = this.database.prepare(`
+      SELECT r.id, c.name, r.reward_minor, r.rewarded_at, o.code AS order_code
+      FROM referrals r
+      JOIN customers c ON c.id = r.referred_id
+      LEFT JOIN shop_orders o ON o.id = r.first_order_id
+      WHERE r.referrer_id = ? AND r.status = 'rewarded'
+      ORDER BY r.rewarded_at DESC
+    `).all(customerId) as Array<{ id: string; name: string; reward_minor: number; rewarded_at: string; order_code: string | null }>
+
+    const ledgerRows = this.database.prepare(`
+      SELECT id, type, amount_minor, balance_after_minor, description, created_at
+      FROM customer_credit_ledger
+      WHERE customer_id = ?
+      ORDER BY id DESC
+      LIMIT 50
+    `).all(customerId) as Array<{ id: number; type: string; amount_minor: number; balance_after_minor: number; description: string; created_at: string }>
+
+    const totalEarnedRow = this.database.prepare(`
+      SELECT COALESCE(SUM(amount_minor), 0) AS total
+      FROM customer_credit_ledger
+      WHERE customer_id = ? AND type = 'referral_reward'
+    `).get(customerId) as { total: number | bigint }
+
+    const anonymize = (fullName: string) => {
+      const parts = fullName.trim().split(/\s+/)
+      return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0]}.`
+    }
+
+    return {
+      referralCode: customer.referral_code,
+      shareUrl: `https://onkys.cr/?ref=${customer.referral_code}`,
+      creditBalanceMinor,
+      summary: {
+        pendingCount: pendingRows.length,
+        validCount: validRows.length,
+        totalEarnedMinor: Number(totalEarnedRow?.total ?? 0),
+      },
+      pendingReferrals: pendingRows.map(row => ({
+        id: row.id,
+        referredName: anonymize(row.name),
+        status: 'pending' as const,
+        createdAt: row.created_at,
+        firstOrderCode: null,
+        rewardMinor: null,
+        rewardedAt: null,
+      })),
+      validReferrals: validRows.map(row => ({
+        id: row.id,
+        referredName: anonymize(row.name),
+        status: 'rewarded' as const,
+        createdAt: row.rewarded_at,
+        firstOrderCode: row.order_code,
+        rewardMinor: row.reward_minor,
+        rewardedAt: row.rewarded_at,
+      })),
+      ledger: ledgerRows.map(row => ({
+        id: row.id,
+        type: row.type as any,
+        amountMinor: row.amount_minor,
+        balanceAfterMinor: row.balance_after_minor,
+        description: row.description,
+        createdAt: row.created_at,
+      })),
+    }
   }
 }

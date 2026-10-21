@@ -93,14 +93,14 @@
 .member-body { padding: 14px 2px 0; }
 .account-success { display: flex; align-items: center; gap: 8px; padding: 0 0 14px; font-size: 11px; color: #2d6645; line-height: 1.6; }
 .member-welcome { display: flex; align-items: center; gap: 14px; border: 1px solid #e7ddec; background: #fbf9fd; border-radius: 14px; padding: 13px 16px; margin-top: 12px; }
-.member-welcome-pill { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 52px; padding: 6px 8px; background: #391e4b; color: #ffffff; border-radius: 10px; flex-shrink: 0; line-height: 1; }
-.member-welcome-pill > span { font-size: 18px; font-weight: 750; letter-spacing: -0.5px; }
-.member-welcome-pill small { font-size: 11px; font-weight: 600; }
-.member-welcome-pill > small:last-child { font-size: 8px; font-weight: 700; letter-spacing: 0.8px; margin-top: 3px; opacity: 0.85; }
+.member-welcome-pill { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 72px; padding: 8px 10px; background: #391e4b; color: #ffffff; border-radius: 12px; flex-shrink: 0; text-align: center; line-height: 1; }
+.welcome-pill-rate { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: baseline; justify-content: center; line-height: 1; }
+.welcome-pill-rate small { font-size: 13px; font-weight: 700; margin-left: 1px; }
+.welcome-pill-label { font-size: 7px; font-weight: 700; letter-spacing: 0.5px; margin-right: -0.5px; text-transform: uppercase; margin-top: 4px; opacity: 0.92; white-space: nowrap; display: block; text-align: center; line-height: 1; }
 .member-welcome-copy { min-width: 0; }
-.member-benefit-label { display: flex; align-items: center; gap: 5px; font-size: 8px; font-weight: 700; letter-spacing: 1.2px; color: #795788; margin-bottom: 3px; }
-.member-welcome strong { display: block; color: #1f1228; font-size: 12.5px; font-weight: 650; line-height: 1.35; }
-.member-welcome p { font-size: 11px; line-height: 1.5; color: #675572; margin-top: 3px; }
+.member-benefit-label { display: flex; align-items: center; gap: 5px; font-size: 8.5px; font-weight: 700; letter-spacing: 1.2px; color: #795788; margin-bottom: 3px; }
+.member-welcome strong { display: block; color: #1f1228; font-size: 13px; font-weight: 650; line-height: 1.35; }
+.member-welcome p { font-size: 11px; line-height: 1.5; color: #675572; margin-top: 2px; }
 .member-orders { margin-top: 20px; }
 .member-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .member-section-heading h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; letter-spacing: -0.3px; color: #1e1227; margin: 0; }
@@ -138,6 +138,172 @@
 .member-shop.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin-top: 20px; margin-bottom: 14px; border-radius: 12px; background: #2e183b; color: #ffffff; font-size: 13px; font-weight: 600; border: 0; cursor: pointer; box-shadow: 0 4px 14px rgba(46, 24, 59, 0.15); transition: background .18s; }
 .member-shop:hover { background: #422354; }
 .member-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 4px 6px; border-top: 1px solid #f1ecf3; font-size: 10.5px; color: #796883; }
+
+/* Referrals Milestone Card (3 friends = 1 gummy) */
+.member-referrals {
+  margin-top: 14px;
+}
+.referrals-milestone-card {
+  border: 1px solid #e7dcec;
+  background: radial-gradient(ellipse at 100% 0%, #f7f1fa 0%, #fffdfd 70%);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 4px 14px #38244806;
+}
+.milestone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.milestone-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #5c2f70;
+  background: #f1e4f7;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.milestone-rule {
+  font-size: 10px;
+  color: #796684;
+  font-weight: 600;
+}
+.milestone-title {
+  font-size: 14.5px;
+  font-weight: 750;
+  color: #1e1127;
+  letter-spacing: -0.3px;
+  margin: 0 0 4px;
+}
+.milestone-subtext {
+  font-size: 11px;
+  color: #6b5876;
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+.milestone-counter-box {
+  background: #ffffff;
+  border: 1px solid #ebe0ef;
+  border-radius: 14px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.milestone-counter-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #3b2749;
+}
+.milestone-counter-label strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1f1228;
+}
+.milestone-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-size: 22px;
+  line-height: 1;
+  margin: 8px 0 6px;
+  user-select: none;
+}
+.milestone-dot.is-filled {
+  color: #391e4b;
+  transform: scale(1.08);
+}
+.milestone-dot.is-empty {
+  color: #cfbfd8;
+}
+.milestone-status-message {
+  font-size: 12px;
+  font-weight: 650;
+  color: #5a3270;
+  margin: 0;
+  line-height: 1.4;
+}
+.referral-share-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+.referral-share-btn {
+  min-height: 40px;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 6px;
+  border-radius: 12px;
+  background: #391e4b;
+  color: #ffffff;
+}
+.referral-share-btn:hover {
+  background: #4d2b63;
+}
+.referral-copy-btn {
+  min-height: 40px;
+  padding: 0 16px;
+  background: #f7f2f9;
+  border: 1px solid #e2d5e7;
+  color: #4a2e5d;
+  font-size: 12px;
+  font-weight: 650;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .15s, border-color .15s;
+}
+.referral-copy-btn:hover {
+  background: #eee4f2;
+  border-color: #d2c0db;
+}
+.referral-details {
+  margin-top: 12px;
+  border-top: 1px dashed #e5d9eb;
+  padding-top: 10px;
+  font-size: 11px;
+}
+.referral-items-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.referral-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid #ede5f1;
+  border-radius: 8px;
+}
+.referral-item-row .status-pending {
+  font-size: 10px;
+  color: #8c6720;
+  background: #fdf6e7;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.referral-item-row .status-rewarded {
+  font-size: 10px;
+  color: #185a35;
+  background: #e9f5ed;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 700;
+}
 .member-logout { min-height: 38px; color: #6d5879; font-size: 11px; font-weight: 550; display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 4px 8px; border-radius: 6px; cursor: pointer; text-decoration: none; }
 .member-logout:hover { color: #1f1228; background: #f4edf6; text-decoration: none; }
 .account-history-error { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 16px; border: 1px solid #eddee4; border-radius: 14px; background: #fff9f9; color: #8d4255; text-align: center; }

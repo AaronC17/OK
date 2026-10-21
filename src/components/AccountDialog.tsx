@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { CustomerOrders } from '../account-types.ts'
+import type { CustomerOrders, CustomerReferralsData } from '../account-types.ts'
 import type { Customer } from '../hooks/useCustomer.ts'
 import { store } from '../config/store.ts'
-import { customerOrders, errorMessage, orderDate } from '../lib/orders-api.ts'
+import { customerOrders, customerReferrals, errorMessage, orderDate } from '../lib/orders-api.ts'
 import { money } from '../lib/shop.ts'
 import { cartDrawer } from '../lib/dialog-loaders.ts'
 import { orderStatusLabels } from '../order-types.ts'
@@ -23,6 +23,12 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [referralCode, setReferralCode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('ref') || ''
+    }
+    return ''
+  })
   const [showPassword, setShowPassword] = useState(false)
   const [privacy, setPrivacy] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -32,6 +38,8 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
   const [loadedHistory, setHistory] = useState<{ owner: string; data: CustomerOrders } | null>(null)
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [referralsData, setReferralsData] = useState<CustomerReferralsData | null>(null)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [page, setPage] = useState(1)
   const [revision, setRevision] = useState(0)
   const form = useRef<HTMLFormElement>(null)
@@ -50,6 +58,7 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
     void customerOrders(page).then(result => { if (alive) setHistory({ owner: user.id, data: result }) })
       .catch(error => { if (alive) setHistoryError(errorMessage(error)) })
       .finally(() => { if (alive) setHistoryLoading(false) })
+    void customerReferrals().then(result => { if (alive) setReferralsData(result) }).catch(() => {})
     return () => { alive = false }
   }, [open, user?.id, page, revision])
 
@@ -85,7 +94,7 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      if (registering) { await customer.register({ name: name.trim(), email: email.trim(), password, privacyAccepted: privacy }); setCreated(true) }
+      if (registering) { await customer.register({ name: name.trim(), email: email.trim(), password, privacyAccepted: privacy, referralCode: referralCode.trim() || undefined }); setCreated(true) }
       else await customer.login(email.trim(), password)
       setPassword(''); setShowPassword(false); setPage(1)
     } catch (error) { setError(errorMessage(error)) }
@@ -125,15 +134,128 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
         {created && <p className="account-success" role="status"><Icon name="check" size={16} />Tu cuenta está lista. Qué gusto tenerte aquí.</p>}
         {user.welcomeAvailable && <aside className="member-welcome" aria-label="Tu beneficio de bienvenida">
           <div className="member-welcome-pill" aria-hidden="true">
-            <span>10<small>%</small></span>
-            <small>DESC</small>
+            <span className="welcome-pill-rate">10<small>%</small></span>
+            <small className="welcome-pill-label">DE DESCUENTO</small>
           </div>
           <div className="member-welcome-copy">
             <span className="member-benefit-label"><Icon name="gift" size={13} />TU BIENVENIDA</span>
-            <strong>Tu primer antojo, con 10% menos.</strong>
-            <p>Automático en tu primer pedido de productos. No incluye el envío.</p>
+            <strong>10% en tu primer pedido</strong>
+            <p>Se aplica automáticamente en tu carrito.</p>
           </div>
         </aside>}
+        <section className="member-referrals" aria-label="Programa de invitación">
+          <div className="referrals-milestone-card">
+            <header className="milestone-header">
+              <span className="milestone-badge"><Icon name="gift" size={13} /> GOMITA DE REGALO</span>
+              <span className="milestone-rule">En compras de ₡3.000 o más</span>
+            </header>
+            <h3 className="milestone-title">Invitá a 3 amigos y llevate una gomita</h3>
+            <p className="milestone-subtext">Ellos reciben 10% en su primer pedido. Cuando completen su compra, sumás progreso para tu gomita gratis.</p>
+
+            {(() => {
+              const validCount = referralsData?.summary.validCount ?? 0
+              const currentInCycle = validCount % 3
+              const remaining = 3 - currentInCycle
+              const isComplete = validCount > 0 && currentInCycle === 0
+
+              return (
+                <div className="milestone-counter-box">
+                  <div className="milestone-counter-label">
+                    <span>Amigos que ya compraron:</span>
+                    <strong>{isComplete ? '3 de 3' : `${currentInCycle} de 3`}</strong>
+                  </div>
+                  <div className="milestone-dots" role="img" aria-label={`Progreso: ${isComplete ? 3 : currentInCycle} de 3 compras completadas`}>
+                    {[0, 1, 2].map(dotIndex => {
+                      const isFilled = isComplete || dotIndex < currentInCycle
+                      return (
+                        <span key={dotIndex} className={`milestone-dot ${isFilled ? 'is-filled' : 'is-empty'}`}>
+                          {isFilled ? '●' : '○'}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  <p className="milestone-status-message">
+                    {isComplete
+                      ? '🎉 ¡Felicidades! Ganaste tu gomita de regalo para tu próximo pedido de ₡3.000 o más.'
+                      : remaining === 1
+                      ? 'Te falta 1 compra para ganar tu gomita'
+                      : `Te faltan ${remaining} compras para ganar tu gomita`}
+                  </p>
+                </div>
+              )
+            })()}
+
+            <div className="referral-share-actions">
+              <button
+                type="button"
+                className="button button-primary referral-share-btn"
+                onClick={() => {
+                  const url = referralsData?.shareUrl || (user.referralCode ? `${window.location.origin}/?ref=${user.referralCode}` : '')
+                  const text = `¡Mae, te regalo 10% en tu primer pedido de gomitas Onky's! 🌶️ Pedí con mi enlace: ${url}`
+                  if (typeof navigator !== 'undefined' && navigator.share) {
+                    void navigator.share({ title: "Onky's Gomitas", text, url }).catch(() => {})
+                  } else {
+                    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
+                    window.open(waUrl, '_blank', 'noopener,noreferrer')
+                  }
+                }}
+              >
+                <Icon name="arrow-up" size={15} />
+                <span>Compartir enlace</span>
+              </button>
+
+              <button
+                type="button"
+                className="referral-copy-btn"
+                onClick={() => {
+                  const url = referralsData?.shareUrl || (user.referralCode ? `${window.location.origin}/?ref=${user.referralCode}` : '')
+                  if (url) {
+                    void navigator.clipboard.writeText(url)
+                    setCopiedLink(true)
+                    setTimeout(() => setCopiedLink(false), 2000)
+                  }
+                }}
+              >
+                <Icon name={copiedLink ? 'check' : 'copy'} size={15} />
+                <span>{copiedLink ? '¡Copiado!' : 'Copiar'}</span>
+              </button>
+            </div>
+
+            {referralsData && (referralsData.validReferrals.length > 0 || referralsData.pendingReferrals.length > 0) && (
+              <div className="referral-details">
+                {referralsData.validReferrals.length > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#185a35', textTransform: 'uppercase' }}>Ya compraron ({referralsData.validReferrals.length})</span>
+                    <div className="referral-items-list">
+                      {referralsData.validReferrals.map(r => (
+                        <div key={r.id} className="referral-item-row">
+                          <div>
+                            <strong>{r.referredName}</strong>
+                            <small style={{ display: 'block', color: '#776680', fontSize: '9.5px' }}>{r.firstOrderCode ? `Pedido ${r.firstOrderCode}` : '1ra compra pagada'}</small>
+                          </div>
+                          <span className="status-rewarded">✓ Contabilizado</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {referralsData.pendingReferrals.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#8c6720', textTransform: 'uppercase' }}>Pendientes de compra ({referralsData.pendingReferrals.length})</span>
+                    <div className="referral-items-list">
+                      {referralsData.pendingReferrals.map(r => (
+                        <div key={r.id} className="referral-item-row">
+                          <strong>{r.referredName}</strong>
+                          <span className="status-pending">Esperando 1ra compra</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
         <section className="member-orders" aria-labelledby="member-orders-title" aria-busy={historyLoading}>
           <div className="member-section-heading">
             <div>
@@ -182,6 +304,23 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder, o
             {registering && <div className="form-field"><label htmlFor="account-name">Tu nombre</label><div className="account-input"><Icon name="user" size={17} /><input id="account-name" autoComplete="name" required minLength={2} maxLength={100} placeholder="¿Cómo te llamas?" value={name} onChange={event => { setName(event.target.value); setErrors(current => ({ ...current, name: undefined })) }} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'account-name-error' : undefined} /></div>{errors.name && <p id="account-name-error" className="field-error">{errors.name}</p>}</div>}
             <div className="form-field"><label htmlFor="account-email">Correo electrónico</label><div className="account-input"><Icon name="mail" size={17} /><input id="account-email" type="email" autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false} required maxLength={254} placeholder="tucorreo@ejemplo.com" value={email} onChange={event => { setEmail(event.target.value); setErrors(current => ({ ...current, email: undefined })) }} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'account-email-error' : undefined} /></div>{errors.email && <p id="account-email-error" className="field-error">{errors.email}</p>}</div>
             <div className="form-field"><div className="account-password-label"><label htmlFor="account-password">Contraseña</label>{registering && <small id="account-password-help">Mínimo 8 caracteres</small>}</div><div className="account-input account-password"><Icon name="lock" size={17} /><input id="account-password" type={showPassword ? 'text' : 'password'} autoComplete={registering ? 'new-password' : 'current-password'} required minLength={registering ? 8 : undefined} maxLength={128} placeholder={registering ? 'Crea tu contraseña' : 'Tu contraseña'} value={password} onChange={event => { setPassword(event.target.value); setErrors(current => ({ ...current, password: undefined })) }} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'account-password-error' : registering ? 'account-password-help' : undefined} /><button type="button" className="icon-button" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><Icon name={showPassword ? 'eye-off' : 'eye'} size={18} /></button></div>{errors.password && <p id="account-password-error" className="field-error">{errors.password}</p>}</div>
+            {registering && (
+              <div className="form-field">
+                <label htmlFor="account-referral">Código de referido <small style={{ fontWeight: 400, color: '#7a6b82' }}>(opcional)</small></label>
+                <div className="account-input">
+                  <Icon name="gift" size={17} />
+                  <input
+                    id="account-referral"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    maxLength={20}
+                    placeholder="ONKY-XXXX"
+                    value={referralCode}
+                    onChange={event => setReferralCode(event.target.value.toUpperCase())}
+                  />
+                </div>
+              </div>
+            )}
             {registering && <div className="account-consent"><label><input type="checkbox" checked={privacy} onChange={event => { setPrivacy(event.target.checked); setErrors(current => ({ ...current, privacy: undefined })) }} aria-invalid={!!errors.privacy} aria-describedby={errors.privacy ? 'account-privacy-error' : undefined} /><span>Acepto que Onky’s guarde mi nombre, correo y pedidos para gestionar mi cuenta.</span></label>{errors.privacy && <p id="account-privacy-error" className="field-error">{errors.privacy}</p>}</div>}
             {error && <p ref={errorRef} tabIndex={-1} className="account-error" role="alert">{error}</p>}
             <button className="button button-primary account-submit" type="submit"><span>{busy ? registering ? 'Creando tu cuenta…' : 'Entrando…' : customer.loading ? 'Conectando…' : registering ? 'Crear mi cuenta' : 'Entrar a mi cuenta'}</span><span className="account-submit-icon" aria-hidden="true">{busy || customer.loading ? <span className="account-spinner" /> : <Icon name="arrow" size={17} />}</span></button>

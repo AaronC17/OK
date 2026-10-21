@@ -38,7 +38,7 @@ test('accounts: explicit consent, normalized unique emails and strict fields; cr
   const user = db.account(signed.session)!
   assert.equal(user.email, 'ana@ejemplo.cr')
   assert.equal(user.welcomeAvailable, true)
-  assert.deepEqual(Object.keys(user).sort(), ['createdAt', 'email', 'id', 'name', 'welcomeAvailable'])
+  assert.deepEqual(Object.keys(user).sort(), ['createdAt', 'creditBalanceMinor', 'email', 'id', 'name', 'referralCode', 'welcomeAvailable'])
   assert.equal(db.session(guest.token!, 'customer'), null)
   assert.notEqual(signed.session.csrf, guest.session.csrf)
   assert.equal(db.session(signed.token, 'admin'), null)

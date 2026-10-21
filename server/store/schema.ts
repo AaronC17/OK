@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS admin (
 );
 CREATE TABLE IF NOT EXISTS customers (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  referral_code TEXT UNIQUE,
   created_at TEXT NOT NULL, welcome_order_id TEXT,
   privacy_version TEXT NOT NULL, privacy_accepted_at TEXT NOT NULL
 );
@@ -53,4 +54,31 @@ CREATE TABLE IF NOT EXISTS shop_events (
   version INTEGER NOT NULL, event TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE(order_id, version, event)
 );
+CREATE TABLE IF NOT EXISTS referrals (
+  id TEXT PRIMARY KEY,
+  referrer_id TEXT NOT NULL REFERENCES customers(id),
+  referred_id TEXT NOT NULL UNIQUE REFERENCES customers(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'rewarded', 'revoked')),
+  first_order_id TEXT UNIQUE REFERENCES shop_orders(id),
+  order_total_minor INTEGER CHECK (order_total_minor >= 0),
+  reward_minor INTEGER CHECK (reward_minor >= 0 AND reward_minor <= 500000),
+  rewarded_at TEXT,
+  created_at TEXT NOT NULL,
+  CHECK (referrer_id != referred_id)
+);
+CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals(referrer_id, status);
+CREATE INDEX IF NOT EXISTS referrals_referred ON referrals(referred_id);
+CREATE TABLE IF NOT EXISTS customer_credit_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  type TEXT NOT NULL CHECK (type IN ('referral_reward', 'order_redemption', 'referral_clawback', 'manual_adjustment')),
+  amount_minor INTEGER NOT NULL,
+  balance_after_minor INTEGER NOT NULL,
+  order_id TEXT REFERENCES shop_orders(id),
+  referral_id TEXT REFERENCES referrals(id),
+  idempotency_key TEXT UNIQUE NOT NULL,
+  description TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS credit_ledger_customer ON customer_credit_ledger(customer_id, created_at DESC);
 `

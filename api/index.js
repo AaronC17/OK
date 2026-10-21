@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS admin (
 );
 CREATE TABLE IF NOT EXISTS customers (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  referral_code TEXT UNIQUE,
   created_at TEXT NOT NULL, welcome_order_id TEXT,
   privacy_version TEXT NOT NULL, privacy_accepted_at TEXT NOT NULL
 );
@@ -222,6 +223,33 @@ CREATE TABLE IF NOT EXISTS shop_events (
   version INTEGER NOT NULL, event TEXT NOT NULL, created_at TEXT NOT NULL,
   UNIQUE(order_id, version, event)
 );
+CREATE TABLE IF NOT EXISTS referrals (
+  id TEXT PRIMARY KEY,
+  referrer_id TEXT NOT NULL REFERENCES customers(id),
+  referred_id TEXT NOT NULL UNIQUE REFERENCES customers(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'rewarded', 'revoked')),
+  first_order_id TEXT UNIQUE REFERENCES shop_orders(id),
+  order_total_minor INTEGER CHECK (order_total_minor >= 0),
+  reward_minor INTEGER CHECK (reward_minor >= 0 AND reward_minor <= 500000),
+  rewarded_at TEXT,
+  created_at TEXT NOT NULL,
+  CHECK (referrer_id != referred_id)
+);
+CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals(referrer_id, status);
+CREATE INDEX IF NOT EXISTS referrals_referred ON referrals(referred_id);
+CREATE TABLE IF NOT EXISTS customer_credit_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  type TEXT NOT NULL CHECK (type IN ('referral_reward', 'order_redemption', 'referral_clawback', 'manual_adjustment')),
+  amount_minor INTEGER NOT NULL,
+  balance_after_minor INTEGER NOT NULL,
+  order_id TEXT REFERENCES shop_orders(id),
+  referral_id TEXT REFERENCES referrals(id),
+  idempotency_key TEXT UNIQUE NOT NULL,
+  description TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS credit_ledger_customer ON customer_credit_ledger(customer_id, created_at DESC);
 `;
 
 // src/lib/shop.ts
@@ -564,11 +592,25 @@ async function accountPasswordMatches(password, stored) {
   const actual = await derive(password, salt);
   return timingSafeEqual2(actual, Buffer.from(hash, "hex")) && !!stored;
 }
+function parseReferralCode(value) {
+  if (value === void 0 || value === null || value === "") return void 0;
+  if (typeof value !== "string") throw new StoreError(422, "C\xF3digo de referido inv\xE1lido.");
+  const code = value.trim().toUpperCase();
+  if (!/^[A-Z0-9-]{4,20}$/.test(code)) {
+    throw new StoreError(422, "El formato del c\xF3digo de referido no es v\xE1lido.");
+  }
+  return code;
+}
 function parseRegistration(value) {
   const data = record(value);
-  fields2(data, ["name", "email", "password", "privacyAccepted"]);
+  fields2(data, ["name", "email", "password", "privacyAccepted", "referralCode"]);
   if (data.privacyAccepted !== true) throw new StoreError(422, "Acepta el uso de tus datos para crear y gestionar tu cuenta.");
-  return { name: text2(data.name, 2, 100, "Nombre"), email: email(data.email), password: data.password };
+  return {
+    name: text2(data.name, 2, 100, "Nombre"),
+    email: email(data.email),
+    password: data.password,
+    referralCode: parseReferralCode(data.referralCode)
+  };
 }
 function parseAccountLogin(value) {
   const data = record(value);
@@ -605,11 +647,17 @@ var ShopDatabase = class {
     this.catalog = catalog;
     this.database.exec(schema);
     for (const [table, name, definition] of [
+      ["customers", "referral_code", "TEXT UNIQUE"],
       ["sessions", "account_id", "TEXT REFERENCES customers(id)"],
       ["shop_orders", "account_id", "TEXT REFERENCES customers(id)"],
       ["shop_orders", "discount_minor", "INTEGER NOT NULL DEFAULT 0 CHECK (discount_minor >= 0)"]
     ]) {
       if (!this.database.prepare(`SELECT name FROM pragma_table_info('${table}') WHERE name = ?`).get(name)) this.database.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+    const nullCodes = this.database.prepare("SELECT id FROM customers WHERE referral_code IS NULL").all();
+    for (const c of nullCodes) {
+      const code = this.generateReferralCode();
+      this.database.prepare("UPDATE customers SET referral_code = ? WHERE id = ?").run(code, c.id);
     }
     this.database.exec("CREATE INDEX IF NOT EXISTS shop_orders_customer ON shop_orders(account_id, created_at)");
     const receiptCol = this.database.prepare(`SELECT "notnull" FROM pragma_table_info('manual_payments') WHERE name = 'receipt_id'`).get();
@@ -698,12 +746,30 @@ var ShopDatabase = class {
   logout(session) {
     this.database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(session.hash);
   }
+  generateReferralCode() {
+    for (let i = 0; i < 20; i++) {
+      const code = `ONKY-${randomUUID().slice(0, 6).toUpperCase()}`;
+      const exists = this.database.prepare("SELECT id FROM customers WHERE referral_code = ?").get(code);
+      if (!exists) return code;
+    }
+    return `ONKY-${randomUUID().slice(0, 8).toUpperCase()}`;
+  }
   accountFromRow(row) {
-    return { id: row.id, name: row.name, email: row.email, createdAt: row.created_at, welcomeAvailable: row.welcome_order_id === null };
+    const id = row.id;
+    const balance = this.database.prepare("SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?").get(id);
+    return {
+      id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.created_at,
+      welcomeAvailable: row.welcome_order_id === null,
+      referralCode: row.referral_code ?? void 0,
+      creditBalanceMinor: Number(balance?.balance ?? 0)
+    };
   }
   account(session) {
     if (!session.accountId) return null;
-    const row = this.database.prepare("SELECT id, name, email, created_at, welcome_order_id FROM customers WHERE id = ?").get(session.accountId);
+    const row = this.database.prepare("SELECT id, name, email, created_at, welcome_order_id, referral_code FROM customers WHERE id = ?").get(session.accountId);
     return row ? this.accountFromRow(row) : null;
   }
   signInCustomer(id, previous) {
@@ -719,9 +785,21 @@ var ShopDatabase = class {
     const hash = await accountPasswordHash(data.password);
     return this.transaction(() => {
       if (this.database.prepare("SELECT id FROM customers WHERE email = ?").get(data.email)) throw new StoreError(409, "Ya existe una cuenta con este correo. Inicia sesi\xF3n.");
+      let referrerId = null;
+      if (data.referralCode) {
+        const referrer = this.database.prepare("SELECT id, email FROM customers WHERE referral_code = ?").get(data.referralCode);
+        if (!referrer) throw new StoreError(422, "El c\xF3digo de referido no existe.");
+        if (referrer.email.toLowerCase() === data.email.toLowerCase()) throw new StoreError(422, "No puedes usar tu propio c\xF3digo de referido.");
+        referrerId = referrer.id;
+      }
       const id = randomUUID();
+      const referralCode = this.generateReferralCode();
       const now = timestamp();
-      this.database.prepare("INSERT INTO customers (id, name, email, password_hash, created_at, privacy_version, privacy_accepted_at) VALUES (?, ?, ?, ?, ?, 'customer-account-v1', ?)").run(id, data.name, data.email, hash, now, now);
+      this.database.prepare("INSERT INTO customers (id, name, email, password_hash, referral_code, created_at, privacy_version, privacy_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 'customer-account-v1', ?)").run(id, data.name, data.email, hash, referralCode, now, now);
+      if (referrerId) {
+        this.database.prepare("INSERT INTO referrals (id, referrer_id, referred_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)").run(randomUUID(), referrerId, id, now);
+        this.audit(null, "customer.referral_pending", id, `Referido por ${referrerId}. Pendiente de primera compra.`);
+      }
       const result = this.signInCustomer(id, previous);
       this.audit(null, "customer.registered", id, "Cuenta creada con consentimiento. Descuento de bienvenida disponible para el primer pedido.");
       return result;
@@ -959,6 +1037,7 @@ var ShopDatabase = class {
       this.database.prepare("UPDATE shop_orders SET status = 'ready', payment_confirmed_at = ?, customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(now, now, id);
       this.audit(id, "payment.confirmed_manual", actor, note);
       const updated = this.getOrder(id);
+      this.rewardReferralIfEligible(updated);
       this.event(updated, "payment.confirmed_manual");
       return updated;
     });
@@ -1007,6 +1086,125 @@ var ShopDatabase = class {
     const counts = Object.fromEntries(statuses.map((status) => [status, 0]));
     for (const row of this.database.prepare(`SELECT status, count(*) AS count FROM shop_orders ${customerId ? "WHERE account_id = ?" : ""} GROUP BY status`).all(...customerId ? [customerId.slice(0, 36)] : [])) counts[row.status] = Number(row.count);
     return { orders, counts, total, page, pageSize: 50 };
+  }
+  rewardReferralIfEligible(order) {
+    if (!order.customerAccountId || !order.totalMinor || order.totalMinor <= 0) return;
+    const buyerId = order.customerAccountId;
+    const referral = this.database.prepare(
+      "SELECT id, referrer_id, status FROM referrals WHERE referred_id = ? AND status = 'pending'"
+    ).get(buyerId);
+    if (!referral) return;
+    const priorPaid = this.database.prepare(
+      "SELECT count(*) AS count FROM shop_orders WHERE account_id = ? AND status = 'ready' AND id != ?"
+    ).get(buyerId, order.id);
+    if (Number(priorPaid.count) > 0) {
+      this.database.prepare("UPDATE referrals SET status = 'revoked' WHERE id = ?").run(referral.id);
+      return;
+    }
+    const MAX_REWARD_MINOR = 5e5;
+    const rewardMinor = Math.min(Math.round(order.totalMinor * 0.1), MAX_REWARD_MINOR);
+    const now = timestamp();
+    const idempotencyKey = `reward:order:${order.id}:ref:${referral.id}`;
+    const existing = this.database.prepare("SELECT id FROM customer_credit_ledger WHERE idempotency_key = ?").get(idempotencyKey);
+    if (existing) return;
+    const currentBalanceRow = this.database.prepare(
+      "SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?"
+    ).get(referral.referrer_id);
+    const balanceAfter = Number(currentBalanceRow?.balance ?? 0) + rewardMinor;
+    this.database.prepare(`
+      UPDATE referrals
+      SET status = 'rewarded', first_order_id = ?, order_total_minor = ?, reward_minor = ?, rewarded_at = ?
+      WHERE id = ? AND status = 'pending'
+    `).run(order.id, order.totalMinor, rewardMinor, now, referral.id);
+    this.database.prepare(`
+      INSERT INTO customer_credit_ledger (
+        customer_id, type, amount_minor, balance_after_minor, order_id, referral_id, idempotency_key, description, created_at
+      ) VALUES (?, 'referral_reward', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      referral.referrer_id,
+      rewardMinor,
+      balanceAfter,
+      order.id,
+      referral.id,
+      idempotencyKey,
+      `Cr\xE9dito del 10% por la primera compra de tu referido (Pedido ${order.code})`,
+      now
+    );
+    this.audit(order.id, "referral.rewarded", "system", `Cr\xE9dito de recompensa de \u20A1${(rewardMinor / 100).toLocaleString("es-CR")} registrado para el referente ${referral.referrer_id}`);
+  }
+  referrals(session) {
+    const customerId = requireAccount(session);
+    const customer = this.database.prepare("SELECT referral_code FROM customers WHERE id = ?").get(customerId);
+    if (!customer?.referral_code) throw new StoreError(404, "No se encontr\xF3 la cuenta.");
+    const balanceRow = this.database.prepare("SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?").get(customerId);
+    const creditBalanceMinor = Number(balanceRow?.balance ?? 0);
+    const pendingRows = this.database.prepare(`
+      SELECT r.id, c.name, r.created_at
+      FROM referrals r
+      JOIN customers c ON c.id = r.referred_id
+      WHERE r.referrer_id = ? AND r.status = 'pending'
+      ORDER BY r.created_at DESC
+    `).all(customerId);
+    const validRows = this.database.prepare(`
+      SELECT r.id, c.name, r.reward_minor, r.rewarded_at, o.code AS order_code
+      FROM referrals r
+      JOIN customers c ON c.id = r.referred_id
+      LEFT JOIN shop_orders o ON o.id = r.first_order_id
+      WHERE r.referrer_id = ? AND r.status = 'rewarded'
+      ORDER BY r.rewarded_at DESC
+    `).all(customerId);
+    const ledgerRows = this.database.prepare(`
+      SELECT id, type, amount_minor, balance_after_minor, description, created_at
+      FROM customer_credit_ledger
+      WHERE customer_id = ?
+      ORDER BY id DESC
+      LIMIT 50
+    `).all(customerId);
+    const totalEarnedRow = this.database.prepare(`
+      SELECT COALESCE(SUM(amount_minor), 0) AS total
+      FROM customer_credit_ledger
+      WHERE customer_id = ? AND type = 'referral_reward'
+    `).get(customerId);
+    const anonymize = (fullName) => {
+      const parts = fullName.trim().split(/\s+/);
+      return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0]}.`;
+    };
+    return {
+      referralCode: customer.referral_code,
+      shareUrl: `https://onkys.cr/?ref=${customer.referral_code}`,
+      creditBalanceMinor,
+      summary: {
+        pendingCount: pendingRows.length,
+        validCount: validRows.length,
+        totalEarnedMinor: Number(totalEarnedRow?.total ?? 0)
+      },
+      pendingReferrals: pendingRows.map((row) => ({
+        id: row.id,
+        referredName: anonymize(row.name),
+        status: "pending",
+        createdAt: row.created_at,
+        firstOrderCode: null,
+        rewardMinor: null,
+        rewardedAt: null
+      })),
+      validReferrals: validRows.map((row) => ({
+        id: row.id,
+        referredName: anonymize(row.name),
+        status: "rewarded",
+        createdAt: row.rewarded_at,
+        firstOrderCode: row.order_code,
+        rewardMinor: row.reward_minor,
+        rewardedAt: row.rewarded_at
+      })),
+      ledger: ledgerRows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        amountMinor: row.amount_minor,
+        balanceAfterMinor: row.balance_after_minor,
+        description: row.description,
+        createdAt: row.created_at
+      }))
+    };
   }
 };
 
@@ -1222,6 +1420,53 @@ var MongoShopDatabase = class {
     const total = await this.collection("shop_orders").countDocuments(filter);
     const rows = await this.collection("shop_orders").find(filter).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 20).limit(20).toArray();
     return { orders: await this.fromDocs(rows), total, page, pageSize: 20 };
+  }
+  async referrals(session) {
+    const customerId = requireAccount(session);
+    const customer = await this.collection("customers").findOne({ id: customerId });
+    if (!customer) throw new StoreError(404, "No se encontr\xF3 la cuenta.");
+    const referralCode = customer.referral_code || `ONKY-${customerId.slice(0, 6).toUpperCase()}`;
+    const ledgerDocs = await this.collection("customer_credit_ledger").find({ customer_id: customerId }).sort({ created_at: -1 }).limit(50).toArray();
+    const creditBalanceMinor = ledgerDocs.reduce((acc, cur) => acc + (cur.amount_minor || 0), 0);
+    const pendingDocs = await this.collection("referrals").find({ referrer_id: customerId, status: "pending" }).sort({ created_at: -1 }).toArray();
+    const validDocs = await this.collection("referrals").find({ referrer_id: customerId, status: "rewarded" }).sort({ rewarded_at: -1 }).toArray();
+    const totalEarnedMinor = validDocs.reduce((acc, cur) => acc + (cur.reward_minor || 0), 0);
+    return {
+      referralCode,
+      shareUrl: `https://onkys.cr/?ref=${referralCode}`,
+      creditBalanceMinor,
+      summary: {
+        pendingCount: pendingDocs.length,
+        validCount: validDocs.length,
+        totalEarnedMinor
+      },
+      pendingReferrals: pendingDocs.map((r) => ({
+        id: r.id,
+        referredName: r.referred_name || "Invitado",
+        status: "pending",
+        createdAt: r.created_at,
+        firstOrderCode: null,
+        rewardMinor: null,
+        rewardedAt: null
+      })),
+      validReferrals: validDocs.map((r) => ({
+        id: r.id,
+        referredName: r.referred_name || "Invitado",
+        status: "rewarded",
+        createdAt: r.rewarded_at,
+        firstOrderCode: r.first_order_code || null,
+        rewardMinor: r.reward_minor,
+        rewardedAt: r.rewarded_at
+      })),
+      ledger: ledgerDocs.map((l, idx) => ({
+        id: idx + 1,
+        type: l.type,
+        amountMinor: l.amount_minor,
+        balanceAfterMinor: l.balance_after_minor,
+        description: l.description,
+        createdAt: l.created_at
+      }))
+    };
   }
   async customers(query) {
     const page = accountPage(query);
@@ -1744,6 +1989,10 @@ function makeShopHandler(store2, options = {}) {
       }
       if (path === "/api/account/orders" && method === "GET") {
         json(response, 200, await store2.accountOrders(await requireSession("customer"), url.searchParams));
+        return;
+      }
+      if (path === "/api/account/referrals" && method === "GET") {
+        json(response, 200, await store2.referrals(await requireSession("customer")));
         return;
       }
       if (path === "/api/admin/session" && method === "GET") {

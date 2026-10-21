@@ -1,6 +1,6 @@
 import type { CartItem } from '../types.ts'
 import type { AdminAuth, AdminOrders, CheckoutConfig, OrderAudit, OrderCustomer, ShopOrder, SinpeSettings } from '../order-types.ts'
-import type { AdminCustomers, CustomerAuth, CustomerOrders, Registration } from '../account-types.ts'
+import type { AdminCustomers, CustomerAuth, CustomerOrders, CustomerReferralsData, Registration } from '../account-types.ts'
 
 export class ApiError extends Error {
   status: number
@@ -64,6 +64,7 @@ export const registerCustomer = (data: Registration) => rememberCustomer(() => r
 export const loginCustomer = (email: string, password: string) => rememberCustomer(() => request<CustomerAuth>('/api/account/login', 'POST', { email, password }))
 export const logoutCustomer = () => rememberCustomer(() => request<CustomerAuth>('/api/account/logout', 'POST', {}))
 export const customerOrders = (page = 1) => request<CustomerOrders>(`/api/account/orders?page=${page}`)
+export const customerReferrals = () => request<CustomerReferralsData>('/api/account/referrals')
 export const currentOrder = () => request<{ order: ShopOrder | null }>('/api/orders/current')
 export const fetchOrder = (id: string) => request<ShopOrder>(`/api/orders/${encodeURIComponent(id)}`)
 

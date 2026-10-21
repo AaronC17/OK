@@ -20,11 +20,26 @@ export async function accountPasswordMatches(password: string, stored?: string) 
   const actual = await derive(password, salt)
   return timingSafeEqual(actual, Buffer.from(hash, 'hex')) && !!stored
 }
+export function parseReferralCode(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'string') throw new StoreError(422, 'Código de referido inválido.')
+  const code = value.trim().toUpperCase()
+  if (!/^[A-Z0-9-]{4,20}$/.test(code)) {
+    throw new StoreError(422, 'El formato del código de referido no es válido.')
+  }
+  return code
+}
+
 export function parseRegistration(value: unknown) {
   const data = record(value)
-  fields(data, ['name', 'email', 'password', 'privacyAccepted'])
+  fields(data, ['name', 'email', 'password', 'privacyAccepted', 'referralCode'])
   if (data.privacyAccepted !== true) throw new StoreError(422, 'Acepta el uso de tus datos para crear y gestionar tu cuenta.')
-  return { name: text(data.name, 2, 100, 'Nombre'), email: email(data.email), password: data.password }
+  return {
+    name: text(data.name, 2, 100, 'Nombre'),
+    email: email(data.email),
+    password: data.password,
+    referralCode: parseReferralCode(data.referralCode),
+  }
 }
 export function parseAccountLogin(value: unknown) {
   const data = record(value)

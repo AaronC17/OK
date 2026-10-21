@@ -91,19 +91,19 @@ export default function App() {
       <Catalog onProduct={openProduct} onZoom={setZoom} />
       <MixExperience onCustomize={customizeMix} suspended={overlayOpen} />
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
-        <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
+        <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Fácil, rápido y directo a tu puerta.</p></div>
         <div className="how-steps">
-          <article><span className="how-number">01</span><Icon name="bear" size={26} /><h3>Elige</h3><p>Tu tipo de gomita favorito.</p></article>
-          <article><span className="how-number">02</span><Icon name="sliders" size={26} /><h3>Personaliza</h3><p>Tipos, mezclas y presentaciones en un mismo carrito.</p></article>
-          <article><span className="how-number">03</span><Icon name="bank" size={28} /><h3>Paga con SINPE</h3><p>Registra tu pedido, usa su código en el SINPE y adjunta el comprobante para revisión.</p></article>
+          <article><span className="how-number">01</span><Icon name="bear" size={26} /><h3>Elige</h3><p>Tus gomitas favoritas.</p></article>
+          <article><span className="how-number">02</span><Icon name="sliders" size={26} /><h3>Personaliza</h3><p>Arma tu mix o elige tu tamaño ideal.</p></article>
+          <article><span className="how-number">03</span><Icon name="bank" size={28} /><h3>Paga con SINPE</h3><p>Transfiere con tu código de pedido y sube el comprobante.</p></article>
         </div>
       </div></section>
       <section className="questions-section container" aria-labelledby="questions-title">
         <div><span className="eyebrow">PREGUNTAS FRECUENTES</span><h2 id="questions-title">Preguntas frecuentes</h2></div>
         <div className="questions-list">
-          <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Registra el pedido desde el carrito. Cuando estén confirmados el total y el destino SINPE, recibirás instrucciones y un código para el detalle de tu transferencia. Adjunta el comprobante y la referencia bancaria. La tienda comprobará el abono antes de marcarlo como listo para preparar; subir una imagen no confirma el pago.</p></details>
-          <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>{store.gummies.mixes.enabled ? store.gummies.mixes.note : 'Por ahora, un solo tipo por bolsa.'} Elige entre {weightList}. También puedes añadir varias bolsas distintas al mismo carrito.</p></details>
-          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos de Costa Rica por ₡2.800. En compras de productos mayores a ₡15.000, el envío es gratis. El carrito calcula el costo automáticamente antes de pagar. También puedes elegir Recoger en Orotina Centro y consultar el estado del pedido desde este navegador.{store.demo ? ' Los precios de productos siguen siendo de demostración; no envíes dinero real todavía.' : ''}</p></details>
+          <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Haces tu pedido en la página, pagas por SINPE Móvil con el código asignado y subes tu comprobante. Revisamos el pago y de inmediato empezamos a preparar tu antojo.</p></details>
+          <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>¡Claro! Puedes elegir un solo tipo o armar un mix con dos o tres opciones en presentaciones de {weightList}.</p></details>
+          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos por ₡2.800 (¡gratis en compras mayores a ₡15.000!). También puedes retirar sin costo en Orotina Centro.{store.demo ? ' Los precios son de demostración; no envíes dinero real todavía.' : ''}</p></details>
         </div>
       </section>
     </main>

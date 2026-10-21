@@ -9,7 +9,7 @@ import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { shippingFee } from '../../src/lib/shop.ts'
 import type { CustomerSession, ShopRepository, StoredReceipt } from './repository.ts'
-import type { AdminCustomers, CustomerAccount, CustomerOrders } from '../../src/account-types.ts'
+import type { AdminCustomers, CustomerAccount, CustomerOrders, CustomerReferralsData } from '../../src/account-types.ts'
 import { accountIdFromOwner, accountOwner, accountPage, accountPasswordHash, accountPasswordMatches, parseAccountLogin, parseRegistration, requireAccount, requireGuest } from './accounts.ts'
 import { welcomeDiscount } from '../../src/lib/welcome.ts'
 
@@ -242,6 +242,62 @@ export class MongoShopDatabase implements ShopRepository {
     const total = await this.collection('shop_orders').countDocuments(filter)
     const rows = await this.collection('shop_orders').find(filter).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 20).limit(20).toArray()
     return { orders: await this.fromDocs(rows), total, page, pageSize: 20 }
+  }
+
+  async referrals(session: Session): Promise<CustomerReferralsData> {
+    const customerId = requireAccount(session)
+    const customer = await this.collection('customers').findOne({ id: customerId })
+    if (!customer) throw new StoreError(404, 'No se encontró la cuenta.')
+    const referralCode = customer.referral_code || `ONKY-${customerId.slice(0, 6).toUpperCase()}`
+
+    const ledgerDocs = await this.collection('customer_credit_ledger')
+      .find({ customer_id: customerId })
+      .sort({ created_at: -1 })
+      .limit(50)
+      .toArray()
+
+    const creditBalanceMinor = ledgerDocs.reduce((acc: number, cur: any) => acc + (cur.amount_minor || 0), 0)
+
+    const pendingDocs = await this.collection('referrals').find({ referrer_id: customerId, status: 'pending' }).sort({ created_at: -1 }).toArray()
+    const validDocs = await this.collection('referrals').find({ referrer_id: customerId, status: 'rewarded' }).sort({ rewarded_at: -1 }).toArray()
+    const totalEarnedMinor = validDocs.reduce((acc: number, cur: any) => acc + (cur.reward_minor || 0), 0)
+
+    return {
+      referralCode,
+      shareUrl: `https://onkys.cr/?ref=${referralCode}`,
+      creditBalanceMinor,
+      summary: {
+        pendingCount: pendingDocs.length,
+        validCount: validDocs.length,
+        totalEarnedMinor,
+      },
+      pendingReferrals: pendingDocs.map((r: any) => ({
+        id: r.id,
+        referredName: r.referred_name || 'Invitado',
+        status: 'pending',
+        createdAt: r.created_at,
+        firstOrderCode: null,
+        rewardMinor: null,
+        rewardedAt: null,
+      })),
+      validReferrals: validDocs.map((r: any) => ({
+        id: r.id,
+        referredName: r.referred_name || 'Invitado',
+        status: 'rewarded',
+        createdAt: r.rewarded_at,
+        firstOrderCode: r.first_order_code || null,
+        rewardMinor: r.reward_minor,
+        rewardedAt: r.rewarded_at,
+      })),
+      ledger: ledgerDocs.map((l: any, idx: number) => ({
+        id: idx + 1,
+        type: l.type,
+        amountMinor: l.amount_minor,
+        balanceAfterMinor: l.balance_after_minor,
+        description: l.description,
+        createdAt: l.created_at,
+      })),
+    }
   }
 
   async customers(query: URLSearchParams): Promise<AdminCustomers> {
