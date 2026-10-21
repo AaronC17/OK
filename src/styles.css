@@ -998,6 +998,11 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .announcement > span { gap: 5px; }
   .site-header { padding-block: 6px; }
   .header-inner { width: calc(100% - 20px); height: 62px; padding-inline: 12px; border-radius: 19px; }
+  /* A nearly opaque surface keeps the floating header without sampling every
+     moving pixel behind it during touch scrolling. */
+  .site-header.is-scrolled .header-inner { background: #fbfaf9f5; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .hero-catalog-cta, .button.experience-cta, .hero-photo-label, .premium-badge { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .premium-badge { background: #382448e8; }
   .wordmark { font-size: 31px; letter-spacing: -2.3px; }
   .header-inner nav { gap: 0; }
   .header-inner nav a { font-size: 11px; padding-inline: 10px; }
@@ -1012,7 +1017,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .hero-copy { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px; }
   .hero-copy > .eyebrow { font-size: 7px; letter-spacing: 1.5px; justify-content: center; margin-bottom: 0; }
   .hero h1 { font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(39px,10.8vw,45px); font-weight: 400; letter-spacing: -.8px; line-height: 1.14; margin: 8px 0 10px; }
-  .hero h1 > span { font-style: italic; padding-bottom: 0.25em; margin-bottom: -0.25em; padding-right: 0.12em; }
+  .hero h1 > span { font-style: italic; padding-bottom: 0.25em; margin-bottom: -0.25em; padding-right: 0.12em; filter: none; }
   .hero-copy > p { font-size: 12px; line-height: 1.7; margin-bottom: 12px; }
   .hero .button { min-height: 44px; font-size: 11px; padding: 11px 17px; gap: 20px; }
   .hero-secondary { max-width: none; font-size: 10px; margin-top: 9px; justify-content: center; }

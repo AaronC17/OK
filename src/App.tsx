@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { store } from './config/store.ts'
 import { MAX_QUANTITY, selectionKey } from './lib/shop.ts'
+import { accountDialog, cartDrawer, productDialog } from './lib/dialog-loaders.ts'
 import type { CartItem } from './types.ts'
 import { useCart } from './hooks/useCart.ts'
 import { useCustomer } from './hooks/useCustomer.ts'
@@ -12,19 +13,20 @@ import { Catalog } from './components/Catalog.tsx'
 import { MixExperience } from './components/MixExperience.tsx'
 import { HeroMedia } from './components/HeroMedia.tsx'
 import { BrandMarquee } from './components/BrandMarquee.tsx'
-import { SectionLink } from './components/SectionLink.tsx'
+import { navigateToSection, SectionLink } from './components/SectionLink.tsx'
 import type { AccountMode } from './components/AccountDialog.tsx'
 import './account-shell.css'
 
-const ProductDialog = lazy(() => import('./components/ProductDialog.tsx').then(module => ({ default: module.ProductDialog })))
-const CartDrawer = lazy(() => import('./components/CartDrawer.tsx').then(module => ({ default: module.CartDrawer })))
-const AccountDialog = lazy(() => import('./components/AccountDialog.tsx').then(module => ({ default: module.AccountDialog })))
+const ProductDialog = lazy(productDialog.load)
+const CartDrawer = lazy(cartDrawer.load)
+const AccountDialog = lazy(accountDialog.load)
 const weightList = new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))
 
 export default function App() {
   const cart = useCart()
   const customer = useCustomer()
   const [accountOpen, setAccountOpen] = useState(false)
+  const [accountRequested, setAccountRequested] = useState(false)
   const [accountMode, setAccountMode] = useState<AccountMode>('login')
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
@@ -34,6 +36,7 @@ export default function App() {
   const [zoom, setZoom] = useState<{ src: string; alt: string; name: string } | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null)
+  const overlayOpen = cartOpen || productOpen || !!zoom || infoOpen || accountOpen
 
   useEffect(() => { document.title = store.name }, [])
 
@@ -44,8 +47,13 @@ export default function App() {
   }, [toast])
 
   const openCart = useCallback(() => { setSelectedOrderId(null); setCartRequested(true); setCartOpen(true) }, [])
-  const openAccount = useCallback((mode: AccountMode = 'login') => { setAccountMode(mode); setCartOpen(false); setAccountOpen(true) }, [])
+  const openAccount = useCallback((mode: AccountMode = 'login') => { setAccountMode(mode); setAccountRequested(true); setCartOpen(false); setAccountOpen(true) }, [])
   const viewAccountOrder = (id: string) => { setSelectedOrderId(id); setAccountOpen(false); setCartRequested(true); setCartOpen(true) }
+  const shopFromAccount = () => {
+    setAccountOpen(false)
+    // Restore the dialog's focus/scroll lock before moving into the catalog.
+    requestAnimationFrame(() => navigateToSection('catalogo'))
+  }
   const openProduct = useCallback((target: ProductTarget) => {
     setProduct({ target, instance: Date.now() })
     setProductOpen(true)
@@ -75,13 +83,13 @@ export default function App() {
           <SectionLink section="catalogo" className="button hero-catalog-cta">Ver productos <Icon name="arrow" size={19} /></SectionLink>
         </div>
         <div className={`hero-visual ${store.heroVideo ? 'has-video' : ''}`}>
-          <HeroMedia image={store.heroImage} alt={store.heroImageAlt} video={store.heroVideo} />
+          <HeroMedia image={store.heroImage} alt={store.heroImageAlt} video={store.heroVideo} suspended={overlayOpen} />
           <div className="hero-photo-label"><Icon name="pepper" size={17} /> Dulce. Ácido. Picosito.</div>
         </div>
       </section>
-      <BrandMarquee signedIn={!!customer.user} loading={customer.loading} onRegister={() => openAccount('register')} />
+      <BrandMarquee signedIn={!!customer.user} loading={customer.loading} onRegister={() => openAccount('register')} suspended={overlayOpen} />
       <Catalog onProduct={openProduct} onZoom={setZoom} />
-      <MixExperience onCustomize={customizeMix} suspended={cartOpen || productOpen || !!zoom || infoOpen || accountOpen} />
+      <MixExperience onCustomize={customizeMix} suspended={overlayOpen} />
       <section id="como-pedir" className="how-section" aria-labelledby="how-title"><div className="container">
         <div className="how-heading"><div><span className="eyebrow">CÓMO PEDIR</span><h2 id="how-title">Cómo pedir</h2></div><p>Tu pedido, tu código y tu comprobante. Todo aquí.</p></div>
         <div className="how-steps">
@@ -104,8 +112,8 @@ export default function App() {
         <div><SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink></div>
         <div className="footer-links"><span className="eyebrow">EXPLORA</span><SectionLink section="gomitas">Gomitas enchiladas</SectionLink>{store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}{store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}<SectionLink section="como-pedir">Cómo pedir</SectionLink></div>
         <div className="footer-contact"><span className="eyebrow">TU PEDIDO, AQUÍ</span>
-          <button className="text-button" onClick={openCart}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
-          <button className="text-button" onClick={event => { event.currentTarget.focus({ preventScroll: true }); openAccount() }}>{customer.user ? 'Mi cuenta y mis pedidos' : 'Iniciar sesión o crear cuenta'} <Icon name="user" size={16} /></button>
+          <button className="text-button" {...cartDrawer.intent} onClick={openCart}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
+          <button className="text-button" {...accountDialog.intent} onClick={event => { event.currentTarget.focus({ preventScroll: true }); openAccount() }}>{customer.user ? 'Mi cuenta y mis pedidos' : 'Iniciar sesión o crear cuenta'} <Icon name="user" size={16} /></button>
           <p>Pago con SINPE Móvil · Revisión del abono</p>
           {store.contact.email && <a href={`mailto:${store.contact.email}`}>{store.contact.email}</a>}
           {store.contact.instagramUrl && <a href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram <Icon name="arrow-up" size={14} /></a>}
@@ -120,7 +128,7 @@ export default function App() {
       {cartRequested && <CartDrawer key={`${customer.user?.id ?? 'guest'}:${selectedOrderId ?? 'cart'}`} open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} customerAccount={customer.user} selectedOrderId={selectedOrderId} onRegister={() => openAccount('register')} onOrderCreated={customer.orderCreated} />}
     </Suspense>
     <Suspense fallback={<LoadingDialog open={accountOpen} onClose={() => setAccountOpen(false)} />}>
-      {accountOpen && <AccountDialog open initialMode={accountMode} customer={customer} onClose={() => setAccountOpen(false)} onOrder={viewAccountOrder} />}
+      {accountRequested && <AccountDialog open={accountOpen} initialMode={accountMode} customer={customer} onClose={() => setAccountOpen(false)} onOrder={viewAccountOrder} onShop={shopFromAccount} />}
     </Suspense>
     <Lightbox image={zoom} onClose={() => setZoom(null)} />
     <Modal open={infoOpen} onClose={() => setInfoOpen(false)} titleId="info-title" className="info-dialog">

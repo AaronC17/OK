@@ -11,7 +11,7 @@ function prefersStill() {
 }
 
 /** Serves an already generated local MP4. Never calls a generation API. */
-export function HeroMedia({ image, alt, video }: { image: string; alt: string; video?: StoreConfig['heroVideo'] }) {
+export function HeroMedia({ image, alt, video, suspended = false }: { image: string; alt: string; video?: StoreConfig['heroVideo']; suspended?: boolean }) {
   const root = useRef<HTMLDivElement>(null)
   const player = useRef<HTMLVideoElement>(null)
   const [enabled, setEnabled] = useState(() => !prefersStill())
@@ -37,10 +37,10 @@ export function HeroMedia({ image, alt, video }: { image: string; alt: string; v
   useEffect(() => {
     const element = player.current
     if (!element) return
-    if (enabled && intent && visible && tabVisible && ready && !failed) {
+    if (enabled && intent && visible && tabVisible && ready && !failed && !suspended) {
       void element.play().catch(() => { setPlaying(false); setIntent(false) })
     } else element.pause()
-  }, [enabled, intent, visible, tabVisible, ready, failed])
+  }, [enabled, intent, visible, tabVisible, ready, failed, suspended])
 
   const toggle = () => {
     if (playing) { setIntent(false); player.current?.pause(); return }

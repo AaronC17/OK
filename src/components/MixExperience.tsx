@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState, type ComponentType, type CSSProperti
 import { Icon } from './Icon.tsx'
 import { store } from '../config/store.ts'
 import { ProductImage } from './ui.tsx'
+import { productDialog } from '../lib/dialog-loaders.ts'
 import mixVideo from '../config/mix-video.json'
 import type { MixSceneMotion } from './mix-motion.ts'
 import './mix-experience.css'
@@ -136,7 +137,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
         <span><span>02</span> Mezcla suave y cobertura pareja.</span>
         <span><span>03</span> Empacado listo para disfrutar.</span>
       </div>
-      <button className="button experience-cta" onClick={onCustomize}>Crear mi combinación <Icon name="arrow" size={19} /></button>
+      <button className="button experience-cta" {...productDialog.intent} onClick={onCustomize}>Crear mi combinación <Icon name="arrow" size={19} /></button>
     </div>
     <div ref={film} className="mix-film" style={{ '--cycle': `${mixVideo.duration}ms` } as CSSProperties} data-static={!motionRequested} data-paused={!visible || !tabVisible || !motionRequested || paused || suspended || playbackBlocked} data-scene-ready="false" data-renderer={useVideo ? 'video' : undefined}>
       <div className="film-top"><div><span>Preparación<small>Vista previa</small></span></div>{!playbackBlocked && <button type="button" className="film-playback" onClick={togglePlayback} aria-label={motionRequested && !paused ? 'Pausar animación' : 'Reproducir animación'}><Icon name={motionRequested && !paused ? 'pause' : 'play'} size={16} /><span>{motionRequested && !paused ? 'Pausar' : 'Reproducir'}</span></button>}</div>

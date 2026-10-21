@@ -5,6 +5,7 @@ import type { ProductTarget } from './ProductDialog.tsx'
 import { Icon } from './Icon.tsx'
 import { ProductImage } from './ui.tsx'
 import { CARD_IMAGE_SIZES } from '../lib/product-images.ts'
+import { productDialog } from '../lib/dialog-loaders.ts'
 
 function startingPrice(prices: (number | null | undefined)[]) {
   const valid = prices.filter((price): price is number => typeof price === 'number' && Number.isSafeInteger(price) && price >= 0)
@@ -21,7 +22,7 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
         <div><span className="eyebrow section-kicker"><span>01</span> GOMITAS</span><h2 id="gummies-title">Tu combinación favorita.</h2><p>De un solo tipo o mixtas. Tú pones las reglas.</p></div>
         <span className="section-side-note"><Icon name="sliders" size={18} /> {store.gummies.weights.map(weight => `${weight} g`).join(' · ')}</span>
       </div>
-      <div className="product-grid gummy-grid">{store.gummies.mixes.enabled && <article className="product-card mobile-mix-card">
+      <div className="product-grid gummy-grid">{store.gummies.mixes.enabled && <article className="product-card mobile-mix-card" {...productDialog.intent}>
           <button className="card-photo blended-card" onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} aria-label="Personalizar gomitas mixtas">
             <ProductImage src={store.heroImage} alt={store.heroImageAlt} sizes={CARD_IMAGE_SIZES} width={800} height={800} /><span className="premium-badge">Más vendido</span><span className="photo-action"><Icon name="layers" size={20} /></span>
           </button>
@@ -29,7 +30,7 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
             <div className="product-card-footer"><div><span className="price-from">Desde</span><strong>{startingPrice(store.gummies.mixes.combinations.flatMap(combination => Object.values(combination.prices)))}</strong></div><button className="product-action" onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })} aria-label="Elegir presentación de gomitas mixtas">Personalizar <span className="action-icon"><Icon name="plus" size={17} /></span></button></div>
           </div>
         </article>}
-        {visibleGummyTypes(store).map((type, index) => <article className="product-card" key={type.id}>
+        {visibleGummyTypes(store).map((type, index) => <article className="product-card" key={type.id} {...productDialog.intent}>
         <button className={`card-photo${type.id === 'ositos' ? ' blended-card' : ''}`} onClick={() => onProduct({ kind: 'gummy', typeId: type.id })} aria-label={`Personalizar ${type.name}`}>
           <ProductImage src={type.image} alt={type.imageAlt} sizes={CARD_IMAGE_SIZES} loading="lazy" width={800} height={800} style={{ objectPosition: type.imagePosition }} />
           <span className="product-tag">{type.tag}</span><span className="photo-action"><Icon name="arrow-up" size={20} /></span>
@@ -42,7 +43,7 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
         </div>
       </article>)}
       </div>
-      {store.gummies.mixes.enabled && <div className="mix-invitation"><span className="mix-invitation-icon"><Icon name="layers" size={23} /></span><div><strong>¿Para qué elegir solo uno?</strong><p>Combina dos o tres favoritos en una misma bolsa.</p></div><button onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })}>Armar mi mix <Icon name="arrow" size={17} /></button></div>}
+      {store.gummies.mixes.enabled && <div className="mix-invitation"><span className="mix-invitation-icon"><Icon name="layers" size={23} /></span><div><strong>¿Para qué elegir solo uno?</strong><p>Combina dos o tres favoritos en una misma bolsa.</p></div><button {...productDialog.intent} onClick={() => onProduct({ kind: 'gummy', typeId: store.gummies.types[0]?.id ?? '', mixed: true })}>Armar mi mix <Icon name="arrow" size={17} /></button></div>}
       {store.demo && <p className="catalog-footnote">Disponibilidad por confirmar con la tienda.</p>}
     </section>
     {store.products && store.products.length > 0 && <section id="uvarindas" className="product-section" aria-labelledby="uvarindas-title">
@@ -51,7 +52,7 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
         <span className="section-side-note"><Icon name="pepper" size={18} /> Antojo especial</span>
       </div>
       <div className="product-grid gummy-grid">
-        {store.products.map(product => <article className="product-card" key={product.id}>
+        {store.products.map(product => <article className="product-card" key={product.id} {...productDialog.intent}>
           <button className="card-photo blended-card" onClick={() => onProduct({ kind: 'product', product })} aria-label={`Pedir ${product.name}`}>
             <ProductImage src={product.image} alt={product.imageAlt} sizes={CARD_IMAGE_SIZES} width={800} height={800} />
             <span className="premium-badge">Nuevo</span>
@@ -70,7 +71,7 @@ export const Catalog = memo(function Catalog({ onProduct, onZoom }: {
       <div className="section-heading">
         <div><span className="eyebrow section-kicker"><span>02</span> POSTRES</span><h2 id="desserts-title">Una pausa que sabe bien.</h2></div>
       </div>
-      <div className="product-grid">{store.desserts.map(dessert => <article className="product-card" key={dessert.id}>
+      <div className="product-grid">{store.desserts.map(dessert => <article className="product-card" key={dessert.id} {...productDialog.intent}>
         <div className="dessert-photo-wrap">
           <button className="card-photo" aria-label={`Personalizar ${dessert.name}`} onClick={() => onProduct({ kind: 'dessert', dessert })}>
             <ProductImage src={dessert.image} alt={dessert.imageAlt} width={800} height={640} loading="lazy" style={{ objectPosition: dessert.imagePosition }} />

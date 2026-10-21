@@ -27,7 +27,7 @@ test('checkout and alternate views are loaded only when requested', async ({ pag
   page.on('request', request => resources.push(new URL(request.url()).pathname))
   await page.goto('/')
   await expect(page.locator('.hero-photo')).toBeVisible()
-  expect(resources.filter(path => /\/(?:CartDrawer|ProductDialog|BrandGallery|FoodDirection|GummiesPreview|AdminDashboard|orders)-.*\.(js|css)$/.test(path))).toEqual([])
+  expect(resources.filter(path => /\/(?:AccountDialog|CartDrawer|ProductDialog|BrandGallery|FoodDirection|GummiesPreview|AdminDashboard|orders)-.*\.(js|css)$/.test(path))).toEqual([])
 
   await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
   const product = page.getByRole('dialog', { name: 'Ositos enchilados' })
@@ -43,6 +43,43 @@ test('checkout and alternate views are loaded only when requested', async ({ pag
   await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
   await page.getByRole('button', { name: 'Abrir carrito, 1 artículos' }).click()
   await expect(cart.getByLabel('Tu nombre')).toHaveValue('Prueba de rendimiento')
+})
+
+test('dialog intent prepares code once without opening a panel or fetching private history', async ({ page, isMobile }) => {
+  const resources: string[] = []
+  page.on('request', request => resources.push(new URL(request.url()).pathname))
+  await page.goto('/')
+  await expect(page.locator('.welcome-marquee-link')).toBeEnabled()
+  for (const [name, chunk] of [['Iniciar sesión', 'AccountDialog'], ['Abrir carrito, 0 artículos', 'CartDrawer'], ['Personalizar Ositos', 'ProductDialog']]) {
+    const button = page.getByRole('button', { name, exact: true })
+    if (isMobile) await button.dispatchEvent('pointerdown', { pointerType: 'touch' })
+    else await button.hover()
+    const requests = () => resources.filter(path => new RegExp(`/assets/${chunk}-.*\\.js$`).test(path))
+    await expect.poll(requests).toHaveLength(1)
+    await button.focus()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(requests()).toHaveLength(1)
+  }
+  expect(resources.filter(path => /^\/api\/(account\/orders|orders\/current)/.test(path))).toEqual([])
+  await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Ositos enchilados' })).toBeVisible()
+})
+
+test('data saving skips speculative dialogs but still opens them on demand', async ({ page }) => {
+  await page.addInitScript(() => {
+    const connection = new EventTarget()
+    Object.defineProperty(connection, 'saveData', { value: true })
+    Object.defineProperty(navigator, 'connection', { value: connection, configurable: true })
+  })
+  const resources: string[] = []
+  page.on('request', request => resources.push(new URL(request.url()).pathname))
+  await page.goto('/')
+  const button = page.getByRole('button', { name: 'Iniciar sesión', exact: true })
+  await button.focus()
+  await button.dispatchEvent('pointerdown', { pointerType: 'touch' })
+  expect(resources.filter(path => /\/AccountDialog-.*\.(js|css)$/.test(path))).toEqual([])
+  await button.click()
+  await expect(page.getByRole('dialog', { name: 'Iniciar sesión', exact: true })).toBeVisible()
 })
 
 test('SVG recipe and mobile media fallback synchronize and pause offscreen', async ({ page, isMobile, browserName }) => {

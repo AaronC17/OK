@@ -111,7 +111,7 @@ test('gummies-only cart, variant prices, persistence, delivery and server-create
   expect(errors).toEqual([])
 })
 
-test('symmetrical glass menu, proportional icons, responsive layout and keyboard accessibility', async ({ page }, testInfo) => {
+test('symmetrical menu, proportional icons, responsive layout and keyboard accessibility', async ({ page }, testInfo) => {
   await page.goto('/')
   await page.evaluate(() => document.fonts.ready)
   await expect(page.getByRole('heading', { name: 'Tu mezcla. Tus reglas.' })).toBeVisible()
@@ -132,7 +132,9 @@ test('symmetrical glass menu, proportional icons, responsive layout and keyboard
   await page.setViewportSize(testInfo.project.name === 'mobile' ? { width: 390, height: 844 } : { width: 1440, height: 1000 })
   await page.locator('#gomitas').scrollIntoViewIfNeeded()
   await expect(page.locator('.site-header')).toHaveClass(/is-scrolled/)
-  expect(await page.locator('.header-inner').evaluate(el => getComputedStyle(el).backdropFilter)).toContain('blur(22px)')
+  const headerFilter = await page.locator('.header-inner').evaluate(el => getComputedStyle(el).backdropFilter)
+  if (testInfo.project.name === 'mobile') expect(headerFilter).toBe('none')
+  else expect(headerFilter).toContain('blur(22px)')
   await page.locator('.mix-film').scrollIntoViewIfNeeded()
   await expect.poll(async () => page.locator('main img').evaluateAll(images => images.filter(img => !(img as HTMLImageElement).complete || !(img as HTMLImageElement).naturalWidth).length)).toBe(0)
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))

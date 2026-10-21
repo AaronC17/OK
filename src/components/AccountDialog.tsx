@@ -5,6 +5,7 @@ import type { Customer } from '../hooks/useCustomer.ts'
 import { store } from '../config/store.ts'
 import { customerOrders, errorMessage, orderDate } from '../lib/orders-api.ts'
 import { money } from '../lib/shop.ts'
+import { cartDrawer } from '../lib/dialog-loaders.ts'
 import { orderStatusLabels } from '../order-types.ts'
 import { GummyBearMark } from './GummyBearMark.tsx'
 import { Icon } from './Icon.tsx'
@@ -13,9 +14,10 @@ import '../account.css'
 
 export type AccountMode = 'login' | 'register'
 type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'privacy', string>>
+const memberSince = new Intl.DateTimeFormat('es-CR', { month: 'short', year: 'numeric', timeZone: 'America/Costa_Rica' })
 
-export function AccountDialog({ open, initialMode, customer, onClose, onOrder }: {
-  open: boolean; initialMode: AccountMode; customer: Customer; onClose: () => void; onOrder: (id: string) => void
+export function AccountDialog({ open, initialMode, customer, onClose, onOrder, onShop }: {
+  open: boolean; initialMode: AccountMode; customer: Customer; onClose: () => void; onOrder: (id: string) => void; onShop: () => void
 }) {
   const [mode, setMode] = useState(initialMode)
   const [name, setName] = useState('')
@@ -39,7 +41,9 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder }:
   const history = loadedHistory?.owner === user?.id ? loadedHistory?.data ?? null : null
 
   useEffect(() => {
-    if (!open || !user) { setHistory(null); return }
+    // Reopening shows the last result immediately while revalidating it.
+    // The owner check above prevents another account from seeing that history.
+    if (!open || !user) return
     let alive = true
     setHistoryLoading(true)
     setHistoryError('')
@@ -48,6 +52,15 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder }:
       .finally(() => { if (alive) setHistoryLoading(false) })
     return () => { alive = false }
   }, [open, user?.id, page, revision])
+
+  useEffect(() => {
+    setPage(1)
+    if (!user) { setHistory(null); setHistoryError('') }
+  }, [user?.id])
+  useEffect(() => {
+    setMode(initialMode); setErrors({}); setError(''); setPassword(''); setShowPassword(false)
+    if (!open) { setCreated(false); setName(''); setEmail(''); setPrivacy(false) }
+  }, [open, initialMode])
 
   useEffect(() => {
     if (Object.keys(errors).length) form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
@@ -93,22 +106,34 @@ export function AccountDialog({ open, initialMode, customer, onClose, onOrder }:
     </div>
     {user ? <div className="member-content">
       <header className="member-heading">
-        <span className="eyebrow">TU ESPACIO EN ONKY’S</span>
-        <div className="member-profile"><span className="member-avatar" aria-hidden="true">{user.name.trim().slice(0, 1).toLocaleUpperCase('es')}</span><div><h2 id="account-title">Hola, {user.name.split(' ')[0]}.</h2><p>{user.email}</p></div></div>
-        {created && <p className="account-success" role="status"><Icon name="check" size={16} />Tu cuenta está lista. Qué gusto tenerte aquí.</p>}
+        <div className="member-profile">
+          <div><span className="member-eyebrow">QUÉ BUENO VERTE</span><h2 id="account-title">Hola, {user.name.trim().split(/\s+/)[0]}.</h2><p>{user.email}</p></div>
+          <span className="member-avatar" aria-hidden="true">{user.name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toLocaleUpperCase('es')}<span><GummyBearMark size={14} /></span></span>
+        </div>
+        <div className="member-since"><span>Tu cuenta. Tus antojos.</span><span>Desde <time dateTime={user.createdAt}>{memberSince.format(new Date(user.createdAt))}</time></span></div>
       </header>
-      {user.welcomeAvailable && <div className="member-welcome"><span className="member-welcome-icon"><Icon name="gift" size={22} /></span><div><strong>Tu primer antojo, con 10% menos.</strong><p>Se aplica automáticamente a los productos de tu primer pedido. El envío no está incluido.</p></div></div>}
-      <section className="member-orders" aria-labelledby="member-orders-title" aria-busy={historyLoading}>
-        <div className="member-section-heading"><h3 id="member-orders-title">Mis pedidos {history && <span>{history.total}</span>}</h3><button className="icon-button" aria-label="Actualizar mis pedidos" disabled={historyLoading} onClick={() => setRevision(value => value + 1)}><Icon name="refresh" size={16} /></button></div>
-        {historyError ? <div className="account-history-error"><p className="field-error" role="alert">{historyError}</p><button className="text-button" onClick={() => setRevision(value => value + 1)}>Reintentar</button></div> : history?.orders.length ? <div className="member-order-list">{history.orders.map(order => <button className="member-order" key={order.id} onClick={() => onOrder(order.id)} aria-label={`Ver pedido ${order.code}`}>
-          <span className="member-order-icon"><Icon name="bag" size={18} /></span>
-          <span className="member-order-info"><strong>{order.code}</strong><small>{orderDate(order.createdAt)}</small><span className={`member-order-status ${order.status === 'ready' ? 'is-ready' : ''}`}>{orderStatusLabels[order.status]}</span></span>
-          <span className="member-order-total">{order.totalMinor === null ? 'Por confirmar' : money(order.totalMinor, store)}<Icon name="arrow" size={16} /></span>
-        </button>)}</div> : <div className="member-empty"><Icon name="bag" size={27} /><strong>{historyLoading ? 'Buscando tus pedidos…' : 'Aquí empiezan tus próximos antojos.'}</strong><p>{historyLoading ? 'Un momento, por favor.' : 'Tus pedidos y su seguimiento estarán en este espacio, incluso si cambias de dispositivo.'}</p></div>}
-        {history && history.total > history.pageSize && <div className="member-pagination"><button className="text-button" disabled={page === 1 || historyLoading} onClick={() => setPage(value => value - 1)}>Anterior</button><span>{page} / {Math.ceil(history.total / history.pageSize)}</span><button className="text-button" disabled={page * history.pageSize >= history.total || historyLoading} onClick={() => setPage(value => value + 1)}>Siguiente</button></div>}
-      </section>
-      {error && <p ref={errorRef} tabIndex={-1} className="account-error" role="alert">{error}</p>}
-      <footer className="member-footer"><button className="button button-primary" onClick={onClose}>Seguir comprando<Icon name="arrow" size={17} /></button><button className="text-button member-logout" disabled={busy} onClick={() => { void logout() }}><Icon name="logout" size={16} />{busy ? 'Cerrando…' : 'Cerrar sesión'}</button></footer>
+      <div className="member-body">
+        {created && <p className="account-success" role="status"><Icon name="check" size={16} />Tu cuenta está lista. Qué gusto tenerte aquí.</p>}
+        {user.welcomeAvailable && <aside className="member-welcome" aria-label="Tu beneficio de bienvenida">
+          <div className="member-welcome-amount"><span>10<small>%</small></span><span>DE REGALO</span></div>
+          <div className="member-welcome-copy"><span className="member-benefit-label"><Icon name="gift" size={13} />TU BIENVENIDA</span><strong>Tu primer antojo, con 10% menos.</strong><p>Automático en tu primer pedido de productos. No incluye el envío.</p></div>
+        </aside>}
+        <section className="member-orders" aria-labelledby="member-orders-title" aria-busy={historyLoading}>
+          <div className="member-section-heading"><div><h3 id="member-orders-title">Mis pedidos {history && <span>{history.total}</span>}</h3><p>Cada antojo, en un solo lugar.</p></div><button className="icon-button member-refresh" aria-label="Actualizar mis pedidos" disabled={historyLoading} onClick={() => setRevision(value => value + 1)}><Icon name="refresh" size={16} /></button></div>
+          {historyError && <div className="account-history-error"><Icon name="receipt" size={24} /><p role="alert">{historyError}</p><button className="text-button" onClick={() => setRevision(value => value + 1)}>Reintentar <Icon name="refresh" size={14} /></button></div>}
+          {(!historyError || history) && (!history || (historyLoading && history.page !== page) ? <div className="member-orders-loading" role="status"><span className="sr-only">Buscando tus pedidos…</span>{[0, 1].map(index => <div className="member-order-skeleton" key={index} aria-hidden="true"><span /><div><i /><i /></div><span /></div>)}</div>
+            : history.orders.length ? <div className="member-order-list">{history.orders.map(order => <button className="member-order" key={order.id} {...cartDrawer.intent} onClick={() => onOrder(order.id)} aria-label={`Ver pedido ${order.code}`}>
+              <span className="member-order-icon"><Icon name="bag" size={19} /></span>
+              <span className="member-order-info"><strong>{order.code}</strong><small>{orderDate(order.createdAt)}</small><span className={`member-order-status is-${order.status}`}>{orderStatusLabels[order.status]}</span></span>
+              <span className="member-order-total"><strong>{order.totalMinor === null ? 'Por confirmar' : money(order.totalMinor, store)}</strong><span>Ver pedido <Icon name="arrow" size={14} /></span></span>
+            </button>)}</div>
+            : <div className="member-empty"><div className="member-empty-art" aria-hidden="true"><span className="member-empty-orbit" /><span className="member-empty-bag"><span /><GummyBearMark size={27} /></span><span className="member-empty-spark">✦</span></div><h4>Tu próximo antojo empieza aquí.</h4><p>Elige algo que te encante.<br />Nosotros guardamos aquí tus pedidos.</p></div>)}
+          {history && history.total > history.pageSize && <div className="member-pagination"><button className="text-button" disabled={page === 1 || historyLoading} onClick={() => setPage(value => value - 1)}>Anterior</button><span>{page} / {Math.ceil(history.total / history.pageSize)}</span><button className="text-button" disabled={page * history.pageSize >= history.total || historyLoading} onClick={() => setPage(value => value + 1)}>Siguiente</button></div>}
+        </section>
+        <button className="button member-shop" onClick={onShop}><span>Seguir comprando</span><span className="member-shop-arrow"><Icon name="arrow" size={18} /></span></button>
+        {error && <p ref={errorRef} tabIndex={-1} className="account-error" role="alert">{error}</p>}
+        <footer className="member-footer"><span>Hecho para tus antojos.</span><button className="text-button member-logout" disabled={busy} onClick={() => { void logout() }}><Icon name="logout" size={15} />{busy ? 'Cerrando…' : 'Cerrar sesión'}</button></footer>
+      </div>
     </div> : <div className="account-layout">
       <aside className="account-story" aria-hidden="true">
         <div className="account-story-visual"><ProductImage src={store.heroImage} alt="" sizes="220px" /><span className="account-story-seal"><GummyBearMark size={27} /></span></div>

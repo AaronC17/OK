@@ -35,8 +35,10 @@ test('accounts: branded, accessible registration, persistent login, logout and c
   const member = page.getByRole('dialog', { name: 'Hola, Ana.' })
   await expect(member.getByText('Tu cuenta está lista.', { exact: false })).toBeVisible()
   await expect(member.getByText('Tu primer antojo, con 10% menos.')).toBeVisible()
-  await expect(member.getByText('Aquí empiezan tus próximos antojos.')).toBeVisible()
+  await expect(member.getByText('Tu próximo antojo empieza aquí.')).toBeVisible()
   await member.getByRole('button', { name: 'Seguir comprando' }).click()
+  await expect(page.locator('#catalogo')).toBeFocused()
+  await expect(page).toHaveURL(/#catalogo$/)
   await expect(page.locator('.brand-marquee-track')).toBeVisible()
   await expect(page.locator('.brand-marquee-bear')).toHaveCount(24)
   await expect(offer).toHaveCount(0)
@@ -170,6 +172,21 @@ test('accounts: welcome discount, saved order, cross-device history and customer
   await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
   await page.getByRole('button', { name: 'Abrir mi cuenta', exact: true }).click()
   const member = page.locator('.account-dialog')
+  const savedOrder = member.getByRole('button', { name: `Ver pedido ${order.code}`, exact: true })
+  await expect(savedOrder).toBeVisible()
+  await member.getByRole('button', { name: 'Cerrar mi cuenta' }).click()
+  // A slow refresh must not blank the previously loaded account on reopening.
+  let releaseHistory!: () => void
+  const historyGate = new Promise<void>(resolve => { releaseHistory = resolve })
+  await page.route('**/api/account/orders?*', async route => { await historyGate; await route.continue() })
+  try {
+    await page.getByRole('button', { name: 'Abrir mi cuenta', exact: true }).click()
+    await expect(member.locator('.member-orders')).toHaveAttribute('aria-busy', 'true')
+    await expect(savedOrder).toBeVisible()
+    await expect(member.locator('.member-orders-loading')).toHaveCount(0)
+  } finally { releaseHistory() }
+  await expect(member.locator('.member-orders')).toHaveAttribute('aria-busy', 'false')
+  await page.unroute('**/api/account/orders?*')
   await member.getByRole('button', { name: `Ver pedido ${order.code}`, exact: true }).click()
   await expect(cart.locator('#assigned-order-code')).toHaveText(order.code)
   await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
