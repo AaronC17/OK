@@ -28,7 +28,7 @@
   .header-actions { gap: 6px; }
   .account-toggle { padding-inline: 10px; }
   .account-toggle > span, .header-actions-divider { display: none; }
-  .welcome-marquee-link { padding-inline: 12px; gap: 8px; font-size: 10.5px; }
+  .welcome-marquee-link { padding-inline: 14px; gap: 9px; font-size: 11px; }
   .welcome-marquee-link strong { font-weight: 800; color: #2c123d; }
   .welcome-marquee-link > .icon:first-child { width: 15px; height: 15px; }
   .welcome-marquee-link > .icon:last-child { width: 13px; height: 13px; }

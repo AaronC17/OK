@@ -1028,32 +1028,34 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .how-section { contain-intrinsic-block-size: auto 366px; }
   .questions-section { contain-intrinsic-block-size: auto 257px; }
   .container { width: calc(100% - 32px); }
-  .announcement { height: 26px; font-size: 7.5px; gap: 9px; }
+  .announcement { height: 28px; font-size: 8px; gap: 11px; }
   .announcement > span { gap: 5px; }
-  .site-header { padding-block: 4px; }
-  .header-inner { width: calc(100% - 20px); height: 56px; padding-inline: 12px; border-radius: 18px; }
+  .announcement.shipping-announcement { min-height: 28px; height: 28px; padding: 4px 8px; font-size: 8px; line-height: 1.2; display: flex; align-items: center; justify-content: center; }
+  .site-header { padding-block: 6px; }
+  .header-inner { width: calc(100% - 20px); height: 62px; padding-inline: 12px; border-radius: 19px; }
   /* A nearly opaque surface keeps the floating header without sampling every
      moving pixel behind it during touch scrolling. */
   .site-header.is-scrolled .header-inner { background: #fbfaf9f5; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .hero-catalog-cta, .button.experience-cta, .hero-photo-label, .premium-badge { -webkit-backdrop-filter: none; backdrop-filter: none; }
   .premium-badge { background: #382448e8; }
-  .wordmark { font-size: 29px; letter-spacing: -2px; }
+  .wordmark { font-size: 31px; letter-spacing: -2.3px; }
   .header-inner nav { gap: 0; }
   .header-inner nav a { font-size: 11px; padding-inline: 10px; }
   .cart-label { display: none; }
   .cart-toggle { gap: 7px; padding: 9px; }
   .cart-toggle > svg { width: 18px; height: 18px; }
   .cart-count { width: 19px; height: 19px; font-size: 9px; }
-  /* Keep both the hero pouch and the 10% welcome marquee visible above the fold on mobile. */
-  .hero { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 2px; margin-top: 0; min-height: 0; height: min(480px, calc(100vh - 156px)); height: min(480px, calc(100svh - 156px)); border-radius: 9px; }
-  .hero-copy { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 4px 6px 2px; }
+  /* Keep both the hero pouch and the 10% welcome marquee visible above the fold on mobile without empty space.
+     Total non-hero height = announcement (28px) + header (74px) + marquee (44px) = 146px. */
+  .hero { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 4px; margin-top: 0; min-height: 0; height: calc(100vh - 146px); height: calc(100svh - 146px); border-radius: 9px; }
+  .hero-copy { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 8px 4px; }
   .hero-copy > .eyebrow { font-size: 7px; letter-spacing: 1.5px; justify-content: center; margin-bottom: 0; }
-  .hero h1 { font-family: 'DM Serif Hero', 'DM Serif Display', Georgia, serif; font-size: clamp(33px,9.2vw,39px); font-weight: 400; letter-spacing: -.7px; line-height: 1.1; margin: 4px 0 6px; }
+  .hero h1 { font-family: 'DM Serif Hero', 'DM Serif Display', Georgia, serif; font-size: clamp(38px,10.5vw,44px); font-weight: 400; letter-spacing: -.8px; line-height: 1.13; margin: 6px 0 8px; }
   .hero h1 > span { font-style: italic; display: inline-block; padding-bottom: 0.25em; margin-bottom: -0.25em; padding-right: 0.12em; filter: url(#onkys-liquid-glass); }
-  .hero-copy > p { font-size: 11.5px; line-height: 1.45; margin-bottom: 8px; }
-  .hero .button { min-height: 38px; font-size: 11px; padding: 8px 16px; gap: 14px; }
-  .hero-secondary { max-width: none; font-size: 9.5px; margin-top: 6px; justify-content: center; }
-  .hero-visual { height: 100%; min-height: 0; aspect-ratio: auto; margin: 0 auto; width: calc(100% - 40px); max-width: 310px; }
+  .hero-copy > p { font-size: 12px; line-height: 1.55; margin-bottom: 10px; }
+  .hero .button { min-height: 42px; font-size: 11px; padding: 10px 18px; gap: 16px; }
+  .hero-secondary { max-width: none; font-size: 10px; margin-top: 8px; justify-content: center; }
+  .hero-visual { height: 100%; min-height: 0; aspect-ratio: auto; margin: 0 auto; width: calc(100% - 46px); max-width: 350px; }
   /* Paint the soft shadow once. Chained alpha drop-shadows repeatedly rasterize
      the large pouch on WebKit, including while a product dialog is open. */
   .hero-visual:not(.has-video)::before { content: ''; position: absolute; top: 6%; left: 50%; height: 115%; aspect-ratio: 3 / 4; max-width: 125%; transform: translateX(-50%); background: radial-gradient(ellipse, #2a16364d 15%, #2a163629 44%, transparent 70%); pointer-events: none; }
@@ -1251,11 +1253,11 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .add-button { min-height: 46px; }
 }
 @media (max-width: 600px) and (max-height: 640px) {
-  .hero { height: min(420px, calc(100svh - 146px)); }
-  .hero-copy { padding-block: 2px 4px; }
-  .hero h1 { font-size: clamp(28px, 8.5vw, 34px); line-height: 1.08; margin-block: 3px 5px; }
-  .hero-copy > p { font-size: 11px; line-height: 1.4; margin-bottom: 6px; }
-  .hero .button { min-height: 36px; padding: 7px 14px; font-size: 10.5px; }
+  .hero { height: calc(100vh - 146px); height: calc(100svh - 146px); }
+  .hero-copy { padding-block: 3px 4px; }
+  .hero h1 { font-size: clamp(30px, 9vw, 36px); line-height: 1.1; margin-block: 4px 6px; }
+  .hero-copy > p { font-size: 11.5px; line-height: 1.45; margin-bottom: 8px; }
+  .hero .button { min-height: 38px; padding: 8px 16px; font-size: 11px; }
 }
 @media (max-width: 360px) {
   .header-inner { padding-inline: 10px; }
