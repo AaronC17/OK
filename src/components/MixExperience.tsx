@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import { Icon } from './Icon.tsx'
+import { store } from '../config/store.ts'
 import { ProductImage } from './ui.tsx'
 import mixVideo from '../config/mix-video.json'
 import type { MixSceneMotion } from './mix-motion.ts'
@@ -33,6 +34,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
   const [playbackBlocked, setPlaybackBlocked] = useState(false)
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [motionRequested, setMotionRequested] = useState(!reduced && !saveData)
+  const [paused, setPaused] = useState(false)
   const [visible, setVisible] = useState(false)
   const [tabVisible, setTabVisible] = useState(!document.hidden)
   const [near, setNear] = useState(false)
@@ -45,6 +47,7 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
       setReduced(media.matches)
       setSaveData(savesData())
       setMotionRequested(!media.matches && !savesData())
+      setPaused(false)
     }
     media.addEventListener('change', preference)
     dataPreference.addEventListener('change', preference)
@@ -70,16 +73,16 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
   // The SVG meshes and physics are not part of a phone's initial JS bundle.
   // Mount them only for a nearby desktop scene or a failed native video.
   useEffect(() => {
-    if (useVideo || !near || !motionRequested || reduced || Bowl) return
+    if (useVideo || !near || !motionRequested || Bowl) return
     let disposed = false
     void import('./GummyBowl.tsx').then(module => {
       if (!disposed) setBowl(() => module.GummyBowl)
     }).catch(error => console.error('Mix illustration could not be loaded:', error))
     return () => { disposed = true }
-  }, [useVideo, near, motionRequested, reduced, Bowl])
+  }, [useVideo, near, motionRequested, Bowl])
 
   useEffect(() => {
-    if (!near || !motionRequested || reduced) return
+    if (!near || !motionRequested) return
     if (useVideo) {
       let disposed = false
       void import('./mix-video-motion.ts').then(({ animateMixVideo }) => {
@@ -105,18 +108,29 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
       prepared.setRunning(shouldRun.current)
     }).catch(error => { if (!controller.signal.aborted) console.error('Mix animation could not be prepared:', error) })
     return () => { disposed = true; controller.abort(); scene.current?.dispose(); scene.current = null }
-  }, [near, motionRequested, useVideo, reduced, Bowl])
+  }, [near, motionRequested, useVideo, Bowl])
 
   useEffect(() => {
-    shouldRun.current = visible && tabVisible && motionRequested && !reduced && !suspended
+    shouldRun.current = visible && tabVisible && motionRequested && !paused && !suspended
     scene.current?.setRunning(shouldRun.current)
-  }, [visible, tabVisible, motionRequested, reduced, suspended])
+  }, [visible, tabVisible, motionRequested, paused, suspended])
+
+  const togglePlayback = () => {
+    if (motionRequested && !paused && !playbackBlocked) {
+      if (reduced || saveData) setMotionRequested(false)
+      else setPaused(true)
+      return
+    }
+    setMotionRequested(true)
+    setPaused(false)
+    if (playbackBlocked) scene.current?.setRunning(true)
+  }
 
   return <section ref={root} className="experience-section container" aria-labelledby="experience-title">
     <div className="experience-copy">
       <span className="eyebrow">RECETA ARTESANAL</span>
       <h2 id="experience-title">Ositos enchilados.</h2>
-      <p>Chamoy, Tajín y limón fresco sobre gomitas de osito, en 100, 250 o 500 g.</p>
+      <p>Chamoy, Tajín y limón fresco sobre gomitas de osito, en {new Intl.ListFormat('es', { type: 'disjunction' }).format(store.gummies.weights.map(weight => `${weight} g`))}.</p>
       <div className="experience-points">
         <span><span>01</span> Chamoy, Tajín y limón fresco.</span>
         <span><span>02</span> Mezcla suave y cobertura pareja.</span>
@@ -124,8 +138,8 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
       </div>
       <button className="button experience-cta" onClick={onCustomize}>Crear mi combinación <Icon name="arrow" size={19} /></button>
     </div>
-    <div ref={film} className="mix-film" style={{ '--cycle': `${mixVideo.duration}ms` } as CSSProperties} data-static={reduced || !motionRequested} data-scene-ready="false" data-renderer={useVideo ? 'video' : undefined}>
-      <div className="film-top"><div><span>Preparación<small>Vista previa</small></span></div><span className="film-loop-label">EN BUCLE</span></div>
+    <div ref={film} className="mix-film" style={{ '--cycle': `${mixVideo.duration}ms` } as CSSProperties} data-static={!motionRequested} data-paused={!visible || !tabVisible || !motionRequested || paused || suspended || playbackBlocked} data-scene-ready="false" data-renderer={useVideo ? 'video' : undefined}>
+      <div className="film-top"><div><span>Preparación<small>Vista previa</small></span></div>{!playbackBlocked && <button type="button" className="film-playback" onClick={togglePlayback} aria-label={motionRequested && !paused ? 'Pausar animación' : 'Reproducir animación'}><Icon name={motionRequested && !paused ? 'pause' : 'play'} size={16} /><span>{motionRequested && !paused ? 'Pausar' : 'Reproducir'}</span></button>}</div>
       <p className="sr-only">Animación ilustrativa: se vierte chamoy, se espolvorea Tajín y se añade jugo de limón de una jarrita. Los ositos caen, se comprimen y se doblan suavemente al contacto. La cuchara barre los lados y pliega la mezcla hacia dentro; el chamoy espeso se adhiere y escurre lentamente. Al final aparece la bolsa terminada. No representa la preparación de un pedido real.</p>
       <div className="film-scene">
         <div className="film-ingredients" aria-hidden="true">{MIX_INGREDIENTS.map((item, index) => <div className={`film-ingredient ingredient-${index}`} key={item.id}>
@@ -134,15 +148,13 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
         </div>)}</div>
         <div className="mix-stage">
           {useVideo ? <>
-            <video ref={video} className="mix-video" src={near && motionRequested && !reduced ? videoSource.url : undefined} poster={near ? mixVideo.poster : undefined}
-              width={mixVideo.width} height={mixVideo.height} muted playsInline loop preload={near && motionRequested && !reduced ? 'auto' : 'none'} aria-hidden="true"
+            <video ref={video} className="mix-video" src={near && motionRequested ? videoSource.url : undefined} poster={near ? mixVideo.poster : undefined}
+              width={mixVideo.width} height={mixVideo.height} muted playsInline loop preload={near && motionRequested ? 'auto' : 'none'} aria-hidden="true"
               onError={() => { setPlaybackBlocked(false); setUseVideo(false) }} />
-            {playbackBlocked && !reduced && <button type="button" className="mix-play-button" onClick={() => {
-              void video.current?.play().catch(() => setPlaybackBlocked(true))
-            }}><Icon name="play" size={16} />Reproducir animación</button>}
+            {playbackBlocked && motionRequested && <button type="button" className="mix-play-button" onClick={togglePlayback}><Icon name="play" size={16} />Reproducir animación</button>}
           </> : <>
             <div className="mix-bowl-scene" aria-hidden="true">
-              {Bowl ? <Bowl loadImages={near && motionRequested} /> : <ProductImage className="mix-still" src={near ? mixVideo.poster : undefined} alt="" width={mixVideo.width} height={mixVideo.height} />}
+              {Bowl && motionRequested ? <Bowl loadImages={near} /> : <ProductImage className="mix-still" src={near ? mixVideo.poster : undefined} alt="" width={mixVideo.width} height={mixVideo.height} />}
             </div>
             <div className="finished-mix" aria-hidden="true">
               <span className="finish-sparkle sparkle-one">✦</span><span className="finish-sparkle sparkle-two">✦</span><span className="finish-sparkle sparkle-three">✧</span>
@@ -159,7 +171,6 @@ export const MixExperience = memo(function MixExperience({ onCustomize, suspende
             </div>
           </>}
           <div className="film-captions" aria-hidden="true"><span className="caption-season">Chamoy, Tajín y limón.</span><span className="caption-select">Ahora, tus ositos favoritos.</span><span className="caption-mix">Todo se mezcla. Todo se antoja.</span><span className="caption-ready">Lista para el carrito.</span></div>
-          {saveData && !motionRequested && !reduced && <button type="button" className="mix-play-button" onClick={() => setMotionRequested(true)}><Icon name="play" size={16} />Reproducir animación</button>}
         </div>
         <div className="film-timeline" aria-hidden="true"><span className="film-step film-step-1"><i />Sazonar</span><span className="film-step film-step-2"><i />Mezclar</span><span className="film-step film-step-3"><i />Disfrutar</span></div>
       </div>

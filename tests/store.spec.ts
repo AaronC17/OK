@@ -26,21 +26,25 @@ test('only gummies are shown and a saved dessert is removed from the cart', asyn
   await expect(page.locator('.cart-line')).toHaveCount(1)
 })
 
-test('mixto combines hidden catalog types as ingredients', async ({ page }, testInfo) => {
+test('mixto combines hidden catalog types as ingredients', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Personalizar Tiritas', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Personalizar Gusanitos', exact: true })).toHaveCount(0)
-  await page.getByRole('button', { name: testInfo.project.name === 'mobile' ? 'Personalizar gomitas mixtas' : 'Armar mi mix' }).click()
-  const configurator = page.getByRole('dialog', { name: 'Tu mezcla. Tus reglas.' })
-  await expect(configurator.getByText('Siempre mixto. Elige los gramos.', { exact: true })).toBeVisible()
-  await expect(configurator.locator('.type-options input')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Personalizar gomitas mixtas', exact: true }).click()
+  const configurator = page.getByRole('dialog', { name: 'Mix de gomitas', exact: true })
+  await expect(configurator.locator('.type-options input:checked')).toHaveCount(3)
   await expect(configurator.locator('.weight-options input')).toHaveCount(3)
-  await expect(configurator.locator('.configuration-price')).toContainText('₡1 400')
+  await expect(configurator.locator('.configuration-price')).toContainText('₡1 200')
+  await configurator.getByRole('checkbox', { name: 'Aros', exact: true }).uncheck()
+  await configurator.getByRole('checkbox', { name: 'Gusanos', exact: true }).uncheck()
+  await expect(configurator.getByRole('button', { name: 'Añadir al carrito' })).toBeDisabled()
+  await configurator.getByRole('checkbox', { name: 'Gusanos', exact: true }).check()
   await configurator.getByRole('button', { name: 'Añadir al carrito' }).click()
   await page.getByRole('button', { name: 'Abrir carrito, 1 artículos' }).click()
   await expect(page.locator('.cart-line')).toHaveCount(1)
   await expect(page.locator('.cart-line')).toContainText('Mix de gomitas enchiladas')
-  await expect(page.locator('.cart-line')).toContainText('Gusanitos')
+  await expect(page.locator('.cart-line')).toContainText('Gusanos')
+  await expect(page.locator('.cart-line')).not.toContainText('Aros')
 })
 
 test('gummies-only cart, variant prices, persistence, delivery and server-created SINPE order', async ({ page, request }) => {
@@ -53,9 +57,9 @@ test('gummies-only cart, variant prices, persistence, delivery and server-create
   await page.getByRole('button', { name: 'Cerrar carrito' }).click()
 
   await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
-  const configurator = page.getByRole('dialog', { name: 'Tu mezcla. Tus reglas.' })
+  const configurator = page.getByRole('dialog', { name: 'Ositos enchilados', exact: true })
   await expect(configurator.locator('.weight-options input')).toHaveCount(3)
-  for (const [weight, price] of [['100', '₡1 200'], ['200', '₡2 200'], ['500', '₡4 800']]) {
+  for (const [weight, price] of [['100', '₡1 200'], ['250', '₡2 500'], ['500', '₡4 800']]) {
     await configurator.getByRole('radio', { name: `${weight} g`, exact: true }).check()
     await expect(configurator.locator('.configuration-price')).toContainText(price)
   }
@@ -83,6 +87,7 @@ test('gummies-only cart, variant prices, persistence, delivery and server-create
   await expect(cart.getByLabel('Tu nombre')).toBeFocused()
   await cart.getByLabel('Tu nombre').fill('Ana Pérez')
   await cart.getByLabel('Teléfono de contacto').fill('61551234')
+  await cart.getByLabel('Correo electrónico').fill('ana.prueba@ejemplo.cr')
   await cart.getByLabel('Dirección o punto de entrega').fill('Calle del Sol 12, 2º B')
   await cart.getByLabel(/Acepto que la tienda guarde/).check()
   await cart.getByRole('radio', { name: /Recogida|Recoger/ }).check()
@@ -94,8 +99,8 @@ test('gummies-only cart, variant prices, persistence, delivery and server-create
   await expect(cart.locator('.cart-line')).toHaveCount(1)
   await expect(cart.locator('.total-row')).toContainText('₡14 400')
   await cart.getByRole('button', { name: 'Crear pedido con SINPE' }).click()
-  await expect(cart.locator('#assigned-order-code')).toHaveValue(/^ONK-[A-F0-9]{16}$/)
-  await expect(cart.locator('.sinpe-instructions')).toContainText('₡14 400')
+  await expect(cart.locator('#assigned-order-code')).toHaveText(/^ONK-\d{4,}$/)
+  await expect(cart.locator('.sinpe-pay-card')).toContainText('₡14 400')
   const result = await (await page.request.get('/api/orders/current')).json()
   expect(result.order.customer.name).toBe('Ana Pérez')
   expect(result.order.customer.address).toBe('')
@@ -154,72 +159,48 @@ test('symmetrical glass menu, proportional icons, responsive layout and keyboard
   await page.locator('.cart-drawer').screenshot({ path: `test-results/${testInfo.project.name}-cart.png` })
 })
 
-test('loop selects, mixes, finishes and pauses, respecting reduced motion', async ({ page }, testInfo) => {
+test('recipe offers manual pause, offscreen suspension and explicit reduced-motion playback', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
   const film = page.locator('.mix-film')
-  const expectPlayback = async (state: 'paused' | 'running') => {
-    await expect.poll(() => film.evaluate((el, state) => {
-      const animations = el.getAnimations({ subtree: true })
-      const times = animations.map(animation => Number(animation.currentTime))
-      return animations.length > 0 && animations.every(animation => animation.playState === state && !animation.pending) && Math.max(...times) - Math.min(...times) < 2
-    }, state)).toBe(true)
+  const expectPlayback = async (playing: boolean) => {
+    await expect.poll(() => film.evaluate(el => {
+      const video = el.querySelector('video')
+      return video ? !video.paused && video.readyState >= 2 : el.getAnimations({ subtree: true }).some(animation => animation.playState === 'running')
+    })).toBe(playing)
   }
   await film.scrollIntoViewIfNeeded()
   await expect(film).toHaveAttribute('data-paused', 'false')
-  await expectPlayback('running')
-  // StrictMode must not leave a second, competing motion on the same bear.
-  expect(await film.locator('.bowl-gummy').first().evaluate(el => el.getAnimations().length)).toBe(1)
+  await expectPlayback(true)
   await page.getByRole('button', { name: 'Pausar animación' }).click()
-  await expectPlayback('paused')
+  await expectPlayback(false)
   await page.getByRole('button', { name: 'Reproducir animación' }).click()
-  await expectPlayback('running')
+  await expectPlayback(true)
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
   await expect(film).toHaveAttribute('data-paused', 'true')
-  await expectPlayback('paused')
+  await expectPlayback(false)
   await film.scrollIntoViewIfNeeded()
   await expect(film).toHaveAttribute('data-paused', 'false')
-  await expectPlayback('running')
-  // Seek the shared CSS / Web Animations timeline without artificial waits.
-  for (const [time, visible] of [[1500, '.caption-season'], [3500, '.caption-select'], [7500, '.caption-mix'], [12500, '.caption-ready']] as const) {
-    await film.evaluate((el, time) => el.getAnimations({ subtree: true }).forEach(animation => { animation.pause(); animation.currentTime = time }), time)
-    await expect(film.locator(visible)).toHaveCSS('opacity', '1')
-    if (time === 7500) {
-      await expect(film.locator('.mixing-spoon')).toHaveCSS('opacity', '1')
-      await film.screenshot({ path: `test-results/${testInfo.project.name}-mix-stirring.png` })
-    }
-    if (time === 12500) await expect(film.locator('.finished-mix')).toHaveCSS('opacity', '1')
-  }
-  await page.locator('.experience-section').screenshot({ path: `test-results/${testInfo.project.name}-mix-ready.png` })
-  const photoSources = await film.locator('.bowl-illustration defs image').evaluateAll(images => images.map(image => image.getAttribute('href')))
-  expect(photoSources).toHaveLength(4)
-  for (const source of photoSources) {
-    const response = await page.request.get(source!)
-    expect(response.ok()).toBe(true)
-    expect(response.headers()['content-type']).toContain('image/webp')
-  }
+  await expectPlayback(true)
   await page.getByRole('button', { name: 'Pausar animación' }).click()
   await expect(film).toHaveAttribute('data-paused', 'true')
   await expect(page.getByRole('button', { name: 'Reproducir animación' })).toBeVisible()
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(film).toHaveAttribute('data-static', 'true')
-  await expect(film.locator('.finished-mix')).toHaveCSS('opacity', '1')
-  await expect(film.locator('.mix-bowl-scene')).toHaveCSS('opacity', '0')
-  await expectPlayback('paused')
+  await expectPlayback(false)
   await page.getByRole('button', { name: 'Reproducir animación' }).click()
   await expect(film).toHaveAttribute('data-static', 'false')
-  await expectPlayback('running')
+  await expectPlayback(true)
   await page.getByRole('button', { name: 'Pausar animación' }).click()
   await expect(film).toHaveAttribute('data-static', 'true')
-  await expectPlayback('paused')
+  await expectPlayback(false)
   await page.getByRole('button', { name: 'Crear mi combinación' }).click()
-  const mixDialog = page.getByRole('dialog', { name: 'Tu mezcla. Tus reglas.' })
-  // El artículo Mixto siempre combina todo: sin radios de modo ni elección de tipos.
+  const mixDialog = page.getByRole('dialog', { name: 'Mix de gomitas', exact: true })
   await expect(mixDialog.getByRole('radio', { name: 'Mixto', exact: true })).toHaveCount(0)
   await expect(mixDialog.getByRole('radio', { name: 'Un solo tipo', exact: true })).toHaveCount(0)
   await expect(mixDialog.getByText('Elige dos o tres favoritos', { exact: false })).toHaveCount(0)
-  await expect(mixDialog.getByText('Siempre mixto. Elige los gramos.', { exact: true })).toBeVisible()
+  await expect(mixDialog.locator('.type-options input:checked')).toHaveCount(3)
   await expect(mixDialog.locator('.weight-options input')).toHaveCount(3)
   await expect(mixDialog.locator('.product-visual img')).toHaveAttribute('src', '/images/bolsa-mix.webp')
   expect(errors).toEqual([])

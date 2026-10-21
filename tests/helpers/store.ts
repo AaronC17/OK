@@ -1,4 +1,5 @@
 import type { APIRequestContext, Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -51,9 +52,8 @@ export async function checkoutOrder(page: Page, delivery: 'pickup' | 'delivery' 
   return await (await page.request.get('/api/orders/current')).json().then((result: { order: ShopOrder }) => result.order)
 }
 
-export async function sendReceipt(page: Page, order: ShopOrder, reference: string) {
-  await page.getByLabel('Código del pedido', { exact: false }).last().fill(order.code)
-  await page.getByLabel('Referencia bancaria del SINPE').fill(reference)
+export async function sendReceipt(page: Page, order: ShopOrder) {
+  await expect(page.locator('#assigned-order-code')).toHaveText(order.code)
   await page.locator('#receipt-file').setInputFiles(await testReceipt())
   await page.getByRole('button', { name: 'Enviar comprobante para revisión' }).click()
 }
@@ -62,6 +62,6 @@ export async function loginAdminPage(page: Page) {
   await page.goto('/admin')
   await page.getByLabel('Usuario', { exact: true }).fill(adminCredentials.username)
   await page.getByLabel('Contraseña', { exact: true }).fill(adminCredentials.password)
-  await page.getByRole('button', { name: 'Entrar a administración' }).click()
-  await page.getByRole('heading', { name: 'Tus pedidos.', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Administración' }).waitFor()
 }

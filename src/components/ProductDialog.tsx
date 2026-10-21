@@ -261,7 +261,7 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
                 <label className="size-option" style={{ cursor: 'default' }}>
                   <input type="radio" name="product-variant" checked readOnly />
                   <span><strong>{product!.unitLabel ?? 'Domo individual'}</strong><small>{product!.tag}</small></span>
-                  <span>{money(product!.priceMinor ?? 0, store)}</span>
+                  <span>{product!.priceMinor === undefined ? 'Por definir' : money(product!.priceMinor, store)}</span>
                 </label>
               )}
             </div>
@@ -269,6 +269,7 @@ export function ProductDialog({ target, open, onClose, onAdd }: {
           {product!.ingredients && (
             <p className="option-note"><Icon name="info" size={16} />Ingredientes: {product!.ingredients}.</p>
           )}
+          {product!.allergenInfo && <p className="option-note">Alérgenos: {product!.allergenInfo}</p>}
         </> : <>
           <fieldset><legend>01 <span>Elige tu presentación</span></legend>
             <div className="size-options">{dessert!.variants.map(variant => <label key={variant.id} className={`size-option ${!variant.available || variant.priceMinor === null ? 'unavailable' : ''}`}>

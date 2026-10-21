@@ -13,13 +13,14 @@ import '../orders.css'
 
 type OrderDetail = { order: ShopOrder; audit: OrderAudit[] }
 
-const shortDate = (value: string) => new Intl.DateTimeFormat('es-CR', {
+const shortDateFormatter = new Intl.DateTimeFormat('es-CR', {
   timeZone: 'America/Costa_Rica',
   day: 'numeric',
   month: 'short',
   hour: 'numeric',
   minute: '2-digit',
-}).format(new Date(value))
+})
+const shortDate = (value: string) => shortDateFormatter.format(new Date(value))
 
 function summarizeOrderLines(order: ShopOrder) {
   return order.lines.map(line => `${line.quantity}× ${line.name}${line.options.length ? ` (${line.options.join(', ')})` : ''}`).join(' · ')
@@ -132,7 +133,7 @@ function AdminOrderDialog({ detail, onClose, onChanged }: { detail: OrderDetail;
         {isPaid ? (
           <span className="admin-paid-pill"><Icon name="check" size={15} /> Pagada</span>
         ) : (
-          <button type="button" className="admin-mark-paid is-large" disabled={busy} onClick={() => { void confirmPayment() }}>
+          <button type="button" className="admin-mark-paid is-large" disabled={busy || order.totalMinor === null} onClick={() => { void confirmPayment() }}>
             <span className="admin-checkbox-box"><Icon name="check" size={13} /></span>
             <span>{busy ? 'Marcando…' : 'Marcar como pagada'}</span>
           </button>
@@ -200,26 +201,31 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
 
   useEffect(() => { void adminSettings().then(setSettings).catch(error => setError(errorMessage(error))) }, [])
   useEffect(() => {
+    if (tab !== 'orders') return
     let alive = true
+    let pending = false
     const load = async (quiet = false) => {
+      if (pending) return
+      pending = true
       if (!quiet) setLoading(true)
       try {
         const result = await adminOrders(new URLSearchParams({ status: filter, q: search, page: String(page), ...(selectedCustomer ? { customerId: selectedCustomer.id } : {}) }))
         if (alive) { setData(result); setError('') }
       } catch (error) {
         if (alive) { if (error instanceof ApiError && error.status === 401) onExit(); else setError(errorMessage(error)) }
-      } finally { if (alive) setLoading(false) }
+      } finally { pending = false; if (alive) setLoading(false) }
     }
-    void load()
+    setLoading(true)
+    const debounce = window.setTimeout(() => { void load() }, search ? 220 : 0)
     const timer = window.setInterval(() => { if (!document.hidden) void load(true) }, 10_000)
-    return () => { alive = false; window.clearInterval(timer) }
-  }, [filter, search, page, revision, selectedCustomer?.id])
+    return () => { alive = false; window.clearTimeout(debounce); window.clearInterval(timer) }
+  }, [filter, search, page, revision, selectedCustomer?.id, tab])
 
   const openOrder = async (id: string) => {
     const sequence = ++openSequence.current
     setError('')
     try { const result = await adminOrder(id); if (sequence === openSequence.current) setDetail(result) }
-    catch (error) { setError(errorMessage(error)) }
+    catch (error) { if (sequence === openSequence.current) setError(errorMessage(error)) }
   }
 
   const changed = (order: ShopOrder) => {
@@ -361,7 +367,7 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
             </div>
           </div>
 
-          <section className="admin-orders-section" aria-label="Lista de pedidos">
+          <section className="admin-orders-section" aria-label="Lista de pedidos" aria-busy={loading}>
             {data?.orders.length ? (
               <div className="admin-order-list">
                 {data.orders.map(order => {
@@ -410,7 +416,7 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
                           <button
                             type="button"
                             className="admin-mark-paid"
-                            disabled={busy}
+                             disabled={busy || !!confirmingId || order.totalMinor === null}
                             onClick={() => { void markAsPaid(order) }}
                             aria-label={`Marcar orden ${order.code} como pagada`}
                           >
@@ -433,9 +439,9 @@ function AdminWorkspace({ auth, onExit }: { auth: AdminAuth; onExit: () => void 
 
             {data && data.total > data.pageSize && (
               <div className="admin-pagination">
-                <button className="button button-outline" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>Anterior</button>
+                <button className="button button-outline" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}>Anterior</button>
                 <span>{page} / {Math.ceil(data.total / data.pageSize)}</span>
-                <button className="button button-outline" disabled={page * data.pageSize >= data.total} onClick={() => setPage(value => value + 1)}>Siguiente</button>
+                <button className="button button-outline" disabled={page * data.pageSize >= data.total || loading} onClick={() => setPage(value => value + 1)}>Siguiente</button>
               </div>
             )}
           </section>

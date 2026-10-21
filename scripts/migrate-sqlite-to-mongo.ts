@@ -2,21 +2,21 @@ import { DatabaseSync } from 'node:sqlite'
 import { resolve } from 'node:path'
 import { MongoClient } from 'mongodb'
 
-const defaultMongoUri = 'mongodb+srv://utn:88406844Cr..@cluster0.nsiunx4.mongodb.net/?appName=Cluster0'
-const mongoUri = process.env.MONGODB_URI || defaultMongoUri
+const mongoUri = process.env.MONGODB_URI
 const dbName = process.env.MONGODB_DB_NAME || 'onkys'
 const sqlitePath = resolve(process.env.STORE_DATA_DIR || '.data/store', 'orders.sqlite')
 
 export async function migrateSqliteToMongo() {
+  if (!mongoUri) throw new Error('Configura MONGODB_URI antes de ejecutar la migración.')
   console.log(`Abriendo SQLite desde: ${sqlitePath}`)
-  const sqlite = new DatabaseSync(sqlitePath)
+  const sqlite = new DatabaseSync(sqlitePath, { readOnly: true })
 
   console.log(`Conectando a MongoDB Atlas en base de datos: ${dbName}...`)
   const mongo = new MongoClient(mongoUri)
-  await mongo.connect()
   const db = mongo.db(dbName)
 
   try {
+    await mongo.connect()
     // 1. Metadata
     const metadataRows = sqlite.prepare('SELECT key, value FROM metadata').all() as { key: string; value: string }[]
     for (const row of metadataRows) {

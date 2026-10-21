@@ -494,9 +494,11 @@
   gap: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #8c7b99;
-  white-space: nowrap;
+  color: #705d7e;
+  min-width: 0;
+  line-height: 1.4;
 }
+.sinpe-transit-card > .small-note { margin: 0; padding: 0 15px 14px; font-size: 11px; color: #705d7e; }
 .transit-step-dot {
   width: 20px;
   height: 20px;

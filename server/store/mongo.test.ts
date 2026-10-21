@@ -6,7 +6,8 @@ import { MongoShopDatabase } from './mongo.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { tokenHash } from './security.ts'
 
-const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://utn:88406844Cr..@cluster0.nsiunx4.mongodb.net/?appName=Cluster0'
+// Integration tests connect only to an explicitly configured test server.
+const mongoUri = process.env.TEST_MONGODB_URI
 
 const input = () => ({
   items: [{ selection: { kind: 'gummy', typeIds: ['ositos'], weight: 100 }, quantity: 1 }],
@@ -21,11 +22,9 @@ const receipt = (identity = randomUUID()): PreparedReceipt => ({
   contentType: 'image/webp',
 })
 
-test('mongo: full store lifecycle on Atlas (orders, receipts, admin, audit, events, search)', async t => {
-  const testDbName = `onkys_test_${Date.now()}`
-  const db = new MongoShopDatabase(mongoUri, structuredClone(store), { dbName: testDbName })
-  await db.init()
-
+test('mongo: full store lifecycle (orders, receipts, admin, audit, events, search)', { skip: !mongoUri }, async t => {
+  const testDbName = `onkys_test_${randomUUID().replaceAll('-', '').slice(0, 24)}`
+  const db = new MongoShopDatabase(mongoUri!, structuredClone(store), { dbName: testDbName })
   t.after(async () => {
     try {
       await db.db.dropDatabase()
@@ -33,6 +32,7 @@ test('mongo: full store lifecycle on Atlas (orders, receipts, admin, audit, even
       await db.close()
     }
   })
+  await db.init()
 
   // 1. Initialized check & setup token
   assert.equal(await db.initialized(), false)
@@ -98,4 +98,28 @@ test('mongo: full store lifecycle on Atlas (orders, receipts, admin, audit, even
 
   const searchNone = await db.list(new URLSearchParams('q=NONEXISTENT_CODE'))
   assert.equal(searchNone.total, 0)
+
+  // Settings changed inside a transaction must also be read in that session.
+  await db.configure({ enabled: false, phone: '', beneficiary: '' }, 'adminmongo')
+  const pending = await db.createOrder(input(), custSession.hash, randomUUID())
+  assert.equal(pending.status, 'pending_details')
+  await db.configure({ enabled: true, phone: '81111111', beneficiary: 'Nuevo destino de prueba' }, 'adminmongo')
+  const activated = await db.getOrder(pending.id)
+  assert.equal(activated.status, 'awaiting_payment')
+  assert.equal(activated.destination?.phone, '81111111')
+  assert.equal((await db.getOrder(order.id)).destination?.phone, '88888888')
+
+  const uploads = await Promise.allSettled([1, 2].map(() => db.addReceipt(activated.id, custSession.hash, activated.code, `BANK-${randomUUID()}`, randomUUID(), activated.version, receipt())))
+  assert.equal(uploads.filter(result => result.status === 'fulfilled').length, 1)
+  assert.equal(uploads.filter(result => result.status === 'rejected').length, 1)
+  assert.equal((await db.getOrder(activated.id)).version, activated.version + 1)
+
+  const guest = await db.customerSession(undefined)
+  const member = await db.registerCustomer({ name: 'Cuenta de prueba', email: 'cuenta@ejemplo.cr', password: 'Clave-de-prueba-2026!', privacyAccepted: true }, guest.session)
+  const memberOrder = await db.createOrder(input(), `account:${member.session.accountId}`, randomUUID())
+  assert.equal(memberOrder.discountMinor, 12000)
+  const directory = await db.customers(new URLSearchParams('q=cuenta@ejemplo.cr'))
+  assert.equal(directory.customers[0].orderCount, 1)
+  assert.equal(directory.customers[0].welcomeAvailable, false)
+  assert.equal((await db.accountOrders(member.session, new URLSearchParams())).orders[0].id, memberOrder.id)
 })

@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { unlinkSync } from 'node:fs'
+import { isIP } from 'node:net'
 import type { ShopRepository } from './repository.ts'
 import type { Session } from './security.ts'
 import { RateLimits, requireCsrf, tokenHash } from './security.ts'
@@ -50,7 +51,7 @@ async function jsonBody(request: IncomingMessage) {
   catch (error) { if (error instanceof StoreError) throw error; throw new StoreError(400, 'JSON inválido.') }
 }
 
-export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string; mailer?: OrderMailer | null }
+export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string; mailer?: OrderMailer | null; trustVercelProxy?: boolean }
 
 export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions = {}) {
   const limits = new RateLimits()
@@ -70,7 +71,11 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         } catch { /* Reject opaque/invalid origins. */ }
         if (!allowed) throw new StoreError(403, 'Origen no autorizado. Abre la tienda y el panel desde la misma dirección.')
       }
-      const ip = request.socket.remoteAddress ?? 'local'
+      // Vercel overwrites this header at its proxy. Direct/local servers must
+      // never trust a client-supplied forwarded address for rate limiting.
+      const forwarded = options.trustVercelProxy ? request.headers['x-forwarded-for'] : undefined
+      const clientIp = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : ''
+      const ip = isIP(clientIp) ? clientIp : request.socket.remoteAddress ?? 'local'
       const requireSession = async (role: Session['role'], mutate = false) => {
         const session = await store.session(cookie(request, role === 'admin' ? ADMIN_COOKIE : CUSTOMER_COOKIE), role)
         if (!session) throw new StoreError(401, role === 'admin' ? 'Inicia sesión en administración.' : 'Tu sesión de compra venció. Actualiza la tienda.')

@@ -3,15 +3,17 @@ import type { CartItem, CartLine, CheckoutErrors, Customer, DeliveryMethod, Sele
 export const MAX_QUANTITY = 99
 export const CART_STORAGE_KEY = 'onkys.cart.v1'
 
+const moneyFormatters = new Map<string, Intl.NumberFormat>()
+
 export function money(amountMinor: number, config: StoreConfig): string {
   const { code, locale, fractionDigits } = config.currency
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: code,
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: fractionDigits,
-  }).format(amountMinor / 10 ** fractionDigits)
+  const key = `${locale}:${code}:${fractionDigits}`
+  let formatter = moneyFormatters.get(key)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol', minimumFractionDigits: 0, maximumFractionDigits: fractionDigits })
+    moneyFormatters.set(key, formatter)
+  }
+  return formatter.format(amountMinor / 10 ** fractionDigits)
 }
 
 export function selectionKey(selection: Selection): string {
@@ -61,12 +63,15 @@ export function resolveLine(item: CartItem, config: StoreConfig): CartLine | nul
     const product = config.products?.find(p => p.id === selection.productId)
     if (!product?.available) return null
     if (product.variants && product.variants.length > 0) {
-      const variant = product.variants.find(v => v.id === selection.variantId) ?? product.variants[0]
-      if (!variant.available || !validPrice(variant.priceMinor)) return null
+      // Only legacy selections without a variant may use the original presentation.
+      // A removed or mistyped variant must never silently become another product.
+      const variant = selection.variantId === undefined ? product.variants[0] : product.variants.find(v => v.id === selection.variantId)
+      if (!variant?.available || !validPrice(variant.priceMinor)) return null
+      const canonical: Selection = { kind: 'product', productId: product.id, variantId: variant.id }
       return {
-        selection: { kind: 'product', productId: product.id, variantId: variant.id },
+        selection: canonical,
         quantity,
-        key,
+        key: selectionKey(canonical),
         name: product.name,
         options: [product.tag, variant.label],
         image: variant.image ?? product.image,
@@ -75,7 +80,7 @@ export function resolveLine(item: CartItem, config: StoreConfig): CartLine | nul
         lineTotalMinor: variant.priceMinor * quantity,
       }
     }
-    if (!validPrice(product.priceMinor)) return null
+    if (selection.variantId !== undefined || !validPrice(product.priceMinor)) return null
     return {
       selection, quantity, key, name: product.name,
       options: [product.tag, product.unitLabel ?? 'Presentación individual'],
@@ -114,6 +119,7 @@ function parseSelection(value: unknown): Selection | null {
     return { kind: 'dessert', productId: data.productId, variantId: data.variantId }
   }
   if (data.kind === 'product' && typeof data.productId === 'string') {
+    if (data.variantId !== undefined && typeof data.variantId !== 'string') return null
     return { kind: 'product', productId: data.productId, variantId: typeof data.variantId === 'string' ? data.variantId : undefined }
   }
   return null
@@ -134,8 +140,9 @@ export function restoreCart(raw: string | null, config: StoreConfig): { items: C
       const selection = parseSelection(value.selection)
       if (!selection || !Number.isInteger(value.quantity) || value.quantity < 1 || value.quantity > MAX_QUANTITY) { changed = true; continue }
       const item = { selection, quantity: value.quantity as number }
-      if (!resolveLine(item, config)) { changed = true; continue }
-      items = addItem(items, item)
+      const line = resolveLine(item, config)
+      if (!line) { changed = true; continue }
+      items = addItem(items, { selection: line.selection, quantity: line.quantity })
     }
     return { items, changed: changed || data.items.length > 200 }
   } catch {
@@ -152,8 +159,7 @@ export function freeShippingStatus(subtotal: number, config: StoreConfig) {
   const delivery = config.deliveryMethods.find(method => method.id === 'delivery' && method.enabled)
   const threshold = delivery?.freeAboveMinor ?? 1500000
   const isFree = validPrice(threshold) && subtotal > threshold
-  const rawRemaining = threshold - subtotal
-  const remainingMinor = isFree ? 0 : (rawRemaining <= 0 ? 10000 : rawRemaining)
+  const remainingMinor = isFree ? 0 : Math.max(1, threshold - subtotal + 1)
   const percent = isFree ? 100 : Math.min(99, Math.max(0, Math.round((subtotal / threshold) * 100)))
   return { threshold, isFree, remainingMinor, percent }
 }

@@ -9,6 +9,7 @@ import { orderStatusLabels } from '../order-types.ts'
 import { GummyBearMark } from './GummyBearMark.tsx'
 import { Icon } from './Icon.tsx'
 import { Modal, ProductImage } from './ui.tsx'
+import '../account.css'
 
 export type AccountMode = 'login' | 'register'
 type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'privacy', string>>

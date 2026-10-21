@@ -22,13 +22,25 @@ export function useCart() {
     catch { setNotice('No pudimos guardar el carrito en este navegador. Se conservará mientras esta página siga abierta.') }
   }, [items])
 
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== CART_STORAGE_KEY && event.key !== null) return
+      const restored = restoreCart(event.newValue, store)
+      setItems(restored.items)
+      if (restored.changed) setNotice('Actualizamos tu carrito: algunas variantes guardadas ya no están disponibles.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+
   const lines = useMemo(() => items.map(item => resolveLine(item, store)).filter((line): line is CartLine => !!line), [items])
   const count = items.reduce((sum, item) => sum + item.quantity, 0)
 
   return {
     items, lines, count, notice,
     add: (item: CartItem) => {
-      if (resolveLine(item, store)) setItems(current => addItem(current, item))
+      const line = resolveLine(item, store)
+      if (line) setItems(current => addItem(current, { selection: line.selection, quantity: line.quantity }))
     },
     update: (key: string, quantity: number) => {
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) return

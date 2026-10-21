@@ -19,13 +19,13 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
   const isPickup = !order.delivery.requiresAddress
 
   return (
-    <div ref={root} className="sinpe-transit-card" role="region" aria-label="Estado del envío en curso">
+    <div ref={root} className="sinpe-transit-card" role="region" aria-label="Estado del pedido">
       <div className="transit-card-top">
         <span className="transit-live-badge">
           <span className="transit-pulse-dot" />
           {isReady
-            ? (isPickup ? 'Listo para retirar' : 'Pedido en camino')
-            : 'Procesando tu pedido'}
+             ? 'Listo para preparar'
+             : 'Comprobante en revisión'}
         </span>
         <span id="assigned-order-code" className="transit-order-code">{order.code}</span>
       </div>
@@ -35,19 +35,20 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
       <div className="transit-steps" aria-label="Progreso del pedido">
         <div className="transit-step is-done">
           <span className="transit-step-dot"><Icon name="check" size={12} /></span>
-          <span>Pago enviado</span>
+           <span>{order.receipt ? 'Comprobante recibido' : 'Pedido recibido'}</span>
         </div>
         <div className="transit-step-line is-filled" />
         <div className={`transit-step ${isReady ? 'is-done' : 'is-active'}`}>
           <span className="transit-step-dot">{isReady ? <Icon name="check" size={12} /> : <span className="step-inner-pulse" />}</span>
-          <span>Preparando</span>
+           <span>{isReady ? 'Pago verificado' : 'Revisando pago'}</span>
         </div>
         <div className={`transit-step-line ${isReady ? 'is-filled' : ''}`} />
         <div className={`transit-step ${isReady ? 'is-active' : ''}`}>
           <span className="transit-step-dot"><Icon name={isPickup ? 'pin' : 'truck'} size={12} /></span>
-          <span>{isPickup ? 'Para retirar' : 'En camino'}</span>
+           <span>Preparación</span>
         </div>
       </div>
+      <p className="small-note">{isReady ? (isPickup ? 'La tienda coordinará contigo la recogida cuando esté preparado.' : 'La tienda preparará tu pedido para enviarlo por el método elegido.') : 'La tienda debe verificar el abono antes de preparar tu pedido.'}</p>
     </div>
   )
 }
@@ -61,11 +62,15 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
   const [error, setError] = useState('')
   const [copiedField, setCopiedField] = useState<'code' | 'phone' | null>(null)
   const uploadKey = useRef<{ fingerprint: string; key: string } | null>(null)
+  const sendingRef = useRef(false)
+  const copyTimer = useRef<number | undefined>(undefined)
   const canSubmit = order.status === 'awaiting_payment' || order.status === 'rejected'
 
   useEffect(() => {
-    document.querySelector('.cart-drawer')?.scrollTo({ top: 0, behavior: 'instant' })
+    document.querySelector('.drawer-scroll')?.scrollTo({ top: 0, behavior: 'instant' })
   }, [order.status])
+
+  useEffect(() => () => window.clearTimeout(copyTimer.current), [])
 
   useEffect(() => {
     if (!file?.type.startsWith('image/')) { setPreview(''); return }
@@ -78,7 +83,8 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
     try {
       await navigator.clipboard.writeText(value)
       setCopiedField(field)
-      window.setTimeout(() => setCopiedField(current => current === field ? null : current), 2400)
+      window.clearTimeout(copyTimer.current)
+      copyTimer.current = window.setTimeout(() => setCopiedField(null), 2400)
     } catch {
       /* Clipboard permission denied or unavailable */
     }
@@ -86,27 +92,30 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (sendingRef.current || !canSubmit) return
     setError('')
     if (!file) {
-      setError('Adjunta la captura o PDF del comprobante antes de confirmar el pago.')
+      setError('Adjunta la captura o PDF del comprobante para enviarlo a revisión.')
       document.getElementById('receipt-file')?.focus()
       return
     }
-    if (file.size > 5 * 1024 * 1024) { setError('El comprobante no puede superar 5 MB.'); return }
+    if (!file.size || file.size > 5 * 1024 * 1024) { setError('El comprobante debe pesar entre 1 byte y 5 MB.'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) { setError('Selecciona un archivo JPG, PNG, WebP o PDF.'); return }
     const fingerprint = JSON.stringify({ id: order.id, version: order.version, file: [file.name, file.size, file.lastModified] })
     if (uploadKey.current?.fingerprint !== fingerprint) uploadKey.current = { fingerprint, key: crypto.randomUUID() }
     setSending(true)
+    sendingRef.current = true
     try {
       onChange(await uploadReceipt(order, file, uploadKey.current.key))
       setFile(null)
     } catch (err) { setError(errorMessage(err)) }
-    finally { setSending(false) }
+    finally { setSending(false); sendingRef.current = false }
   }
 
   const title = order.status === 'ready'
-    ? '¡Tu pedido va en camino!'
+    ? 'Pago confirmado.'
     : order.status === 'pending_review'
-      ? '¡Pago confirmado!'
+      ? 'Estamos revisando tu pago.'
       : order.status === 'pending_details'
         ? 'Pedido registrado'
         : order.status === 'rejected'
@@ -114,12 +123,12 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
           : 'Completa tu pago'
 
   const subtitle = order.status === 'pending_review'
-    ? 'Recibimos tu comprobante. Estamos alistando tu pedido para que salga lo antes posible.'
+    ? 'Recibimos tu comprobante. La tienda revisará el abono y te avisará cuando confirme el pago.'
     : order.status === 'ready'
-      ? 'Tu pago fue verificado. Tu pedido ya está confirmado y en ruta.'
+      ? 'La tienda verificó tu pago. Tu pedido está listo para preparar.'
       : order.status === 'pending_details'
-        ? 'Tu pedido está guardado. Te avisaremos apenas estén activos los datos SINPE.'
-        : 'Realiza el SINPE Móvil con el código en la descripción, sube tu comprobante y confirma el pago.'
+        ? 'Tu pedido está guardado. Consulta de nuevo cuando estén confirmados el total y los datos SINPE.'
+        : 'Realiza el SINPE Móvil con el código en la descripción y envía tu comprobante para revisión.'
 
   const formattedPhone = order.destination
     ? `${order.destination.phone.slice(0, 4)}-${order.destination.phone.slice(4)}`
@@ -270,7 +279,7 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
           disabled={sending}
         >
           <Icon name="check" size={18} />
-          <span>{sending ? 'Confirmando pago…' : 'Confirmar pago'}</span>
+           <span>{sending ? 'Enviando comprobante…' : 'Enviar comprobante para revisión'}</span>
           <Icon name="arrow" size={16} />
         </button>
       ) : (

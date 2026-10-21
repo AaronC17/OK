@@ -335,12 +335,13 @@ export class ShopDatabase implements ShopRepository {
       const existing = this.database.prepare('SELECT receipt_id FROM manual_payments WHERE order_id = ?').get(id)
       if (order.status === 'ready' && existing && (receiptId === null || existing.receipt_id === receiptId)) return order
       if (order.version !== expectedVersion || order.status === 'ready') throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      if (order.totalMinor === null) throw new StoreError(409, 'Confirma el total del pedido antes de registrar el pago.')
       if (receiptId !== null && (order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
         throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
       }
       const useReceipt = order.receipt && order.status === 'pending_review' ? order.receipt : null
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0))
+      const amount = minorAmount(order.totalMinor)
       // This records the authenticated administrator's manual decision, not bank verification.
       const note = useReceipt
         ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'

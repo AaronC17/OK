@@ -161,6 +161,25 @@ test('store: one verified bank reference cannot confirm two orders, even with di
   assert.equal(db.auditFor(first.id).filter(entry => entry.event === 'payment.confirmed_manual').length, 1)
 })
 
+test('store: an unquoted total cannot be marked paid using only its subtotal', t => {
+  const { db, catalog, create } = setup(t)
+  catalog.deliveryMethods[0].feeMinor = null
+  const order = create('customer-a', randomUUID(), { ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección de prueba' } })
+  assert.equal(order.totalMinor, null)
+  assert.throws(() => db.confirm(order.id, { version: order.version }, 'test-admin'), /total del pedido/)
+  assert.equal(db.getOrder(order.id).status, 'pending_details')
+  assert.equal(db.database.prepare('SELECT count(*) AS count FROM manual_payments').get()!.count, 0)
+})
+
+test('store: removed product variants and canonical duplicates cannot reach checkout', t => {
+  const { create } = setup(t)
+  const product = { selection: { kind: 'product', productId: 'uvarindas', variantId: 'mediano' }, quantity: 1 }
+  for (const variantId of ['removed', '', 123]) {
+    assert.throws(() => create('customer-a', randomUUID(), { ...input(), items: [{ ...product, selection: { ...product.selection, variantId } }] }))
+  }
+  assert.throws(() => create('customer-a', randomUUID(), { ...input(), items: [product, { ...product, selection: { kind: 'product', productId: 'uvarindas' } }] }), /repetidas/)
+})
+
 test('store: requesting corrections preserves history and old versions cannot approve a new receipt', t => {
   const { db, create, upload, confirm } = setup(t)
   const original = upload(create())

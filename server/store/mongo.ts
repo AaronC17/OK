@@ -23,7 +23,7 @@ export class MongoShopDatabase implements ShopRepository {
   private initializedPromise: Promise<void> | null = null
 
   constructor(uri: string, catalog: StoreConfig, options: { dbName?: string } = {}) {
-    this.client = new MongoClient(uri)
+    this.client = new MongoClient(uri, { serverSelectionTimeoutMS: 8_000, connectTimeoutMS: 8_000, maxPoolSize: 10 })
     this.db = this.client.db(options.dbName || 'onkys')
     this.catalog = catalog
   }
@@ -42,18 +42,22 @@ export class MongoShopDatabase implements ShopRepository {
           this.collection('sessions').createIndex({ expires_at: 1 }),
           this.collection('customers').createIndex({ id: 1 }, { unique: true }),
           this.collection('customers').createIndex({ email: 1 }, { unique: true }),
+          this.collection('shop_orders').createIndex({ id: 1 }, { unique: true }),
           this.collection('shop_orders').createIndex({ code: 1 }, { unique: true }),
           this.collection('shop_orders').createIndex({ owner_hash: 1, idempotency_key: 1 }, { unique: true }),
           this.collection('shop_orders').createIndex({ status: 1, created_at: -1 }),
           this.collection('shop_orders').createIndex({ account_id: 1, created_at: -1 }),
+          this.collection('shop_orders').createIndex({ owner_hash: 1, created_at: -1, _id: -1 }),
+          this.collection('receipts').createIndex({ id: 1 }, { unique: true }),
           this.collection('receipts').createIndex({ order_id: 1, upload_key: 1 }, { unique: true }),
           this.collection('receipts').createIndex({ raw_hash: 1 }),
           this.collection('manual_payments').createIndex({ bank_reference: 1 }, { unique: true }),
+          this.collection('manual_payments').createIndex({ order_id: 1 }, { unique: true }),
           this.collection('shop_audit').createIndex({ order_id: 1, created_at: 1 }),
           this.collection('shop_events').createIndex({ order_id: 1, version: 1, event: 1 }, { unique: true }),
         ])
         await this.completePendingDetails()
-      })()
+      })().catch(error => { this.initializedPromise = null; throw error })
     }
     return this.initializedPromise
   }
@@ -237,7 +241,7 @@ export class MongoShopDatabase implements ShopRepository {
     const filter = { account_id: id }
     const total = await this.collection('shop_orders').countDocuments(filter)
     const rows = await this.collection('shop_orders').find(filter).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 20).limit(20).toArray()
-    return { orders: await Promise.all(rows.map(row => this.fromDoc(row))), total, page, pageSize: 20 }
+    return { orders: await this.fromDocs(rows), total, page, pageSize: 20 }
   }
 
   async customers(query: URLSearchParams): Promise<AdminCustomers> {
@@ -247,17 +251,22 @@ export class MongoShopDatabase implements ShopRepository {
     const filter = search ? { $or: [{ name: regex }, { email: regex }] } : {}
     const total = await this.collection('customers').countDocuments(filter)
     const rows = await this.collection('customers').find(filter, { projection: { password_hash: 0 } }).sort({ created_at: -1, id: -1 }).skip((page - 1) * 50).limit(50).toArray()
-    const customers = await Promise.all(rows.map(async row => ({ ...this.accountFromDoc(row), orderCount: await this.collection('shop_orders').countDocuments({ account_id: row.id }) })))
+    const counts = rows.length ? await this.collection('shop_orders').aggregate<{ _id: string; count: number }>([
+      { $match: { account_id: { $in: rows.map(row => row.id) } } },
+      { $group: { _id: '$account_id', count: { $sum: 1 } } },
+    ]).toArray() : []
+    const byCustomer = new Map(counts.map(row => [row._id, row.count]))
+    const customers = rows.map(row => ({ ...this.accountFromDoc(row), orderCount: byCustomer.get(row.id) ?? 0 }))
     return { customers, total, page, pageSize: 50 }
   }
 
-  async settings(): Promise<SinpeSettings> {
-    const doc = await this.collection('metadata').findOne({ key: 'sinpe' })
+  async settings(session?: ClientSession): Promise<SinpeSettings> {
+    const doc = await this.collection('metadata').findOne({ key: 'sinpe' }, { session })
     return doc?.value ? JSON.parse(doc.value as string) as SinpeSettings : { enabled: false, phone: '', beneficiary: '' }
   }
 
-  async destination(): Promise<SinpeDestination | null> {
-    const settings = await this.settings()
+  async destination(session?: ClientSession): Promise<SinpeDestination | null> {
+    const settings = await this.settings(session)
     return settings.enabled ? { phone: settings.phone, beneficiary: settings.beneficiary, bank: 'BAC Credomatic' } : null
   }
 
@@ -280,7 +289,7 @@ export class MongoShopDatabase implements ShopRepository {
   }
 
   private async completePendingDetails(session?: ClientSession): Promise<void> {
-    const destination = await this.destination()
+    const destination = await this.destination(session)
     const cursor = this.collection('shop_orders').find({ status: 'pending_details', current_receipt_id: null }, { session })
     for await (const row of cursor) {
       const delivery = JSON.parse(row.delivery_json as string) as ShopOrder['delivery']
@@ -290,7 +299,7 @@ export class MongoShopDatabase implements ShopRepository {
       const status = total !== null && destination ? 'awaiting_payment' : 'pending_details'
       if (shipping === row.shipping_minor && total === row.total_minor && savedDestination === row.destination_json && status === row.status) continue
       await this.collection('shop_orders').updateOne(
-        { _id: row._id },
+        { _id: row._id, status: 'pending_details', version: row.version },
         {
           $set: {
             shipping_minor: shipping,
@@ -310,8 +319,23 @@ export class MongoShopDatabase implements ShopRepository {
   private async fromDoc(row: Record<string, any>, session?: ClientSession): Promise<ShopOrder> {
     let receipt: Record<string, any> | null = null
     if (row.current_receipt_id) {
-      receipt = await this.collection('receipts').findOne({ id: row.current_receipt_id, order_id: row.id }, { session })
+      receipt = await this.collection('receipts').findOne({ id: row.current_receipt_id, order_id: row.id }, { session, projection: { data: 0 } })
     }
+    return this.orderFromDoc(row, receipt)
+  }
+
+  private async fromDocs(rows: Record<string, any>[]): Promise<ShopOrder[]> {
+    const ids = rows.map(row => row.current_receipt_id).filter(Boolean)
+    // Lists need metadata, never the private multi-megabyte attachment bytes.
+    const receipts = ids.length ? await this.collection('receipts').find({ id: { $in: ids } }, { projection: { data: 0 } }).toArray() : []
+    const byId = new Map(receipts.map(receipt => [receipt.id, receipt]))
+    return rows.map(row => {
+      const receipt = byId.get(row.current_receipt_id)
+      return this.orderFromDoc(row, receipt?.order_id === row.id ? receipt : null)
+    })
+  }
+
+  private orderFromDoc(row: Record<string, any>, receipt: Record<string, any> | null): ShopOrder {
     return {
       id: row.id as string,
       code: row.code as string,
@@ -375,7 +399,7 @@ export class MongoShopDatabase implements ShopRepository {
       if (accountId && !account) throw new StoreError(401, 'Inicia sesión de nuevo para registrar el pedido.')
       const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !account.welcome_order_id)
       const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount
-      const destination = await this.destination()
+      const destination = await this.destination(session)
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
       let nextNum = 1001
@@ -438,8 +462,10 @@ export class MongoShopDatabase implements ShopRepository {
     if (!constantEqual(order.code, orderCode(supplied))) throw new StoreError(422, 'El código no corresponde a este pedido. Copia exactamente el código mostrado.')
   }
 
-  async checkUpload(id: string, owner: string, suppliedCode?: unknown): Promise<ShopOrder> {
-    const order = await this.customerOrder(id, owner)
+  async checkUpload(id: string, owner: string, suppliedCode?: unknown, session?: ClientSession): Promise<ShopOrder> {
+    const row = await this.collection('shop_orders').findOne({ id, owner_hash: owner }, { session })
+    if (!row) throw new StoreError(404, 'Pedido no encontrado en esta sesión.')
+    const order = await this.fromDoc(row, session)
     if (suppliedCode !== undefined && suppliedCode !== null && suppliedCode !== '') this.assertCode(order, suppliedCode)
     return order
   }
@@ -448,7 +474,7 @@ export class MongoShopDatabase implements ShopRepository {
     const key = text(uploadKey, 16, 128, 'Identificador de carga')
     const expectedVersion = version(suppliedVersion)
     return this.transaction(async session => {
-      const order = await this.checkUpload(id, owner, suppliedCode)
+      const order = await this.checkUpload(id, owner, suppliedCode, session)
       const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
         ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
         : bankReference(suppliedReference)
@@ -510,12 +536,13 @@ export class MongoShopDatabase implements ShopRepository {
       const existing = await this.collection('manual_payments').findOne({ order_id: id }, { session })
       if (order.status === 'ready' && existing && (receiptId === null || existing.receipt_id === receiptId)) return order
       if (order.version !== expectedVersion || order.status === 'ready') throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
+      if (order.totalMinor === null) throw new StoreError(409, 'Confirma el total del pedido antes de registrar el pago.')
       if (receiptId !== null && (order.status !== 'pending_review' || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
         throw new StoreError(409, 'El pedido cambió o no tiene este comprobante pendiente de revisión. Actualiza la vista.')
       }
       const useReceipt = order.receipt && order.status === 'pending_review' ? order.receipt : null
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0))
+      const amount = minorAmount(order.totalMinor)
       const note = useReceipt
         ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
         : 'Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria automática.'
@@ -610,7 +637,7 @@ export class MongoShopDatabase implements ShopRepository {
       .skip((page - 1) * 50)
       .limit(50)
       .toArray()
-    const orders = await Promise.all(rows.map(row => this.fromDoc(row)))
+    const orders = await this.fromDocs(rows)
 
     const counts = Object.fromEntries(statuses.map(status => [status, 0])) as Record<ShopOrderStatus, number>
     const agg = await this.collection('shop_orders').aggregate([

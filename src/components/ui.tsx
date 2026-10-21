@@ -36,7 +36,7 @@ export function Modal({ open, onClose, titleId, className = '', children }: {
     return () => {
       dialog.close()
       if (--scrollLocks === 0) document.body.style.overflow = originalOverflow
-      previousFocus?.focus({ preventScroll: true })
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
     }
   }, [open])
   return <dialog ref={ref} className={`modal ${className}`} aria-labelledby={titleId}
@@ -50,24 +50,27 @@ export function Modal({ open, onClose, titleId, className = '', children }: {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }}
     onCancel={event => { event.preventDefault(); onClose() }}
-    onPointerDown={event => { backdropStart.current = event.target === event.currentTarget }}
+    onPointerDown={event => {
+      const rect = event.currentTarget.getBoundingClientRect()
+      backdropStart.current = event.target === event.currentTarget && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)
+    }}
     onClick={event => { if (backdropStart.current && event.target === event.currentTarget) onClose() }}>
     {children}
   </dialog>
 }
 
-export function Quantity({ value, onChange, label, max = MAX_QUANTITY }: {
-  value: number; onChange: (value: number) => void; label: string; max?: number
+export function Quantity({ value, onChange, label, max = MAX_QUANTITY, disabled = false }: {
+  value: number; onChange: (value: number) => void; label: string; max?: number; disabled?: boolean
 }) {
   const id = useId()
   return <div className="quantity" role="group" aria-label={label}>
-    <button type="button" aria-label={`Reducir ${label.toLowerCase()}`} disabled={value <= 1} onClick={() => onChange(value - 1)}><Icon name="minus" size={16} /></button>
+    <button type="button" aria-label={`Reducir ${label.toLowerCase()}`} disabled={disabled || value <= 1} onClick={() => onChange(value - 1)}><Icon name="minus" size={16} /></button>
     <label className="sr-only" htmlFor={id}>{label}</label>
-    <input id={id} type="number" inputMode="numeric" min={1} max={max} value={value} onChange={event => {
+    <input id={id} type="number" inputMode="numeric" min={1} max={max} value={value} disabled={disabled} onChange={event => {
       const next = Number(event.target.value)
       if (Number.isInteger(next) && next >= 1 && next <= max) onChange(next)
     }} onFocus={event => event.currentTarget.select()} />
-    <button type="button" aria-label={`Aumentar ${label.toLowerCase()}`} disabled={value >= max} onClick={() => onChange(value + 1)}><Icon name="plus" size={16} /></button>
+    <button type="button" aria-label={`Aumentar ${label.toLowerCase()}`} disabled={disabled || value >= max} onClick={() => onChange(value + 1)}><Icon name="plus" size={16} /></button>
   </div>
 }
 
@@ -78,5 +81,14 @@ export function Lightbox({ image, onClose }: { image: { src: string; alt: string
       {image && <ProductImage src={image.src} alt={image.alt} className="lightbox-image" />}
       <p>Vista completa, sin recortes</p>
     </div>
+  </Modal>
+}
+
+export function LoadingDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const titleId = useId()
+  return <Modal open={open} onClose={onClose} titleId={titleId} className="loading-dialog">
+    <h2 id={titleId}>Un momento…</h2>
+    <p role="status">Cargando, por favor espera.</p>
+    <button className="text-button" onClick={onClose}>Cerrar</button>
   </Modal>
 }

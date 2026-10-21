@@ -43,7 +43,7 @@ function selection(value: unknown): Selection {
     return {
       kind: 'product',
       productId: text(data.productId, 64),
-      variantId: typeof data.variantId === 'string' && data.variantId.trim() ? text(data.variantId, 64) : undefined,
+      variantId: data.variantId === undefined ? undefined : text(data.variantId, 64),
     }
   }
   throw new PaymentsError(422, 'El producto no es válido.')

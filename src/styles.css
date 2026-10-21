@@ -319,24 +319,16 @@ summary::-webkit-details-marker { display: none; }
 @starting-style { .modal[open] { opacity: 0; transform: translateY(12px); } .modal[open]::backdrop { opacity: 0; } }
 .modal-close { position: absolute; top: 13px; right: 13px; z-index: 2; background: #fbfaf9e8; }
 .modal-close:hover { background: #eee8f0; }
-.modal-close:focus,
 .modal-close:focus-visible,
-.account-close:focus,
 .account-close:focus-visible,
-.account-toggle:focus,
 .account-toggle:focus-visible,
-.cart-toggle:focus,
 .cart-toggle:focus-visible,
-.drawer-header .icon-button:focus,
 .drawer-header .icon-button:focus-visible,
-.lightbox-heading .icon-button:focus,
 .lightbox-heading .icon-button:focus-visible,
-.admin-order-dialog .icon-button:focus,
 .admin-order-dialog .icon-button:focus-visible,
-.brand-preview-top .icon-button:focus,
 .brand-preview-top .icon-button:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
+  outline: 2px solid #75548e;
+  outline-offset: 3px;
 }
 .product-dialog { width: 900px; }
 .product-dialog-inner { position: relative; display: grid; grid-template-columns: .95fr 1.05fr; }
@@ -508,6 +500,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   font-weight: 700;
 }
 .type-option input, .choice-chip input, .size-option input, .delivery-option input, .mode-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.type-option input, .choice-chip input { inset: 0; width: 100%; height: 100%; margin: 0; z-index: 1; cursor: inherit; }
 .type-option:has(input:focus-visible), .choice-chip:has(input:focus-visible), .size-option:has(input:focus-visible), .delivery-option:has(input:focus-visible), .mode-option:has(input:focus-visible) { outline: 2px solid #75548e; outline-offset: 3px; }
 .selection-check {
   position: absolute;
@@ -1243,3 +1236,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   *:not(.sinpe-transit-card):not(.sinpe-transit-card *), *::before, *::after, dialog::backdrop { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   html { scroll-behavior: auto; }
 }
+.app-error { min-height: 65vh; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 20px; padding-block: 40px; }
+.app-error h1 { font-size: clamp(25px, 4vw, 38px); }
+.modal.loading-dialog { padding: 28px; width: 340px; max-width: calc(100% - 32px); border-radius: 20px; }
+.loading-dialog p { margin-block: 15px; }

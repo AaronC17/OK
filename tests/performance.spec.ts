@@ -32,7 +32,7 @@ test('checkout and alternate views are loaded only when requested', async ({ pag
   await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
   const product = page.getByRole('dialog', { name: 'Ositos enchilados' })
   await expect(product).toBeVisible()
-  await product.getByText('250 g', { exact: true }).click()
+  await product.getByRole('radio', { name: '250 g', exact: true }).check()
   await expect(product.getByRole('radio', { name: '250 g', exact: true })).toBeChecked()
   await product.getByRole('button', { name: 'Añadir al carrito' }).click()
   await page.getByRole('button', { name: 'Abrir carrito, 1 artículos' }).click()

@@ -9,6 +9,20 @@ export class ApiError extends Error {
 let customerCsrf = ''
 let adminCsrf = ''
 let checkoutRequest: Promise<CheckoutConfig> | null = null
+let customerChange: Promise<CustomerAuth> | null = null
+
+async function readResponse<T>(response: Response): Promise<T> {
+  if (!response.headers.get('content-type')?.includes('application/json')) throw new ApiError('El servidor de pedidos no está disponible. Reintenta la conexión en unos momentos.', 503)
+  let result: unknown
+  try { result = await response.json() }
+  catch { throw new ApiError('La respuesta de la tienda llegó incompleta. Actualiza el estado antes de reintentar.', 502) }
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new ApiError('La tienda devolvió una respuesta inválida. Reintenta la conexión.', 502)
+  if (!response.ok) {
+    const message = 'error' in result && typeof result.error === 'string' ? result.error : 'No se pudo completar la operación.'
+    throw new ApiError(message, response.status)
+  }
+  return result as T
+}
 
 async function request<T>(path: string, method = 'GET', value?: unknown, role: 'customer' | 'admin' = 'customer'): Promise<T> {
   const form = value instanceof FormData
@@ -21,13 +35,13 @@ async function request<T>(path: string, method = 'GET', value?: unknown, role: '
       body: value === undefined ? undefined : form ? value : JSON.stringify(value), signal: AbortSignal.timeout(form ? 30_000 : 15_000),
     })
   } catch { throw new ApiError('No pudimos conectar con la tienda. Comprueba tu conexión y actualiza el estado antes de reintentar.', 0) }
-  if (!response.headers.get('content-type')?.includes('application/json')) throw new ApiError('El servidor de pedidos no está disponible. Esta tienda necesita su backend, no solo los archivos estáticos.', 503)
-  const result: unknown = await response.json()
-  if (!response.ok) throw new ApiError((result as { error?: string }).error ?? 'No se pudo completar la operación.', response.status)
-  return result as T
+  return readResponse<T>(response)
 }
 
 export function checkoutConfig(): Promise<CheckoutConfig> {
+  // Session rotation and checkout reads must not race: a late guest response
+  // could otherwise replace the CSRF token belonging to the signed-in cookie.
+  if (customerChange) return customerChange.then(checkoutConfig, checkoutConfig)
   checkoutRequest ??= request<CheckoutConfig>('/api/checkout').then(config => { customerCsrf = config.csrfToken; return config }).finally(() => { checkoutRequest = null })
   return checkoutRequest
 }
@@ -35,14 +49,20 @@ export const customerSession = async (): Promise<CustomerAuth> => {
   const config = await checkoutConfig()
   return { user: config.account ?? null, csrfToken: config.csrfToken }
 }
-async function rememberCustomer(promise: Promise<CustomerAuth>) {
-  const auth = await promise
-  customerCsrf = auth.csrfToken
-  return auth
+function rememberCustomer(operation: () => Promise<CustomerAuth>) {
+  if (customerChange) return Promise.reject(new ApiError('Espera a que termine el cambio de sesión.', 409))
+  const pendingCheckout = checkoutRequest
+  customerChange = (async () => {
+    if (pendingCheckout) await pendingCheckout
+    const auth = await operation()
+    customerCsrf = auth.csrfToken
+    return auth
+  })().finally(() => { customerChange = null })
+  return customerChange
 }
-export const registerCustomer = (data: Registration) => rememberCustomer(request<CustomerAuth>('/api/account/register', 'POST', data))
-export const loginCustomer = (email: string, password: string) => rememberCustomer(request<CustomerAuth>('/api/account/login', 'POST', { email, password }))
-export const logoutCustomer = () => rememberCustomer(request<CustomerAuth>('/api/account/logout', 'POST', {}))
+export const registerCustomer = (data: Registration) => rememberCustomer(() => request<CustomerAuth>('/api/account/register', 'POST', data))
+export const loginCustomer = (email: string, password: string) => rememberCustomer(() => request<CustomerAuth>('/api/account/login', 'POST', { email, password }))
+export const logoutCustomer = () => rememberCustomer(() => request<CustomerAuth>('/api/account/logout', 'POST', {}))
 export const customerOrders = (page = 1) => request<CustomerOrders>(`/api/account/orders?page=${page}`)
 export const currentOrder = () => request<{ order: ShopOrder | null }>('/api/orders/current')
 export const fetchOrder = (id: string) => request<ShopOrder>(`/api/orders/${encodeURIComponent(id)}`)
@@ -56,10 +76,7 @@ export async function createOrder(items: CartItem[], deliveryId: string, custome
       body: JSON.stringify({ items, deliveryId, customer, privacyAccepted }),
     })
   } catch { throw new ApiError('No recibimos la respuesta del servidor. Reintenta sin cambiar los datos; se conservará la misma solicitud para evitar duplicados.', 0) }
-  if (!response.headers.get('content-type')?.includes('application/json')) throw new ApiError('El backend de pedidos no está disponible.', 503)
-  const result = await response.json() as ShopOrder & { error?: string }
-  if (!response.ok) throw new ApiError(result.error ?? 'No se pudo registrar el pedido.', response.status)
-  return result
+  return readResponse<ShopOrder>(response)
 }
 
 export function uploadReceipt(order: ShopOrder, file: File, key: string) {
@@ -97,4 +114,5 @@ export function amountFromInput(value: string): number {
   return amount
 }
 export const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'No se pudo completar la operación.'
-export const orderDate = (value: string) => new Intl.DateTimeFormat('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+const dateFormatter = new Intl.DateTimeFormat('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'medium', timeStyle: 'short' })
+export const orderDate = (value: string) => dateFormatter.format(new Date(value))

@@ -15,6 +15,8 @@ function navigate(event: MouseEvent<HTMLAnchorElement>) {
     window.history.pushState(window.history.state, '', url)
   }
   // CSS already defines smooth scrolling and the reduced-motion override.
+  if (!section.hasAttribute('tabindex')) section.tabIndex = -1
+  section.focus({ preventScroll: true })
   section.scrollIntoView({ block: 'start', behavior: 'auto' })
 }
 

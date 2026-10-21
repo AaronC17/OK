@@ -74,11 +74,11 @@ test('mobile hero is centered and product cards are compact with two columns', a
   expect(accessibility.violations.map(violation => ({ id: violation.id, nodes: violation.nodes.map(node => ({ target: node.target, summary: node.failureSummary })) }))).toEqual([])
   await expect(page.locator('.mobile-mix-card .premium-badge')).toHaveText('Más vendido')
   await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
-  const ositosDialog = page.getByRole('dialog', { name: 'Tu mezcla. Tus reglas.' })
+  const ositosDialog = page.getByRole('dialog', { name: 'Ositos enchilados', exact: true })
   await expect(ositosDialog.locator('.type-options')).toHaveCount(0)
   await expect(ositosDialog.locator('.mix-mode')).toHaveCount(0)
   await expect(ositosDialog.locator('.weight-options input')).toHaveCount(3)
-  await expect(ositosDialog.getByText('Elige los gramos', { exact: false })).toBeVisible()
+  await expect(ositosDialog.getByText('Elige el tamaño de tu bolsa', { exact: true })).toBeVisible()
 })
 
 test('desktop keeps its headline font and shows both gummy cards', async ({ page }, testInfo) => {

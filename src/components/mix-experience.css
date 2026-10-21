@@ -75,6 +75,8 @@
 .film-top > div { display: flex; align-items: center; gap: 11px; font-size: 12px; font-weight: 550; }
 .film-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; border: 1px solid #e7e0eb; background: #f7f3fa; color: #765389; }
 .film-top small { display: block; font-size: 9px; font-weight: 400; color: var(--muted); margin-top: 4px; }
+.film-playback { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px; border-radius: 22px; background: #f4eff7; color: var(--purple); font-size: 11px; }
+.film-playback:hover { background: #ebe2f0; }
 .film-loop-label { padding: 5px 7px; font-size: 7px; letter-spacing: 1px; color: #725c82; border: 1px solid #e6dfe9; border-radius: 20px; white-space: nowrap; }
 .film-ingredients { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin: 24px 0 8px; }
 .film-ingredient { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; }

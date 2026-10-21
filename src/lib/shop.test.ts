@@ -172,10 +172,21 @@ test('uvarindas resolves mediano at 2000 and grande at 2500 colones', () => {
   assert.ok(grande.options.includes('Grande'))
 })
 
-test('freeShippingStatus calculates remaining amount and percentage correctly', () => {
-  assert.deepEqual(freeShippingStatus(0, store), { threshold: 1500000, isFree: false, remainingMinor: 1500000, percent: 0 })
-  assert.deepEqual(freeShippingStatus(750000, store), { threshold: 1500000, isFree: false, remainingMinor: 750000, percent: 50 })
-  assert.deepEqual(freeShippingStatus(1200000, store), { threshold: 1500000, isFree: false, remainingMinor: 300000, percent: 80 })
-  assert.deepEqual(freeShippingStatus(1560000, store), { threshold: 1500000, isFree: true, remainingMinor: 0, percent: 100 })
+test('removed variants are rejected; legacy and explicit presentations share one canonical cart line', () => {
+  const legacy: CartItem = { selection: { kind: 'product', productId: 'uvarindas' }, quantity: 2 }
+  const mediano: CartItem = { selection: { kind: 'product', productId: 'uvarindas', variantId: 'mediano' }, quantity: 3 }
+  const removed: CartItem = { selection: { kind: 'product', productId: 'uvarindas', variantId: 'eliminado' }, quantity: 1 }
+  assert.equal(resolveLine(removed, store), null)
+  assert.equal(resolveLine(legacy, store)!.key, resolveLine(mediano, store)!.key)
+  assert.deepEqual(restoreCart(JSON.stringify({ version: 1, items: [legacy, mediano, removed] }), store), {
+    items: [{ ...mediano, quantity: 5 }], changed: true,
+  })
 })
 
+test('freeShippingStatus calculates remaining amount and percentage correctly', () => {
+  assert.deepEqual(freeShippingStatus(0, store), { threshold: 1500000, isFree: false, remainingMinor: 1500001, percent: 0 })
+  assert.deepEqual(freeShippingStatus(750000, store), { threshold: 1500000, isFree: false, remainingMinor: 750001, percent: 50 })
+  assert.deepEqual(freeShippingStatus(1200000, store), { threshold: 1500000, isFree: false, remainingMinor: 300001, percent: 80 })
+  assert.deepEqual(freeShippingStatus(1500000, store), { threshold: 1500000, isFree: false, remainingMinor: 1, percent: 99 })
+  assert.deepEqual(freeShippingStatus(1560000, store), { threshold: 1500000, isFree: true, remainingMinor: 0, percent: 100 })
+})

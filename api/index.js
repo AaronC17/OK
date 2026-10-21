@@ -226,15 +226,16 @@ CREATE TABLE IF NOT EXISTS shop_events (
 
 // src/lib/shop.ts
 var MAX_QUANTITY = 99;
+var moneyFormatters = /* @__PURE__ */ new Map();
 function money(amountMinor, config) {
   const { code, locale, fractionDigits } = config.currency;
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: code,
-    currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: fractionDigits
-  }).format(amountMinor / 10 ** fractionDigits);
+  const key = `${locale}:${code}:${fractionDigits}`;
+  let formatter = moneyFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { style: "currency", currency: code, currencyDisplay: "narrowSymbol", minimumFractionDigits: 0, maximumFractionDigits: fractionDigits });
+    moneyFormatters.set(key, formatter);
+  }
+  return formatter.format(amountMinor / 10 ** fractionDigits);
 }
 function selectionKey(selection2) {
   if (selection2.kind === "gummy") {
@@ -278,12 +279,13 @@ function resolveLine(item, config) {
     const product = config.products?.find((p) => p.id === selection2.productId);
     if (!product?.available) return null;
     if (product.variants && product.variants.length > 0) {
-      const variant2 = product.variants.find((v) => v.id === selection2.variantId) ?? product.variants[0];
-      if (!variant2.available || !validPrice(variant2.priceMinor)) return null;
+      const variant2 = selection2.variantId === void 0 ? product.variants[0] : product.variants.find((v) => v.id === selection2.variantId);
+      if (!variant2?.available || !validPrice(variant2.priceMinor)) return null;
+      const canonical = { kind: "product", productId: product.id, variantId: variant2.id };
       return {
-        selection: { kind: "product", productId: product.id, variantId: variant2.id },
+        selection: canonical,
         quantity,
-        key,
+        key: selectionKey(canonical),
         name: product.name,
         options: [product.tag, variant2.label],
         image: variant2.image ?? product.image,
@@ -292,7 +294,7 @@ function resolveLine(item, config) {
         lineTotalMinor: variant2.priceMinor * quantity
       };
     }
-    if (!validPrice(product.priceMinor)) return null;
+    if (selection2.variantId !== void 0 || !validPrice(product.priceMinor)) return null;
     return {
       selection: selection2,
       quantity,
@@ -385,7 +387,7 @@ function selection(value) {
     return {
       kind: "product",
       productId: text(data.productId, 64),
-      variantId: typeof data.variantId === "string" && data.variantId.trim() ? text(data.variantId, 64) : void 0
+      variantId: data.variantId === void 0 ? void 0 : text(data.variantId, 64)
     };
   }
   throw new PaymentsError(422, "El producto no es v\xE1lido.");
@@ -943,12 +945,13 @@ var ShopDatabase = class {
       const existing = this.database.prepare("SELECT receipt_id FROM manual_payments WHERE order_id = ?").get(id);
       if (order.status === "ready" && existing && (receiptId === null || existing.receipt_id === receiptId)) return order;
       if (order.version !== expectedVersion || order.status === "ready") throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
+      if (order.totalMinor === null) throw new StoreError(409, "Confirma el total del pedido antes de registrar el pago.");
       if (receiptId !== null && (order.status !== "pending_review" || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
         throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
       }
       const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0));
+      const amount = minorAmount(order.totalMinor);
       const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
       if (this.database.prepare("SELECT order_id FROM manual_payments WHERE bank_reference = ? AND order_id != ?").get(reference, id)) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
       const now = timestamp();
@@ -1018,7 +1021,7 @@ var MongoShopDatabase = class {
   catalog;
   initializedPromise = null;
   constructor(uri, catalog, options = {}) {
-    this.client = new MongoClient(uri);
+    this.client = new MongoClient(uri, { serverSelectionTimeoutMS: 8e3, connectTimeoutMS: 8e3, maxPoolSize: 10 });
     this.db = this.client.db(options.dbName || "onkys");
     this.catalog = catalog;
   }
@@ -1035,18 +1038,25 @@ var MongoShopDatabase = class {
           this.collection("sessions").createIndex({ expires_at: 1 }),
           this.collection("customers").createIndex({ id: 1 }, { unique: true }),
           this.collection("customers").createIndex({ email: 1 }, { unique: true }),
+          this.collection("shop_orders").createIndex({ id: 1 }, { unique: true }),
           this.collection("shop_orders").createIndex({ code: 1 }, { unique: true }),
           this.collection("shop_orders").createIndex({ owner_hash: 1, idempotency_key: 1 }, { unique: true }),
           this.collection("shop_orders").createIndex({ status: 1, created_at: -1 }),
           this.collection("shop_orders").createIndex({ account_id: 1, created_at: -1 }),
+          this.collection("shop_orders").createIndex({ owner_hash: 1, created_at: -1, _id: -1 }),
+          this.collection("receipts").createIndex({ id: 1 }, { unique: true }),
           this.collection("receipts").createIndex({ order_id: 1, upload_key: 1 }, { unique: true }),
           this.collection("receipts").createIndex({ raw_hash: 1 }),
           this.collection("manual_payments").createIndex({ bank_reference: 1 }, { unique: true }),
+          this.collection("manual_payments").createIndex({ order_id: 1 }, { unique: true }),
           this.collection("shop_audit").createIndex({ order_id: 1, created_at: 1 }),
           this.collection("shop_events").createIndex({ order_id: 1, version: 1, event: 1 }, { unique: true })
         ]);
         await this.completePendingDetails();
-      })();
+      })().catch((error) => {
+        this.initializedPromise = null;
+        throw error;
+      });
     }
     return this.initializedPromise;
   }
@@ -1211,7 +1221,7 @@ var MongoShopDatabase = class {
     const filter = { account_id: id };
     const total = await this.collection("shop_orders").countDocuments(filter);
     const rows = await this.collection("shop_orders").find(filter).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 20).limit(20).toArray();
-    return { orders: await Promise.all(rows.map((row) => this.fromDoc(row))), total, page, pageSize: 20 };
+    return { orders: await this.fromDocs(rows), total, page, pageSize: 20 };
   }
   async customers(query) {
     const page = accountPage(query);
@@ -1220,15 +1230,20 @@ var MongoShopDatabase = class {
     const filter = search ? { $or: [{ name: regex }, { email: regex }] } : {};
     const total = await this.collection("customers").countDocuments(filter);
     const rows = await this.collection("customers").find(filter, { projection: { password_hash: 0 } }).sort({ created_at: -1, id: -1 }).skip((page - 1) * 50).limit(50).toArray();
-    const customers = await Promise.all(rows.map(async (row) => ({ ...this.accountFromDoc(row), orderCount: await this.collection("shop_orders").countDocuments({ account_id: row.id }) })));
+    const counts = rows.length ? await this.collection("shop_orders").aggregate([
+      { $match: { account_id: { $in: rows.map((row) => row.id) } } },
+      { $group: { _id: "$account_id", count: { $sum: 1 } } }
+    ]).toArray() : [];
+    const byCustomer = new Map(counts.map((row) => [row._id, row.count]));
+    const customers = rows.map((row) => ({ ...this.accountFromDoc(row), orderCount: byCustomer.get(row.id) ?? 0 }));
     return { customers, total, page, pageSize: 50 };
   }
-  async settings() {
-    const doc = await this.collection("metadata").findOne({ key: "sinpe" });
+  async settings(session) {
+    const doc = await this.collection("metadata").findOne({ key: "sinpe" }, { session });
     return doc?.value ? JSON.parse(doc.value) : { enabled: false, phone: "", beneficiary: "" };
   }
-  async destination() {
-    const settings = await this.settings();
+  async destination(session) {
+    const settings = await this.settings(session);
     return settings.enabled ? { phone: settings.phone, beneficiary: settings.beneficiary, bank: "BAC Credomatic" } : null;
   }
   async configure(value, actor) {
@@ -1248,7 +1263,7 @@ var MongoShopDatabase = class {
     return this.catalog.demo;
   }
   async completePendingDetails(session) {
-    const destination = await this.destination();
+    const destination = await this.destination(session);
     const cursor = this.collection("shop_orders").find({ status: "pending_details", current_receipt_id: null }, { session });
     for await (const row of cursor) {
       const delivery = JSON.parse(row.delivery_json);
@@ -1258,7 +1273,7 @@ var MongoShopDatabase = class {
       const status = total !== null && destination ? "awaiting_payment" : "pending_details";
       if (shipping === row.shipping_minor && total === row.total_minor && savedDestination === row.destination_json && status === row.status) continue;
       await this.collection("shop_orders").updateOne(
-        { _id: row._id },
+        { _id: row._id, status: "pending_details", version: row.version },
         {
           $set: {
             shipping_minor: shipping,
@@ -1277,8 +1292,20 @@ var MongoShopDatabase = class {
   async fromDoc(row, session) {
     let receipt = null;
     if (row.current_receipt_id) {
-      receipt = await this.collection("receipts").findOne({ id: row.current_receipt_id, order_id: row.id }, { session });
+      receipt = await this.collection("receipts").findOne({ id: row.current_receipt_id, order_id: row.id }, { session, projection: { data: 0 } });
     }
+    return this.orderFromDoc(row, receipt);
+  }
+  async fromDocs(rows) {
+    const ids = rows.map((row) => row.current_receipt_id).filter(Boolean);
+    const receipts = ids.length ? await this.collection("receipts").find({ id: { $in: ids } }, { projection: { data: 0 } }).toArray() : [];
+    const byId = new Map(receipts.map((receipt) => [receipt.id, receipt]));
+    return rows.map((row) => {
+      const receipt = byId.get(row.current_receipt_id);
+      return this.orderFromDoc(row, receipt?.order_id === row.id ? receipt : null);
+    });
+  }
+  orderFromDoc(row, receipt) {
     return {
       id: row.id,
       code: row.code,
@@ -1338,7 +1365,7 @@ var MongoShopDatabase = class {
       if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para registrar el pedido.");
       const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !account.welcome_order_id);
       const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount;
-      const destination = await this.destination();
+      const destination = await this.destination(session);
       const ready = destination !== null && parsed.amounts.total !== null;
       const id = randomUUID2();
       let nextNum = 1001;
@@ -1399,8 +1426,10 @@ var MongoShopDatabase = class {
   assertCode(order, supplied) {
     if (!constantEqual(order.code, orderCode(supplied))) throw new StoreError(422, "El c\xF3digo no corresponde a este pedido. Copia exactamente el c\xF3digo mostrado.");
   }
-  async checkUpload(id, owner, suppliedCode) {
-    const order = await this.customerOrder(id, owner);
+  async checkUpload(id, owner, suppliedCode, session) {
+    const row = await this.collection("shop_orders").findOne({ id, owner_hash: owner }, { session });
+    if (!row) throw new StoreError(404, "Pedido no encontrado en esta sesi\xF3n.");
+    const order = await this.fromDoc(row, session);
     if (suppliedCode !== void 0 && suppliedCode !== null && suppliedCode !== "") this.assertCode(order, suppliedCode);
     return order;
   }
@@ -1408,7 +1437,7 @@ var MongoShopDatabase = class {
     const key = text2(uploadKey, 16, 128, "Identificador de carga");
     const expectedVersion = version(suppliedVersion);
     return this.transaction(async (session) => {
-      const order = await this.checkUpload(id, owner, suppliedCode);
+      const order = await this.checkUpload(id, owner, suppliedCode, session);
       const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
       const previous = await this.collection("receipts").findOne({ order_id: id, upload_key: key }, { session });
       if (previous) {
@@ -1466,12 +1495,13 @@ var MongoShopDatabase = class {
       const existing = await this.collection("manual_payments").findOne({ order_id: id }, { session });
       if (order.status === "ready" && existing && (receiptId === null || existing.receipt_id === receiptId)) return order;
       if (order.version !== expectedVersion || order.status === "ready") throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
+      if (order.totalMinor === null) throw new StoreError(409, "Confirma el total del pedido antes de registrar el pago.");
       if (receiptId !== null && (order.status !== "pending_review" || !order.receipt || order.receipt.id !== receiptId || !order.destination || order.totalMinor === null)) {
         throw new StoreError(409, "El pedido cambi\xF3 o no tiene este comprobante pendiente de revisi\xF3n. Actualiza la vista.");
       }
       const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
-      const amount = minorAmount(order.totalMinor ?? order.subtotalMinor - (order.discountMinor ?? 0));
+      const amount = minorAmount(order.totalMinor);
       const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
       const dup = await this.collection("manual_payments").findOne({ bank_reference: reference, order_id: { $ne: id } }, { session });
       if (dup) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
@@ -1554,7 +1584,7 @@ var MongoShopDatabase = class {
     }
     const total = await this.collection("shop_orders").countDocuments(filterQuery);
     const rows = await this.collection("shop_orders").find(filterQuery).sort({ created_at: -1, _id: -1 }).skip((page - 1) * 50).limit(50).toArray();
-    const orders = await Promise.all(rows.map((row) => this.fromDoc(row)));
+    const orders = await this.fromDocs(rows);
     const counts = Object.fromEntries(statuses2.map((status) => [status, 0]));
     const agg = await this.collection("shop_orders").aggregate([
       ...customerId ? [{ $match: { account_id: customerId.slice(0, 36) } }] : [],
@@ -1571,6 +1601,7 @@ var MongoShopDatabase = class {
 
 // server/store/http.ts
 import { unlinkSync } from "node:fs";
+import { isIP } from "node:net";
 
 // server/store/receipts.ts
 import { createHash as createHash4 } from "node:crypto";
@@ -1665,7 +1696,9 @@ function makeShopHandler(store2, options = {}) {
         }
         if (!allowed) throw new StoreError(403, "Origen no autorizado. Abre la tienda y el panel desde la misma direcci\xF3n.");
       }
-      const ip = request.socket.remoteAddress ?? "local";
+      const forwarded = options.trustVercelProxy ? request.headers["x-forwarded-for"] : void 0;
+      const clientIp = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : "";
+      const ip = isIP(clientIp) ? clientIp : request.socket.remoteAddress ?? "local";
       const requireSession = async (role, mutate = false) => {
         const session = await store2.session(cookie(request, role === "admin" ? ADMIN_COOKIE : CUSTOMER_COOKIE), role);
         if (!session) throw new StoreError(401, role === "admin" ? "Inicia sesi\xF3n en administraci\xF3n." : "Tu sesi\xF3n de compra venci\xF3. Actualiza la tienda.");
@@ -2292,59 +2325,70 @@ async function createShopRuntime() {
   if (directory === resolve(".") || unsafeRoots.some((root) => directory === root || directory.startsWith(`${root}/`) || directory.startsWith(`${root}\\`))) throw new Error("La carpeta de datos privados no puede ser la ra\xEDz del proyecto ni estar dentro de public/ o dist/.");
   mkdirSync(directory, { recursive: true });
   const mongoUri = process.env.MONGODB_URI;
+  if (process.env.VERCEL && !mongoUri) throw new Error("Configura MONGODB_URI: el almacenamiento temporal de Vercel no conserva los pedidos.");
   let database;
   if (mongoUri) {
     const mongoDb = new MongoShopDatabase(mongoUri, store, { dbName: process.env.MONGODB_DB_NAME || "onkys" });
-    await mongoDb.init();
+    try {
+      await mongoDb.init();
+    } catch (error) {
+      await mongoDb.close();
+      throw error;
+    }
     database = mongoDb;
   } else {
     database = new ShopDatabase(resolve(directory, "orders.sqlite"), store);
   }
   const setupPath = resolve(directory, "admin-setup-token.txt");
-  if (!await database.initialized()) {
-    let token;
-    try {
-      token = readFileSync(setupPath, "utf8").trim();
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        await database.close();
-        throw error;
-      }
-      token = newToken();
-      writeFileSync(setupPath, `${token}
+  try {
+    if (!await database.initialized()) {
+      let token;
+      try {
+        token = readFileSync(setupPath, "utf8").trim();
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+        token = newToken();
+        writeFileSync(setupPath, `${token}
 `, { flag: "wx", mode: 384 });
+      }
+      if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("El c\xF3digo de instalaci\xF3n local no es v\xE1lido. No se sobrescribi\xF3 el archivo existente.");
+      await database.ensureSetupToken(token);
+      console.info("Onky\u2019s: configura administraci\xF3n en /admin. El c\xF3digo de instalaci\xF3n est\xE1 en el archivo privado admin-setup-token.txt de la carpeta de datos.");
     }
-    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
-      await database.close();
-      throw new Error("El c\xF3digo de instalaci\xF3n local no es v\xE1lido. No se sobrescribi\xF3 el archivo existente.");
+    const secure = process.env.STORE_SECURE_COOKIES === "true" || Boolean(process.env.VERCEL);
+    const publicOrigin = process.env.STORE_PUBLIC_ORIGIN || (process.env.VERCEL && process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : void 0);
+    if (process.env.NODE_ENV === "production" && !process.env.VERCEL && (!secure || !publicOrigin?.startsWith("https://"))) {
+      throw new Error("Para producci\xF3n se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa tambi\xE9n la gu\xEDa de despliegue y privacidad.");
     }
-    await database.ensureSetupToken(token);
-    console.info("Onky\u2019s: configura administraci\xF3n en /admin. El c\xF3digo de instalaci\xF3n est\xE1 en el archivo privado admin-setup-token.txt de la carpeta de datos.");
-  }
-  const secure = process.env.STORE_SECURE_COOKIES === "true" || Boolean(process.env.VERCEL);
-  const publicOrigin = process.env.STORE_PUBLIC_ORIGIN || (process.env.VERCEL && process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : void 0);
-  if (process.env.NODE_ENV === "production" && !process.env.VERCEL && (!secure || !publicOrigin?.startsWith("https://"))) {
+    const handler2 = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer(), trustVercelProxy: process.env.VERCEL === "1" });
+    let closed = false;
+    return { database, handler: handler2, close: () => {
+      if (!closed) {
+        closed = true;
+        void database.close();
+      }
+    } };
+  } catch (error) {
     await database.close();
-    throw new Error("Para producci\xF3n se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa tambi\xE9n la gu\xEDa de despliegue y privacidad.");
+    throw error;
   }
-  const handler2 = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer() });
-  let closed = false;
-  return { database, handler: handler2, close: () => {
-    if (!closed) {
-      closed = true;
-      void database.close();
-    }
-  } };
 }
 
 // server/store/api-handler.ts
 var runtimePromise = null;
 async function handler(request, response) {
-  if (!runtimePromise) {
-    runtimePromise = createShopRuntime();
+  try {
+    runtimePromise ??= createShopRuntime().catch((error) => {
+      runtimePromise = null;
+      throw error;
+    });
+    const runtime = await runtimePromise;
+    return await runtime.handler(request, response);
+  } catch {
+    if (response.destroyed || response.writableEnded) return;
+    response.writeHead(503, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "5", "X-Content-Type-Options": "nosniff" });
+    response.end(JSON.stringify({ error: "La tienda no pudo conectar con sus datos. Reintenta en unos momentos." }));
   }
-  const runtime = await runtimePromise;
-  return runtime.handler(request, response);
 }
 export {
   handler as default

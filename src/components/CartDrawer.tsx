@@ -55,6 +55,8 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
   const formRef = useRef<HTMLFormElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const attempt = useRef<{ fingerprint: string; key: string } | null>(null)
+  const submitting = useRef(false)
+  const empty = cart.items.length === 0
   const method = store.deliveryMethods.find(method => method.id === deliveryId && method.enabled)
   const calculated = totals(cart.lines, method)
   const discount = order ? order.discountMinor ?? 0 : welcomeDiscount(calculated.subtotal, !!config?.account?.welcomeAvailable)
@@ -77,7 +79,7 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
       if (selectedOrderId) {
         const selected = await fetchOrder(selectedOrderId)
         if (alive) setOrder(selected)
-      } else if (!cart.items.length) {
+      } else if (empty) {
         const result = await currentOrder()
         if (alive) {
           const activeOrder = result.order && result.order.id !== getDismissedOrderId() ? result.order : null
@@ -86,17 +88,20 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
       }
     }).catch(error => { if (alive) setServerError(errorMessage(error)) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [open, cart.items.length, selectedOrderId])
+  }, [open, empty, selectedOrderId, customerAccount?.welcomeAvailable])
 
   useEffect(() => {
     if (!open || !order || order.status === 'ready') return
     let alive = true
+    let pending = false
     const interval = window.setInterval(() => {
-      if (document.hidden) return
-      void fetchOrder(order.id).then(next => { if (alive) setOrder(current => current?.id === next.id && current.version > next.version ? current : next) }).catch(() => { /* Manual refresh reports connection errors. */ })
+      if (document.hidden || pending || loading) return
+      pending = true
+      void fetchOrder(order.id).then(next => { if (alive) setOrder(current => current?.id === next.id && current.version <= next.version ? next : current) })
+        .catch(() => { /* Manual refresh reports connection errors. */ }).finally(() => { pending = false })
     }, 10_000)
     return () => { alive = false; window.clearInterval(interval) }
-  }, [open, order?.id, order?.status])
+  }, [open, order?.id, order?.status, loading])
 
   const refresh = async () => {
     setLoading(true)
@@ -105,7 +110,7 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
       setConfig(await checkoutConfig())
       if (order) {
         const next = await fetchOrder(order.id)
-        setOrder(current => current?.id === next.id && current.version > next.version ? current : next)
+        setOrder(current => current?.id === next.id && current.version <= next.version ? next : current)
       }
       else if (!cart.items.length) {
         const latest = (await currentOrder()).order
@@ -120,7 +125,7 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
   }
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (preparing) return
+    if (submitting.current || loading || !config) return
     const next: Errors = validateCheckout(cart.lines, { ...customer, deliveryId }, store)
     if (!/^(?:\+?506)?[2-9]\d{7}$/.test(customer.phone.replace(/[\s()-]/g, ''))) next.phone = 'Escribe un teléfono costarricense válido de 8 dígitos.'
     const contact = customer.email.trim()
@@ -130,15 +135,19 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
     if (Object.keys(next).length) { formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); return }
     const fingerprint = JSON.stringify({ items: cart.items, customer, deliveryId, privacy })
     if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, key: crypto.randomUUID() }
+    submitting.current = true
     setPreparing(true)
     setServerError('')
     try {
       const created = await createOrder(cart.items, deliveryId, customer, privacy, attempt.current.key)
+      // A new, identical purchase is a new request; only failed attempts reuse a key.
+      attempt.current = null
       onOrderCreated()
       setDismissedOrderId(null)
       flushSync(() => { setOrder(created); cart.clear(); setPreparing(false) })
       scrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
     } catch (error) { setServerError(errorMessage(error)); setPreparing(false) }
+    finally { submitting.current = false }
   }
   const newOrder = () => {
     if (order) setDismissedOrderId(order.id)
@@ -153,11 +162,11 @@ export function CartDrawer({ open, onClose, cart, customerAccount, selectedOrder
       <header className="drawer-header"><div><span className="eyebrow">{order ? 'PASARELA DE PAGO' : 'TUS PEQUEÑOS GUSTOS'}</span><h2 id="cart-title">{order ? 'Tu pedido' : 'Tu carrito'} {!order && <span>{cart.count}</span>}</h2></div><button className="icon-button" onClick={onClose} aria-label="Cerrar carrito"><Icon name="close" /></button></header>
       {cart.notice && !order && <p className="notice cart-notice" role="status"><Icon name="info" size={17} />{cart.notice}</p>}
       {serverError && <div className="checkout-server-error"><p className="field-error" role="alert">{serverError}</p><button type="button" className="text-button" disabled={loading} onClick={() => { void refresh() }}>Reintentar conexión</button></div>}
-      {!order && !cart.lines.length ? <div className="empty-cart"><div className="empty-bag"><Icon name="bag" size={48} /></div><span className="eyebrow">AQUÍ CABEN TUS FAVORITOS</span><h3>Un buen momento por empezar.</h3><p>Elige tus favoritos.<br />Ahora puedes pedir y pagar con SINPE Móvil.</p><button className="button button-primary" onClick={() => { onClose(); document.getElementById('catalogo')?.scrollIntoView() }}>Explorar el catálogo <Icon name="arrow" size={18} /></button></div> : <>
+      {!order && !cart.lines.length ? <div className="empty-cart" aria-busy={loading}><div className="empty-bag"><Icon name="bag" size={48} /></div>{loading ? <p role="status">Consultando tu pedido…</p> : <><span className="eyebrow">AQUÍ CABEN TUS FAVORITOS</span><h3>Un buen momento por empezar.</h3><p>Elige tus favoritos.<br />Ahora puedes pedir y pagar con SINPE Móvil.</p><button className="button button-primary" onClick={() => { onClose(); document.getElementById('catalogo')?.scrollIntoView() }}>Explorar el catálogo <Icon name="arrow" size={18} /></button></>}</div> : <>
         <div className="drawer-scroll" ref={scrollRef}>
-          {order ? <OrderPanel key={order.id} order={order} onChange={setOrder} onRefresh={() => { void refresh() }} onNew={newOrder} busy={loading} /> : <>
+          {order ? <OrderPanel key={order.id} order={order} onChange={next => setOrder(current => current?.id === next.id && current.version <= next.version ? next : current)} onRefresh={() => { void refresh() }} onNew={newOrder} busy={loading} /> : <>
             {deliveryId === 'delivery' && <FreeShippingBar subtotal={amounts.subtotal} />}
-            <div className="cart-lines">{cart.lines.map(line => <article key={line.key} className="cart-line"><ProductImage src={line.image} alt={line.imageAlt} sizes="83px" /><div className="cart-line-details"><div className="cart-line-heading"><h3>{line.name}</h3><button className="icon-button remove-button" disabled={preparing} onClick={() => cart.remove(line.key)} aria-label={`Eliminar ${line.name}, ${line.options.join(', ')}`}><Icon name="trash" size={16} /></button></div><p>{line.options.join(' · ')}</p><span className="unit-price">{money(line.unitPriceMinor, store)} / unidad</span><div className="cart-line-bottom"><Quantity value={line.quantity} onChange={value => { if (!preparing) cart.update(line.key, value) }} label={`Cantidad de ${line.name}, ${line.options.join(', ')}`} /><strong>{money(line.lineTotalMinor, store)}</strong></div></div></article>)}</div>
+            <div className="cart-lines">{cart.lines.map(line => <article key={line.key} className="cart-line"><ProductImage src={line.image} alt={line.imageAlt} sizes="83px" /><div className="cart-line-details"><div className="cart-line-heading"><h3>{line.name}</h3><button className="icon-button remove-button" disabled={preparing} onClick={() => cart.remove(line.key)} aria-label={`Eliminar ${line.name}, ${line.options.join(', ')}`}><Icon name="trash" size={16} /></button></div><p>{line.options.join(' · ')}</p><span className="unit-price">{money(line.unitPriceMinor, store)} / unidad</span><div className="cart-line-bottom"><Quantity value={line.quantity} disabled={preparing} onChange={value => cart.update(line.key, value)} label={`Cantidad de ${line.name}, ${line.options.join(', ')}`} /><strong>{money(line.lineTotalMinor, store)}</strong></div></div></article>)}</div>
             <form ref={formRef} id="checkout-form" className="checkout-form" noValidate onSubmit={event => { void submit(event) }}>
               <fieldset disabled={preparing} className="checkout-fields">
                 {!customerAccount ? <div className="checkout-account-note"><Icon name="gift" size={19} /><div><strong>Tu primer antojo, con 10% menos.</strong><p>Crea tu cuenta para recibir el descuento en productos y guardar tus pedidos. También puedes continuar como invitado.</p><button type="button" className="text-button" onClick={onRegister}>Crear mi cuenta <Icon name="arrow" size={14} /></button></div></div> : config?.account?.welcomeAvailable && <div className="checkout-account-note"><Icon name="gift" size={19} /><div><strong>Tu 10% de bienvenida está aplicado.</strong><p>Solo en los productos de este primer pedido. No necesitas un código.</p></div></div>}

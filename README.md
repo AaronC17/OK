@@ -1,6 +1,6 @@
 # Onky’s — Pequeños momentos, a tu manera
 
-Tienda de gomitas enchiladas con carrito, checkout SINPE Móvil, comprobantes privados y dashboard administrativo para confirmar pagos manualmente. WhatsApp dejó de ser una opción. React + TypeScript + Vite + backend Node/SQLite. El módulo de postres permanece oculto hasta confirmar catálogo y fotografías.
+Tienda de gomitas enchiladas con carrito, checkout SINPE Móvil, comprobantes privados y dashboard administrativo para confirmar pagos manualmente. React + TypeScript + Vite + backend Node con SQLite local o MongoDB. El módulo de postres permanece oculto hasta confirmar catálogo y fotografías.
 
 ## Ejecutar
 
@@ -39,7 +39,7 @@ El frontend se compila en `dist/`, pero **publicar solo esa carpeta ya no basta*
 
 - El flujo de WhatsApp fue retirado. El número SINPE y beneficiario se configuran explícitamente desde administración.
 - Moneda: **colón costarricense, CRC**, símbolo **₡**.
-- Bolsas: **100, 200 y 500 g**, según la última indicación del usuario.
+- Bolsas del catálogo actual: **100, 250 y 500 g**.
 - Se permite **un solo tipo** o **mixto**, eligiendo dos o tres tipos.
 - Nombre utilizado: **Onky’s**, tomado originalmente de la carpeta.
 
@@ -70,8 +70,8 @@ Editar **`src/config/store.ts`** para catálogo, precios y entrega; no es necesa
 Los precios se almacenan en **céntimos enteros**. Con `fractionDigits: 2`:
 
 ```ts
-prices: { 100: 120000, 200: 220000, 500: 480000 }
-// ₡1.200, ₡2.200 y ₡4.800, respectivamente.
+prices: { 100: 120000, 250: 250000, 500: 480000 }
+// ₡1.200, ₡2.500 y ₡4.800, respectivamente.
 ```
 
 Cada peso tiene un importe independiente. Los cálculos de líneas, subtotal y entrega utilizan exclusivamente enteros. El formato `es-CR` muestra el símbolo ₡, separa miles y conserva decimales cuando existen; las instrucciones de pago identifican CRC. `null` significa **precio pendiente** y bloquea esa variante; no se interpreta como gratis.
@@ -80,12 +80,12 @@ Cada peso tiene un importe independiente. Los cálculos de líneas, subtotal y e
 
 En cada `gummies.types` se editan `name`, `coatingLabel`, `description`, `image`, `imageAlt`, `imagePosition`, `available`, `visible` y la tabla `prices`. `variantImages` permite una foto por peso. Con `visible: false`, la tarjeta no aparece en el catálogo, pero el tipo sigue disponible como ingrediente del Mixto; para reactivarlo basta quitar esa opción.
 
-`gummies.mixes.enabled` muestra el artículo **Mixto**, que siempre combina todos los tipos disponibles: su configurador no ofrece selector de modo ni elección de tipos, solo gramos y cantidad. La foto del Mixto es la del paquete mixto (`heroImage`). El catálogo incluye además las cuatro combinaciones posibles de dos o tres tipos, cada una con su propia tabla de precios. Ejemplo:
+`gummies.mixes.enabled` muestra el artículo **Mixto**. Su configurador permite elegir dos o tres tipos, gramos y cantidad. La foto del Mixto es la del paquete mixto (`heroImage`). La configuración incluye las cuatro combinaciones posibles de dos o tres tipos, cada una con su propia tabla de precios. Ejemplo:
 
 ```ts
 {
   typeIds: ['ositos', 'gusanitos'],
-  prices: { 100: 140000, 200: 250000, 500: 550000 },
+  prices: { 100: 120000, 250: 250000, 500: 550000 },
   image: '/images/bolsa-mix.webp',
 }
 ```
@@ -135,7 +135,7 @@ El método actual **Envío por Correos** cubre todo Costa Rica: `feeMinor: 28000
 
 ### Pedidos con SINPE Móvil
 
-El backend genera el código `ONK-` + 16 caracteres hexadecimales y calcula el precio desde el catálogo. El cliente recibe instrucciones cuando están confirmados total y beneficiario, y adjunta su comprobante con código y referencia bancaria. Se valida pertenencia del pedido, código y archivo; subir una imagen solo cambia el estado a **Comprobante en revisión**.
+El backend genera un código secuencial `ONK-1001`, `ONK-1002`… y calcula el precio desde el catálogo. El cliente recibe instrucciones cuando están confirmados total y beneficiario, y adjunta su comprobante. La carga incluye automáticamente el código y un identificador interno del comprobante; este identificador no es una referencia bancaria verificada. Se valida pertenencia del pedido, código y archivo; subir una imagen solo cambia el estado a **Comprobante en revisión**.
 
 La administración revisa el pedido, su código y la imagen y pulsa **Confirmar pedido**, sin transcribir datos ni completar formularios. El backend usa el monto y la referencia guardados y registra la confirmación manual como **Listo para preparar**. Una referencia consumida no puede confirmar otro pedido. Hay correcciones, auditoría, bloqueo de versiones antiguas e idempotencia. No se automatiza BAC ni se garantiza la autenticidad de la imagen. Detalles en [`docs/checkout-sinpe-admin.md`](docs/checkout-sinpe-admin.md).
 
@@ -198,6 +198,10 @@ npx playwright install chromium
 PowerShell: `$env:PW_CHANNEL='chromium'` antes de ejecutar las pruebas. En Linux/macOS: `PW_CHANNEL=chromium npm run test:e2e`.
 
 Se comprueban catálogo, carrito, entrega, códigos generados en backend, idempotencia, comprobantes privados, autenticación/CSRF, referencias no reutilizables, correcciones, confirmación manual y rollback, además de teclado, contraste y adaptación móvil. Las pruebas de navegador usan una base temporal aislada y un puerto libre; no acceden a BAC ni envían dinero.
+
+La integración MongoDB se ejecuta únicamente cuando se define `TEST_MONGODB_URI`, con una base aleatoria `onkys_test_*` que se elimina al terminar. `npm test` funciona sin conexiones externas por defecto. La migración requiere `MONGODB_URI` explícita y abre SQLite en modo de solo lectura. Vercel también requiere MongoDB para conservar pedidos entre invocaciones.
+
+Revisión de robustez y rendimiento: [`docs/revision-tienda.md`](docs/revision-tienda.md).
 
 ## Pendientes para uso comercial
 
