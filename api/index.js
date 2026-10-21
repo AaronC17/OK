@@ -24,7 +24,7 @@ var store = {
         image: "/images/ositos-bolsa.webp",
         imageAlt: "Bolsa de ositos enchilados con chamoy y sticker de Onky\u2019s",
         available: true,
-        prices: { 100: 12e4, 250: 25e4, 500: 48e4 }
+        prices: { 100: 125e3, 250: 25e4, 500: 45e4 }
       },
       {
         id: "tiritas",
@@ -38,7 +38,7 @@ var store = {
         available: true,
         visible: false,
         // Oculto como tarjeta individual; disponible en el mix.
-        prices: { 100: 12e4, 250: 25e4, 500: 52e4 }
+        prices: { 100: 125e3, 250: 25e4, 500: 45e4 }
       },
       {
         id: "gusanitos",
@@ -51,7 +51,7 @@ var store = {
         available: true,
         visible: false,
         // Oculto como tarjeta individual; disponible en el mix.
-        prices: { 100: 12e4, 250: 25e4, 500: 5e5 }
+        prices: { 100: 125e3, 250: 25e4, 500: 45e4 }
       }
     ],
     mixes: {
@@ -59,10 +59,10 @@ var store = {
       note: "Elige un solo tipo o mezcla dos o tres. El peso es el total de la bolsa; las proporciones se coordinan con la tienda.",
       // Combinaciones explícitas. Precios provisionales, no suplementos calculados.
       combinations: [
-        { typeIds: ["ositos", "tiritas"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
-        { typeIds: ["ositos", "gusanitos"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
-        { typeIds: ["tiritas", "gusanitos"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" },
-        { typeIds: ["ositos", "tiritas", "gusanitos"], prices: { 100: 12e4, 250: 25e4, 500: 55e4 }, image: "/images/bolsa-mix.webp" }
+        { typeIds: ["ositos", "tiritas"], prices: { 100: 125e3, 250: 25e4, 500: 45e4 }, image: "/images/bolsa-mix.webp" },
+        { typeIds: ["ositos", "gusanitos"], prices: { 100: 125e3, 250: 25e4, 500: 45e4 }, image: "/images/bolsa-mix.webp" },
+        { typeIds: ["tiritas", "gusanitos"], prices: { 100: 125e3, 250: 25e4, 500: 45e4 }, image: "/images/bolsa-mix.webp" },
+        { typeIds: ["ositos", "tiritas", "gusanitos"], prices: { 100: 125e3, 250: 25e4, 500: 45e4 }, image: "/images/bolsa-mix.webp" }
       ]
     }
   },
@@ -2230,11 +2230,11 @@ function orderEmailMessage(event, order, origin = storeOrigin) {
     title = "Tu pedido est\xE1 en revisi\xF3n";
     headline = "Tu pedido,<br>en revisi\xF3n.";
     status = "En revisi\xF3n";
-    preheader = "Recibimos tu comprobante. Estamos revisando tu abono y te avisaremos en cuanto quede confirmado.";
-    lead = `\xA1Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago para confirmar tu pedido.`;
-    const reviewNext = order.delivery.requiresAddress ? "En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo." : "En cuanto confirmemos el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
+    preheader = "Recibimos tu comprobante. La revisi\xF3n del abono tarda entre 10 y 30 minutos; te avisaremos en cuanto quede confirmado.";
+    lead = `\xA1Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago (suele tardar de 10 a 30 minutos).`;
+    const reviewNext = order.delivery.requiresAddress ? "La revisi\xF3n del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo." : "La revisi\xF3n del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
     body2 = noteBox("\xBFQu\xE9 sigue?", `<p style="margin:0;">Por ahora no necesitas hacer nada m\xE1s. <strong>${reviewNext}</strong></p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ""}`);
-    detailText = `Estado: en revisi\xF3n. ${order.delivery.requiresAddress ? "Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo." : "Una vez confirmado el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega."}${order.receipt?.bankReference ? `
+    detailText = `Estado: en revisi\xF3n (tarda de 10 a 30 minutos). ${order.delivery.requiresAddress ? "Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo." : "Una vez confirmado el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega."}${order.receipt?.bankReference ? `
 Referencia del comprobante: ${order.receipt.bankReference}` : ""}`;
   } else if (paid) {
     title = "\xA1Pago confirmado!";

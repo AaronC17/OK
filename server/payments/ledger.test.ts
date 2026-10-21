@@ -21,7 +21,7 @@ function setup(t: TestContext, mode: PaymentsMode = 'mock') {
 test('ledger: backend prices the current catalog and refuses unknown delivery totals or client prices', t => {
   const ledger = setup(t)
   const order = ledger.createOrder(orderInput(), randomUUID(), NOW)
-  assert.equal(order.amountMinor, 120000)
+  assert.equal(order.amountMinor, 125000)
   assert.match(order.reference, /^ONK-[A-F0-9]{16}$/)
   assert.equal(order.demoOnly, true)
   assert.throws(() => ledger.createOrder({ ...orderInput(), amountMinor: 1 }, randomUUID(), NOW), /campos no permitidos/)

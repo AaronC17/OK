@@ -4,7 +4,7 @@ import type { StoreConfig } from '../types.ts'
  * CONFIGURACIÓN COMERCIAL
  * Moneda confirmada por el usuario. Catálogo y precios de EJEMPLO.
  * El destino SINPE se configura desde administración, sin inferir un teléfono.
- * Todos los importes son enteros en céntimos: 120000 = ₡1.200.
+ * Todos los importes son enteros en céntimos: 125000 = ₡1.250.
  * Cada variante tiene su precio propio; no hay fórmulas por peso ni recargos implícitos.
  */
 export const store: StoreConfig = {
@@ -22,21 +22,21 @@ export const store: StoreConfig = {
         id: 'ositos', name: 'Ositos', coatingLabel: 'enchilados', tag: 'Pequeños, con carácter',
         description: 'El antojo de siempre, con un giro picosito.',
         image: '/images/ositos-bolsa.webp', imageAlt: 'Bolsa de ositos enchilados con chamoy y sticker de Onky’s',
-        available: true, prices: { 100: 120000, 250: 250000, 500: 480000 },
+        available: true, prices: { 100: 125000, 250: 250000, 500: 450000 },
       },
       {
         id: 'tiritas', name: 'Aros', coatingLabel: 'enchilados', tag: 'El lado más dulce',
         description: 'Aros frutales con cobertura de chamoy y chile.',
         image: '/images/tiritas.jpg', imageAlt: 'Aros de gomita enchilados con chamoy',
         imagePosition: '50% 38%', available: true, visible: false, // Oculto como tarjeta individual; disponible en el mix.
-        prices: { 100: 120000, 250: 250000, 500: 520000 },
+        prices: { 100: 125000, 250: 250000, 500: 450000 },
       },
       {
         id: 'gusanitos', name: 'Gusanos', coatingLabel: 'enchilados', tag: 'Fuera de lo habitual',
         description: 'Gusanos dulces y ácidos con ese toque de picante.',
         image: '/images/gusanitos.jpg', imageAlt: 'Gusanos de gomita multicolor enchilados',
         available: true, visible: false, // Oculto como tarjeta individual; disponible en el mix.
-        prices: { 100: 120000, 250: 250000, 500: 500000 },
+        prices: { 100: 125000, 250: 250000, 500: 450000 },
       },
     ],
     mixes: {
@@ -44,10 +44,10 @@ export const store: StoreConfig = {
       note: 'Elige un solo tipo o mezcla dos o tres. El peso es el total de la bolsa; las proporciones se coordinan con la tienda.',
       // Combinaciones explícitas. Precios provisionales, no suplementos calculados.
       combinations: [
-        { typeIds: ['ositos', 'tiritas'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
-        { typeIds: ['ositos', 'gusanitos'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
-        { typeIds: ['tiritas', 'gusanitos'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
-        { typeIds: ['ositos', 'tiritas', 'gusanitos'], prices: { 100: 120000, 250: 250000, 500: 550000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['ositos', 'tiritas'], prices: { 100: 125000, 250: 250000, 500: 450000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['ositos', 'gusanitos'], prices: { 100: 125000, 250: 250000, 500: 450000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['tiritas', 'gusanitos'], prices: { 100: 125000, 250: 250000, 500: 450000 }, image: '/images/bolsa-mix.webp' },
+        { typeIds: ['ositos', 'tiritas', 'gusanitos'], prices: { 100: 125000, 250: 250000, 500: 450000 }, image: '/images/bolsa-mix.webp' },
       ],
     },
   },

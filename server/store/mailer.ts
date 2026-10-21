@@ -109,13 +109,13 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     title = 'Tu pedido está en revisión'
     headline = 'Tu pedido,<br>en revisión.'
     status = 'En revisión'
-    preheader = 'Recibimos tu comprobante. Estamos revisando tu abono y te avisaremos en cuanto quede confirmado.'
-    lead = `¡Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago para confirmar tu pedido.`
+    preheader = 'Recibimos tu comprobante. La revisión del abono tarda entre 10 y 30 minutos; te avisaremos en cuanto quede confirmado.'
+    lead = `¡Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago (suele tardar de 10 a 30 minutos).`
     const reviewNext = order.delivery.requiresAddress
-      ? 'En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo.'
-      : 'En cuanto confirmemos el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
+      ? 'La revisión del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo.'
+      : 'La revisión del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
     body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. <strong>${reviewNext}</strong></p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
-    detailText = `Estado: en revisión. ${order.delivery.requiresAddress ? 'Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.' : 'Una vez confirmado el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
+    detailText = `Estado: en revisión (tarda de 10 a 30 minutos). ${order.delivery.requiresAddress ? 'Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.' : 'Una vez confirmado el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
   } else if (paid) {
     title = '¡Pago confirmado!'
     headline = 'Tu antojo,<br>confirmado.'

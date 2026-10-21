@@ -167,7 +167,7 @@ test('accounts HTTP: registration and logout rotate HttpOnly sessions and CSRF; 
   assert.ok(!JSON.stringify(signed.data).includes('password'))
   assert.match(signed.headers.get('set-cookie')!, /HttpOnly; SameSite=Strict/)
   const order = await buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': randomUUID() })
-  assert.equal(order.data.discountMinor, 12000)
+  assert.equal(order.data.discountMinor, 12500)
   assert.equal((await buyer.call<CustomerOrders>('/api/account/orders')).data.total, 1)
   assert.equal((await outsider.call(`/api/orders/${order.data.id}`)).status, 404)
   assert.equal((await admin.call<AdminCustomers>('/api/admin/customers')).data.customers[0].orderCount, 1)
@@ -181,7 +181,7 @@ test('accounts HTTP: registration and logout rotate HttpOnly sessions and CSRF; 
   const login = await buyer.call<CustomerAuth>('/api/account/login', { email: 'CUENTA@ejemplo.cr', password: customerRegistration().password })
   assert.equal(login.status, 200)
   assert.equal(login.data.user!.id, signed.data.user!.id)
-  assert.equal((await buyer.call<ShopOrder>(`/api/orders/${order.data.id}`)).data.totalMinor, 108000)
+  assert.equal((await buyer.call<ShopOrder>(`/api/orders/${order.data.id}`)).data.totalMinor, 112500)
 })
 
 test('accounts HTTP: simultaneous orders and idempotent retries cannot duplicate a welcome discount', async t => {
@@ -198,7 +198,7 @@ test('accounts HTTP: simultaneous orders and idempotent retries cannot duplicate
   ])
   assert.equal(first.status, 200)
   assert.equal(second.status, 200)
-  assert.equal(first.data.discountMinor! + second.data.discountMinor!, 12000)
+  assert.equal(first.data.discountMinor! + second.data.discountMinor!, 12500)
   const retried = await secondDevice.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': key })
   assert.equal(retried.data.id, first.data.id)
   assert.equal(retried.data.totalMinor, first.data.totalMinor)

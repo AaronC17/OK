@@ -101,10 +101,10 @@ test('saved cart uses current prices and removes paused categories', () => {
   assert.equal(whenEnabled.items.length, 2)
   assert.equal(whenEnabled.changed, false)
   assert.equal(restored.items[0].quantity, 4)
-  assert.equal(resolveLine(restored.items[0], store)!.lineTotalMinor, 480000)
+  assert.equal(resolveLine(restored.items[0], store)!.lineTotalMinor, 500000)
   const config = copy()
-  config.gummies.types[0].prices[100] = 125000
-  assert.equal(resolveLine(restored.items[0], config)!.lineTotalMinor, 500000)
+  config.gummies.types[0].prices[100] = 130000
+  assert.equal(resolveLine(restored.items[0], config)!.lineTotalMinor, 520000)
 })
 
 test('corrupt storage and old discontinued categories/weights are handled gracefully', () => {
@@ -122,12 +122,12 @@ test('corrupt storage and old discontinued categories/weights are handled gracef
 test('quoted, free and fixed delivery have honest totals with integer math', () => {
   const config = withDesserts()
   const lines = [resolveLine(gummy, config)!, resolveLine(dessert, config)!]
-  assert.deepEqual(totals(lines, store.deliveryMethods[0]), { subtotal: 760000, shipping: 280000, total: 1040000 })
-  assert.deepEqual(totals(lines, { ...store.deliveryMethods[0], feeMinor: null }), { subtotal: 760000, shipping: null, total: null })
-  assert.deepEqual(totals(lines, store.deliveryMethods[1]), { subtotal: 760000, shipping: 0, total: 760000 })
-  assert.deepEqual(totals(lines, { ...store.deliveryMethods[0], feeMinor: 133333 }), { subtotal: 760000, shipping: 133333, total: 893333 })
-  assert.equal(normalize(money(893333, store)), '₡8 933,33')
-  assert.equal(normalize(money(120000, store)), '₡1 200')
+  assert.deepEqual(totals(lines, store.deliveryMethods[0]), { subtotal: 770000, shipping: 280000, total: 1050000 })
+  assert.deepEqual(totals(lines, { ...store.deliveryMethods[0], feeMinor: null }), { subtotal: 770000, shipping: null, total: null })
+  assert.deepEqual(totals(lines, store.deliveryMethods[1]), { subtotal: 770000, shipping: 0, total: 770000 })
+  assert.deepEqual(totals(lines, { ...store.deliveryMethods[0], feeMinor: 133333 }), { subtotal: 770000, shipping: 133333, total: 903333 })
+  assert.equal(normalize(money(903333, store)), '₡9 033,33')
+  assert.equal(normalize(money(125000, store)), '₡1 250')
 })
 
 test('Correos costs CRC 2800 through CRC 15000 and is free strictly above the product threshold', () => {
