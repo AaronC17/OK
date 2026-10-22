@@ -2,6 +2,7 @@ import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+import './lib/focus-visibility.ts'
 import './styles.css'
 import './config/hero-fonts.css'
 

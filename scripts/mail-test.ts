@@ -25,9 +25,11 @@ const transport = nodemailer.createTransport({
 try {
   const info = await transport.sendMail({
     from: config.from,
+    replyTo: config.replyTo,
     to,
     bcc: config.bcc && config.bcc !== to ? config.bcc : undefined,
     subject: 'Onky’s · prueba de DirectMail',
+    headers: { 'Auto-Submitted': 'auto-generated' },
     text: 'Prueba de envío SMTP desde la tienda de Onky’s (DirectMail, región ap-southeast-1). Si lees este mensaje, tus credenciales funcionan.',
     html:
       '<div style="font-family:Arial,sans-serif;color:#3a2b47;">' +

@@ -71,12 +71,12 @@ test('store: configuring SINPE automatically enables pending orders without quot
   assert.equal(delivery.status, 'awaiting_payment')
 })
 
-test('store: Correos shipping uses only the product subtotal and the strict CRC 15000 boundary', t => {
+test('store: Correos shipping uses only the product subtotal and includes the CRC 15000 boundary', t => {
   const { create, catalog } = setup(t)
   for (const subtotal of [1499999, 1500000, 1500001, 1560000]) {
     catalog.gummies.types[0].prices[100] = subtotal
     const order = create('customer-a', randomUUID(), { ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección de prueba' } })
-    const shipping = subtotal > 1500000 ? 0 : 280000
+    const shipping = subtotal >= 1500000 ? 0 : 280000
     assert.equal(order.shippingMinor, shipping)
     assert.equal(order.totalMinor, subtotal + shipping)
   }

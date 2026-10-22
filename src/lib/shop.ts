@@ -152,13 +152,13 @@ export function restoreCart(raw: string | null, config: StoreConfig): { items: C
 
 export function shippingFee(subtotal: number, method: DeliveryMethod | undefined): number | null {
   if (!method?.enabled || !validPrice(method.feeMinor)) return null
-  return validPrice(method.freeAboveMinor) && subtotal > method.freeAboveMinor ? 0 : method.feeMinor
+  return validPrice(method.freeAboveMinor) && subtotal >= method.freeAboveMinor ? 0 : method.feeMinor
 }
 
 export function freeShippingStatus(subtotal: number, config: StoreConfig) {
   const delivery = config.deliveryMethods.find(method => method.id === 'delivery' && method.enabled)
   const threshold = delivery?.freeAboveMinor ?? 1500000
-  const isFree = validPrice(threshold) && subtotal > threshold
+  const isFree = validPrice(threshold) && subtotal >= threshold
   const remainingMinor = isFree ? 0 : Math.max(0, threshold - subtotal)
   const percent = isFree ? 100 : Math.min(99, Math.max(0, Math.round((subtotal / threshold) * 100)))
   return { threshold, isFree, remainingMinor, percent }

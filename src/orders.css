@@ -341,7 +341,7 @@
   opacity: 0;
   cursor: pointer;
 }
-.receipt-dropzone:focus-within {
+:root:not([data-input-method="pointer"]) .receipt-dropzone:has(input:focus-visible) {
   outline: 2px solid #75548e;
   outline-offset: 2px;
 }

@@ -126,15 +126,15 @@ test('accounts: admin directory and per-account orders never use email matching 
 })
 
 test('accounts: welcome rounding is integer, deterministic and leaves shipping eligibility based on products', async t => {
-  for (const subtotal of [1, 5, 14, 15, 120000, 1500001, 100000000]) {
+  for (const subtotal of [1, 5, 14, 15, 120000, 1500000, 1500001, 100000000]) {
     assert.equal(welcomeDiscount(subtotal, true), Math.round(subtotal / 10))
     assert.equal(welcomeDiscount(subtotal, false), 0)
   }
   const { db, catalog } = setup(t)
-  catalog.gummies.types[0].prices[100] = 1500001
+  catalog.gummies.types[0].prices[100] = 1500000
   const signed = await db.registerCustomer(registration(), db.customerSession(undefined).session)
   const order = db.createOrder({ ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección de prueba' } }, orderOwner(signed.session), randomUUID())
   assert.equal(order.shippingMinor, 0)
   assert.equal(order.discountMinor, 150000)
-  assert.equal(order.totalMinor, 1350001)
+  assert.equal(order.totalMinor, 1350000)
 })

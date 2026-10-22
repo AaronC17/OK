@@ -38,7 +38,7 @@ El banco se identifica como BAC Credomatic. No se solicita IBAN ni acceso bancar
 
 Sin configuración, se pueden registrar pedidos con su entrega calculada, pero quedan **«Por coordinar»** y no se muestran instrucciones para transferir. Al habilitar SINPE, esos pedidos pasan automáticamente a pendientes de pago. Cambiar el destino después no modifica las instrucciones de pedidos ya emitidos: cada pedido conserva su propio snapshot.
 
-**El catálogo sigue con `demo: true`: los precios de productos siguen siendo ejemplos. La tarifa de Correos ya fue confirmada: ₡2.800 y gratis por compras mayores a ₡15.000. No envíes ni solicites dinero real hasta confirmar el resto de los datos comerciales y el beneficiario.**
+**El catálogo sigue con `demo: true`: los precios de productos siguen siendo ejemplos. La tarifa de Correos ya fue confirmada: ₡2.800 y gratis por compras de ₡15.000 o más. No envíes ni solicites dinero real hasta confirmar el resto de los datos comerciales y el beneficiario.**
 
 ## 3. Recorrido del comprador
 
@@ -59,7 +59,7 @@ Nombre, teléfono, dirección y comprobante se guardan en el servidor, no en `lo
 ### Entrega automática, sin cotizaciones
 
 - **Correos de Costa Rica a todo el país: ₡2.800.**
-- **Envío gratis cuando el subtotal de productos supera ₡15.000**, sin contar el propio envío. A exactamente ₡15.000 se cobran ₡2.800.
+- **Envío gratis cuando el subtotal de productos alcanza o supera ₡15.000**, sin contar el propio envío. A exactamente ₡15.000 también es gratis.
 - La recogida conserva su costo cero.
 
 Carrito y backend usan la misma política, definida en `src/config/store.ts` mediante `feeMinor: 280000` y `freeAboveMinor: 1500000` (céntimos enteros). El servidor calcula el total antes de pedir el pago; no hay campos administrativos de costo de entrega ni detalle de cotización. La franja superior anuncia ambas condiciones.

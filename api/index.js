@@ -146,7 +146,7 @@ var store = {
       feeMinor: 28e4,
       freeAboveMinor: 15e5,
       coverage: "Todo Costa Rica",
-      conditions: "Correos de Costa Rica: \u20A12.800. Env\xEDo gratis en compras mayores a \u20A115.000, sin contar el env\xEDo."
+      conditions: "Correos de Costa Rica: \u20A12.800. Env\xEDo gratis en compras de \u20A115.000 o m\xE1s, sin contar el env\xEDo."
     },
     {
       id: "pickup",
@@ -353,7 +353,7 @@ function resolveLine(item, config) {
 }
 function shippingFee(subtotal, method) {
   if (!method?.enabled || !validPrice(method.feeMinor)) return null;
-  return validPrice(method.freeAboveMinor) && subtotal > method.freeAboveMinor ? 0 : method.feeMinor;
+  return validPrice(method.freeAboveMinor) && subtotal >= method.freeAboveMinor ? 0 : method.feeMinor;
 }
 function totals(lines, method) {
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotalMinor, 0);
@@ -2292,7 +2292,7 @@ function readSmtpConfig(env = process.env) {
   const port = Number(env.SMTP_PORT || "465");
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("SMTP_PORT debe ser un n\xFAmero de puerto v\xE1lido.");
   const secure = port === 465 ? true : env.SMTP_SECURE ? env.SMTP_SECURE.toLowerCase() === "true" : false;
-  return { host, port, secure, user, pass, from: env.MAIL_FROM?.trim() || `Onky\u2019s <${user}>`, bcc: env.MAIL_BCC?.trim() || void 0 };
+  return { host, port, secure, user, pass, from: env.MAIL_FROM?.trim() || `Onky\u2019s <${user}>`, replyTo: env.MAIL_REPLY_TO?.trim() || void 0, bcc: env.MAIL_BCC?.trim() || void 0 };
 }
 var totalDate = new Intl.DateTimeFormat("es-CR", { timeZone: "America/Costa_Rica", dateStyle: "long", timeStyle: "short" });
 var orderDate = new Intl.DateTimeFormat("es-CR", { timeZone: "America/Costa_Rica", dateStyle: "medium" });
@@ -2375,14 +2375,14 @@ function orderEmailMessage(event, order, origin = storeOrigin) {
     detailText = awaitingDetails ? "Estado: pedido registrado. Consulta las indicaciones de pago desde la tienda." : `Estado: pedido registrado. Realiza tu SINPE al ${order.destination.phone}, a nombre de ${order.destination.beneficiary} (${order.destination.bank}), por ${money(order.totalMinor, store)}. Incluye ${order.code} en la descripci\xF3n y sube el comprobante desde la tienda.`;
     action = awaitingDetails ? "Ir a mi pedido" : "Completar mi pedido";
   } else if (event === "receipt.submitted") {
-    title = "Tu pedido est\xE1 en revisi\xF3n";
-    headline = "Tu pedido,<br>en revisi\xF3n.";
-    status = "En revisi\xF3n";
-    preheader = "Recibimos tu comprobante. La revisi\xF3n del abono tarda entre 10 y 30 minutos; te avisaremos en cuanto quede confirmado.";
-    lead = `\xA1Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago (suele tardar de 10 a 30 minutos).`;
-    const reviewNext = order.delivery.requiresAddress ? "La revisi\xF3n del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo." : "La revisi\xF3n del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
-    body2 = noteBox("\xBFQu\xE9 sigue?", `<p style="margin:0;">Por ahora no necesitas hacer nada m\xE1s. <strong>${reviewNext}</strong></p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ""}`);
-    detailText = `Estado: en revisi\xF3n (tarda de 10 a 30 minutos). ${order.delivery.requiresAddress ? "Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo." : "Una vez confirmado el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega."}${order.receipt?.bankReference ? `
+    title = "Pago en revisi\xF3n";
+    headline = "Tu pago,<br>en revisi\xF3n.";
+    status = "Pago en revisi\xF3n";
+    preheader = `Recibimos el comprobante de tu pedido ${order.code}.`;
+    lead = `Hola, ${name}. Estamos revisando el pago de tu pedido. Este proceso suele tardar de 10 a 30 minutos.`;
+    const reviewNext = order.delivery.requiresAddress ? "En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo." : "En cuanto confirmemos el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
+    body2 = noteBox("\xBFQu\xE9 sigue?", `<p style="margin:0;">Por ahora no necesitas hacer nada m\xE1s. ${reviewNext}</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ""}`);
+    detailText = `Estado: pago en revisi\xF3n. Recibimos tu comprobante; revisarlo suele tardar de 10 a 30 minutos. Por ahora no necesitas hacer nada m\xE1s. ${reviewNext}${order.receipt?.bankReference ? `
 Referencia del comprobante: ${order.receipt.bankReference}` : ""}`;
   } else if (paid) {
     title = "\xA1Pago confirmado!";
@@ -2435,8 +2435,6 @@ Abre tu pedido y adjunta el comprobante corregido, conservando el mismo c\xF3dig
   </style>
 </head>
 <body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${"&zwnj;&nbsp;".repeat(80)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
   <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
     <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -2446,6 +2444,7 @@ Abre tu pedido y adjunta el comprobante corregido, conservando el mismo c\xF3dig
           <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky\u2019s<span style="color:#9c7bb1;">.</span></td>
           <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
         </tr></table>
+        <p style="margin:12px 0 0;color:#716b76;font-size:12px;line-height:19px;">${esc(preheader)}</p>
       </td></tr>
       <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:24px 36px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -2483,7 +2482,7 @@ Abre tu pedido y adjunta el comprobante corregido, conservando el mismo c\xF3dig
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:14px 28px;">
           <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
         </td></tr></table>
-        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda y entra a \xABPedido y seguimiento\xBB<br>desde el navegador donde hiciste tu compra.</p>
+        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre <a href="${esc(origin)}" style="color:#65447a;word-break:break-word;">${esc(origin)}</a> y entra a \xABPedido y seguimiento\xBB<br>desde el navegador donde hiciste tu compra.</p>
       </td></tr>` : ""}
       <tr><td align="center" class="mail-pad" style="padding:20px 36px;">
         <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
@@ -2514,8 +2513,10 @@ ${origin ? `Consulta tu pedido: ${origin}
 Abre \xABPedido y seguimiento\xBB desde el navegador donde hiciste tu compra.` : "Consulta tu pedido en la tienda."}
 
 Gracias por dejarnos ser parte de tu antojo.
-El equipo de Onky\u2019s \xB7 Dulce. \xC1cido. Picosito.`;
-  return { subject: `${title} (${order.code})`, html: message, text: text3 };
+El equipo de Onky\u2019s \xB7 Dulce. \xC1cido. Picosito.
+
+Recibiste este correo por tu pedido en Onky\u2019s.`;
+  return { subject: `Onky\u2019s \xB7 ${title} (${order.code})`, html: message, text: text3 };
 }
 function welcomeEmailMessage(account, origin = storeOrigin) {
   const recipient = account.email?.trim();
@@ -2523,12 +2524,12 @@ function welcomeEmailMessage(account, origin = storeOrigin) {
   const name = esc(account.name.trim().split(/\s+/)[0] || account.name.trim() || "cliente");
   const email2 = esc(recipient);
   const image = `${(origin || storeOrigin).replace(/\/+$/, "")}/images/mail-gomitas-v1.png`;
-  const title = "\xA1Te damos la bienvenida!";
-  const headline = "Tu primer antojo,<br>con 10% menos.";
-  const status = "Cuenta creada \xB7 Beneficio de bienvenida";
-  const preheader = "Tu cuenta en Onky\u2019s est\xE1 lista. Tienes un 10% de descuento autom\xE1tico en los productos de tu primer pedido.";
-  const lead = `\xA1Qu\xE9 gusto tenerte aqu\xED, ${name}! Tu cuenta en Onky\u2019s ya est\xE1 lista. Para celebrar que formas parte de nuestra comunidad, tienes un <strong>10% de descuento autom\xE1tico</strong> en los productos de tu primer pedido.`;
-  const action = "Explorar gomitas y armar pedido";
+  const title = "Tu cuenta est\xE1 lista";
+  const headline = "Tu cuenta<br>est\xE1 lista.";
+  const status = "Cuenta creada";
+  const preheader = "Confirmaci\xF3n de registro en Onky\u2019s. Ya puedes acceder a tu cuenta y consultar tus pedidos.";
+  const lead = `Hola, ${name}. Gracias por crear tu cuenta en Onky\u2019s. Puedes iniciar sesi\xF3n con el correo que registraste para guardar y consultar tus pedidos.`;
+  const action = "Abrir la tienda";
   const message = `<!doctype html>
 <html lang="es-CR" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -2544,8 +2545,6 @@ function welcomeEmailMessage(account, origin = storeOrigin) {
       .mail-outer{padding:16px 8px!important;} .mail-pad{padding-left:20px!important;padding-right:20px!important;}
       .mail-hero{padding-top:22px!important;padding-bottom:22px!important;} .hero-title{font-size:30px!important;line-height:33px!important;letter-spacing:-1px!important;}
       .hero-art{width:92px!important;padding-left:14px!important;} .hero-art img{width:92px!important;height:auto!important;}
-      .discount-card-inner{padding:18px 16px!important;} .discount-badge{width:70px!important;padding-right:12px!important;}
-      .discount-num{font-size:30px!important;line-height:32px!important;}
       .mail-button{display:block!important;text-align:center!important;}
     }
     @media only screen and (max-width:360px){
@@ -2555,8 +2554,6 @@ function welcomeEmailMessage(account, origin = storeOrigin) {
   </style>
 </head>
 <body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${"&zwnj;&nbsp;".repeat(80)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
   <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
     <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -2566,6 +2563,7 @@ function welcomeEmailMessage(account, origin = storeOrigin) {
           <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky\u2019s<span style="color:#9c7bb1;">.</span></td>
           <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
         </tr></table>
+        <p style="margin:12px 0 0;color:#716b76;font-size:12px;line-height:19px;">${esc(preheader)}</p>
       </td></tr>
       <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:24px 36px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -2580,46 +2578,17 @@ function welcomeEmailMessage(account, origin = storeOrigin) {
         </tr></table>
       </td></tr>
       <tr><td class="mail-pad" style="padding:24px 36px 0;">
-        <!-- Tarjeta de beneficio 10% -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-          <tr><td class="discount-card-inner" bgcolor="#f8f4fa" style="padding:22px 24px;border:1px solid #e7ddeb;border-radius:12px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-              <td class="discount-badge" valign="middle" style="width:90px;padding-right:18px;border-right:1px dashed #cfb9dc;">
-                <span class="discount-num" style="display:block;font-size:38px;line-height:40px;font-weight:800;color:#382448;letter-spacing:-1.8px;">10<span style="font-size:22px;letter-spacing:-0.5px;">%</span></span>
-                <span style="display:block;font-size:10px;line-height:14px;font-weight:700;color:#65447a;text-transform:uppercase;letter-spacing:0.8px;">DESCUENTO</span>
-              </td>
-              <td valign="middle" style="padding-left:18px;">
-                <h3 style="margin:0 0 5px;color:#382448;font-size:16px;line-height:22px;font-weight:700;">10% de descuento en tu primer pedido</h3>
-                <p style="margin:0;font-size:13px;line-height:20px;color:#5d5664;">Se aplica de forma autom\xE1tica al subtotal de productos en tu carrito. Sin cupones ni c\xF3digos que recordar.</p>
-              </td>
-            </tr></table>
-          </td></tr>
-        </table>
-      </td></tr>
-      <tr><td class="mail-pad" style="padding:16px 36px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-          <tr><td bgcolor="#fbfaf9" style="padding:20px 22px;border-radius:10px;font-size:13px;line-height:21px;color:#5d5664;">
-            <h2 style="margin:0 0 10px;color:#382448;font-size:14px;line-height:20px;font-weight:700;">\xBFC\xF3mo funciona tu beneficio?</h2>
-            <p style="margin:0 0 8px;"><strong>1. Elige tus favoritas:</strong> Explora nuestras gomitas enchiladas, uvarindas o personaliza tu mezcla ideal.</p>
-            <p style="margin:0 0 8px;"><strong>2. Tu descuento se aplica solo:</strong> Inicia sesi\xF3n con este correo (<strong>${email2}</strong>) y ver\xE1s reflejado el 10% menos de inmediato en los productos de tu carrito.</p>
-            <p style="margin:0 0 8px;"><strong>3. Paga f\xE1cil con SINPE M\xF3vil:</strong> Registra tu pedido, usa el c\xF3digo asignado en la transferencia y sube tu comprobante para prepararlo.</p>
-            <p style="margin:0;color:#716b76;font-size:12px;line-height:18px;">* El beneficio aplica exclusivamente a los productos de tu primer pedido; el costo de env\xEDo no est\xE1 incluido.</p>
-          </td></tr>
-        </table>
+        <h2 style="margin:0 0 10px;color:#382448;font-size:16px;line-height:22px;font-weight:700;">Datos de tu cuenta</h2>
+        <p style="margin:0;color:#211d25;font-size:14px;line-height:22px;"><strong>Nombre:</strong> ${esc(account.name)}<br><strong>Correo electr\xF3nico:</strong> <span style="word-break:break-word;">${email2}</span></p>
       </td></tr>
       <tr><td class="mail-pad" style="padding:20px 36px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-          <tr><td style="padding:16px 0;border-top:1px solid #e5e0e6;border-bottom:1px solid #e5e0e6;">
-            <p style="margin:0 0 4px;color:#716b76;font-size:12px;line-height:18px;">Datos de tu cuenta</p>
-            <p style="margin:0;color:#211d25;font-size:14px;line-height:22px;"><strong>Nombre:</strong> ${esc(account.name)}<br><strong>Correo electr\xF3nico:</strong> ${email2}</p>
-          </td></tr>
-        </table>
+        ${noteBox("Beneficio de bienvenida", '<p style="margin:0;">Tu primer pedido incluye un <strong>10% de descuento</strong> que se aplica autom\xE1ticamente al subtotal de productos al iniciar sesi\xF3n. El costo de env\xEDo no est\xE1 incluido.</p>')}
       </td></tr>
       ${origin ? `<tr><td align="center" class="mail-pad" style="padding:24px 36px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:14px 28px;">
           <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
         </td></tr></table>
-        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda desde tu navegador para comenzar.</p>
+        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Entra a <a href="${esc(origin)}" style="color:#65447a;word-break:break-word;">${esc(origin)}</a> e inicia sesi\xF3n con el correo registrado para consultar tus pedidos.</p>
       </td></tr>` : ""}
       <tr><td align="center" class="mail-pad" style="padding:24px 36px;">
         <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
@@ -2631,35 +2600,30 @@ function welcomeEmailMessage(account, origin = storeOrigin) {
     </table>
     <!--[if mso]></td></tr></table><![endif]-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;"><tr><td align="center" style="padding:16px 16px 0;color:#716b76;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;">
-      Recibiste este correo porque creaste una cuenta en Onky\u2019s.<br>Tu correo registrado es <span style="word-break:break-word;">${email2}</span>.
+      Recibiste este correo porque creaste una cuenta en Onky\u2019s.
     </td></tr></table>
   </td></tr></table>
 </body></html>`;
   const text3 = `Onky\u2019s \xB7 ${title}
 Hola, ${account.name}.
 
-\xA1Qu\xE9 gusto tenerte aqu\xED! Tu cuenta en Onky\u2019s ya est\xE1 lista.
-
-TU BENEFICIO DE BIENVENIDA: 10% DE DESCUENTO
-Tu primer pedido tiene un 10% de descuento autom\xE1tico en el subtotal de productos. Sin cupones ni c\xF3digos: solo a\xF1ade tus gomitas favoritas al carrito con tu sesi\xF3n iniciada y el descuento se aplicar\xE1 de inmediato.
-
-\xBFC\xF3mo funciona tu beneficio?
-1. Elige tus favoritas: Explora nuestras gomitas enchiladas, uvarindas o personaliza tu mezcla ideal.
-2. Tu descuento se aplica solo: Inicia sesi\xF3n con este correo (${account.email}) y ver\xE1s reflejado el 10% menos de inmediato en los productos de tu carrito.
-3. Paga f\xE1cil con SINPE M\xF3vil: Registra tu pedido, usa el c\xF3digo asignado en la transferencia y sube tu comprobante para prepararlo.
-
-* El beneficio aplica exclusivamente a los productos de tu primer pedido; el costo de env\xEDo no est\xE1 incluido.
-
-${origin ? `Ir a la tienda: ${origin}
-Abre la tienda desde tu navegador para comenzar.` : "Visita la tienda desde tu navegador."}
+Gracias por crear tu cuenta en Onky\u2019s. Puedes iniciar sesi\xF3n con el correo que registraste para guardar y consultar tus pedidos.
 
 Datos de tu cuenta:
 Nombre: ${account.name}
-Correo: ${account.email}
+Correo: ${recipient}
+
+Beneficio de bienvenida:
+Tu primer pedido incluye un 10% de descuento que se aplica autom\xE1ticamente al subtotal de productos al iniciar sesi\xF3n. El costo de env\xEDo no est\xE1 incluido.
+
+${origin ? `Ir a la tienda: ${origin}
+Inicia sesi\xF3n con el correo registrado para consultar tus pedidos.` : "Visita la tienda e inicia sesi\xF3n para consultar tus pedidos."}
 
 Gracias por dejarnos ser parte de tu antojo.
-El equipo de Onky\u2019s \xB7 Dulce. \xC1cido. Picosito.`;
-  return { subject: "\xA1Te damos la bienvenida a Onky\u2019s! \xB7 10% de descuento en tu primer pedido", html: message, text: text3 };
+El equipo de Onky\u2019s \xB7 Dulce. \xC1cido. Picosito.
+
+Recibiste este correo porque creaste una cuenta en Onky\u2019s.`;
+  return { subject: `Onky\u2019s \xB7 ${title}`, html: message, text: text3 };
 }
 var MAX_TRACKED = 400;
 function createOrderMailer(env = process.env, deliver) {
@@ -2674,6 +2638,16 @@ function createOrderMailer(env = process.env, deliver) {
     connectionTimeout: 6e3,
     greetingTimeout: 6e3,
     socketTimeout: 1e4
+  });
+  const send = (to, message) => transport.sendMail({
+    from: config.from,
+    to: to.trim(),
+    replyTo: config.replyTo,
+    bcc: config.bcc,
+    ...message,
+    // RFC 3834: these messages are generated by an account/order action.
+    // This identifies automation to responders; it does not override spam filters.
+    headers: { "Auto-Submitted": "auto-generated" }
   });
   const sent = /* @__PURE__ */ new Map();
   const first = (key) => {
@@ -2692,7 +2666,7 @@ function createOrderMailer(env = process.env, deliver) {
       const message = orderEmailMessage(event, order, origin);
       if (!message) return Promise.resolve();
       const to = order.customer.email;
-      return transport.sendMail({ from: config.from, to, bcc: config.bcc, subject: message.subject, html: message.html, text: message.text }).then(() => {
+      return send(to, message).then(() => {
         sent.set(key, Date.now());
       }).catch((error) => {
         sent.delete(key);
@@ -2705,7 +2679,7 @@ function createOrderMailer(env = process.env, deliver) {
       const message = welcomeEmailMessage(account, origin);
       if (!message) return Promise.resolve();
       const to = account.email.trim();
-      return transport.sendMail({ from: config.from, to, bcc: config.bcc, subject: message.subject, html: message.html, text: message.text }).then(() => {
+      return send(to, message).then(() => {
         sent.set(key, Date.now());
       }).catch((error) => {
         sent.delete(key);

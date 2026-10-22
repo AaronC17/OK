@@ -6,9 +6,10 @@ import type { ShopOrder } from '../../src/order-types.ts'
 /** Estado del pedido que dispara un correo al cliente. Nombres alineados con la auditoría. */
 export type OrderMailEvent = 'order.created' | 'receipt.submitted' | 'payment.confirmed_manual' | 'receipt.correction_requested'
 
-export interface DirectMailConfig { host: string; port: number; secure: boolean; user: string; pass: string; from: string; bcc?: string }
+export interface DirectMailConfig { host: string; port: number; secure: boolean; user: string; pass: string; from: string; replyTo?: string; bcc?: string }
 
-interface Transport { sendMail(message: { from: string; to: string; bcc?: string; subject: string; html: string; text: string }): Promise<unknown> }
+interface MailContent { subject: string; html: string; text: string }
+interface Transport { sendMail(message: MailContent & { from: string; to: string; replyTo?: string; bcc?: string; headers: Record<string, string> }): Promise<unknown> }
 
 export function readSmtpConfig(env: NodeJS.ProcessEnv = process.env): DirectMailConfig | null {
   const host = env.SMTP_HOST?.trim()
@@ -18,7 +19,7 @@ export function readSmtpConfig(env: NodeJS.ProcessEnv = process.env): DirectMail
   const port = Number(env.SMTP_PORT || '465')
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SMTP_PORT debe ser un número de puerto válido.')
   const secure = port === 465 ? true : (env.SMTP_SECURE ? env.SMTP_SECURE.toLowerCase() === 'true' : false)
-  return { host, port, secure, user, pass, from: env.MAIL_FROM?.trim() || `Onky’s <${user}>`, bcc: env.MAIL_BCC?.trim() || undefined }
+  return { host, port, secure, user, pass, from: env.MAIL_FROM?.trim() || `Onky’s <${user}>`, replyTo: env.MAIL_REPLY_TO?.trim() || undefined, bcc: env.MAIL_BCC?.trim() || undefined }
 }
 
 const totalDate = new Intl.DateTimeFormat('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'long', timeStyle: 'short' })
@@ -79,7 +80,7 @@ function sinpeBox(order: ShopOrder): string {
 }
 
 /** Contenido del correo por estado. Devuelve null cuando el pedido no tiene correo de contacto. */
-export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origin = storeOrigin): { subject: string; html: string; text: string } | null {
+export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origin = storeOrigin): MailContent | null {
   const recipient = order.customer?.email
   if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(recipient)) return null
   const paid = event === 'payment.confirmed_manual'
@@ -106,16 +107,16 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     detailText = awaitingDetails ? 'Estado: pedido registrado. Consulta las indicaciones de pago desde la tienda.' : `Estado: pedido registrado. Realiza tu SINPE al ${order.destination!.phone}, a nombre de ${order.destination!.beneficiary} (${order.destination!.bank}), por ${money(order.totalMinor!, store)}. Incluye ${order.code} en la descripción y sube el comprobante desde la tienda.`
     action = awaitingDetails ? 'Ir a mi pedido' : 'Completar mi pedido'
   } else if (event === 'receipt.submitted') {
-    title = 'Tu pedido está en revisión'
-    headline = 'Tu pedido,<br>en revisión.'
-    status = 'En revisión'
-    preheader = 'Recibimos tu comprobante. La revisión del abono tarda entre 10 y 30 minutos; te avisaremos en cuanto quede confirmado.'
-    lead = `¡Gracias, ${name}! Recibimos tu comprobante. Estamos revisando el pago (suele tardar de 10 a 30 minutos).`
+    title = 'Pago en revisión'
+    headline = 'Tu pago,<br>en revisión.'
+    status = 'Pago en revisión'
+    preheader = `Recibimos el comprobante de tu pedido ${order.code}.`
+    lead = `Hola, ${name}. Estamos revisando el pago de tu pedido. Este proceso suele tardar de 10 a 30 minutos.`
     const reviewNext = order.delivery.requiresAddress
-      ? 'La revisión del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo.'
-      : 'La revisión del abono tarda de 10 a 30 minutos. En cuanto confirmemos el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
-    body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. <strong>${reviewNext}</strong></p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
-    detailText = `Estado: en revisión (tarda de 10 a 30 minutos). ${order.delivery.requiresAddress ? 'Una vez confirmado el pago, tu pedido se prepara para la entrega. Te avisaremos por este correo.' : 'Una vez confirmado el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
+      ? 'En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo.'
+      : 'En cuanto confirmemos el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
+    body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. ${reviewNext}</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
+    detailText = `Estado: pago en revisión. Recibimos tu comprobante; revisarlo suele tardar de 10 a 30 minutos. Por ahora no necesitas hacer nada más. ${reviewNext}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
   } else if (paid) {
     title = '¡Pago confirmado!'
     headline = 'Tu antojo,<br>confirmado.'
@@ -167,8 +168,6 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
   </style>
 </head>
 <body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${'&zwnj;&nbsp;'.repeat(80)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
   <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
     <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -178,6 +177,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
           <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky’s<span style="color:#9c7bb1;">.</span></td>
           <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
         </tr></table>
+        <p style="margin:12px 0 0;color:#716b76;font-size:12px;line-height:19px;">${esc(preheader)}</p>
       </td></tr>
       <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:24px 36px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -215,7 +215,7 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:14px 28px;">
           <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
         </td></tr></table>
-        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda y entra a «Pedido y seguimiento»<br>desde el navegador donde hiciste tu compra.</p>
+        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre <a href="${esc(origin)}" style="color:#65447a;word-break:break-word;">${esc(origin)}</a> y entra a «Pedido y seguimiento»<br>desde el navegador donde hiciste tu compra.</p>
       </td></tr>` : ''}
       <tr><td align="center" class="mail-pad" style="padding:20px 36px;">
         <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
@@ -244,23 +244,25 @@ Entrega: ${order.delivery.name}${order.delivery.requiresAddress && order.custome
 ${origin ? `Consulta tu pedido: ${origin}\nAbre «Pedido y seguimiento» desde el navegador donde hiciste tu compra.` : 'Consulta tu pedido en la tienda.'}
 
 Gracias por dejarnos ser parte de tu antojo.
-El equipo de Onky’s · Dulce. Ácido. Picosito.`
-  return { subject: `${title} (${order.code})`, html: message, text }
+El equipo de Onky’s · Dulce. Ácido. Picosito.
+
+Recibiste este correo por tu pedido en Onky’s.`
+  return { subject: `Onky’s · ${title} (${order.code})`, html: message, text }
 }
 
-/** Contenido del correo de bienvenida con 10% de descuento al crear una cuenta. Devuelve null si el correo es inválido. */
-export function welcomeEmailMessage(account: { name: string; email: string }, origin = storeOrigin): { subject: string; html: string; text: string } | null {
+/** Confirmación de cuenta con sus datos y beneficio de bienvenida. Devuelve null si el correo es inválido. */
+export function welcomeEmailMessage(account: { name: string; email: string }, origin = storeOrigin): MailContent | null {
   const recipient = account.email?.trim()
   if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(recipient)) return null
   const name = esc(account.name.trim().split(/\s+/)[0] || account.name.trim() || 'cliente')
   const email = esc(recipient)
   const image = `${(origin || storeOrigin).replace(/\/+$/, '')}/images/mail-gomitas-v1.png`
-  const title = '¡Te damos la bienvenida!'
-  const headline = 'Tu primer antojo,<br>con 10% menos.'
-  const status = 'Cuenta creada · Beneficio de bienvenida'
-  const preheader = 'Tu cuenta en Onky’s está lista. Tienes un 10% de descuento automático en los productos de tu primer pedido.'
-  const lead = `¡Qué gusto tenerte aquí, ${name}! Tu cuenta en Onky’s ya está lista. Para celebrar que formas parte de nuestra comunidad, tienes un <strong>10% de descuento automático</strong> en los productos de tu primer pedido.`
-  const action = 'Explorar gomitas y armar pedido'
+  const title = 'Tu cuenta está lista'
+  const headline = 'Tu cuenta<br>está lista.'
+  const status = 'Cuenta creada'
+  const preheader = 'Confirmación de registro en Onky’s. Ya puedes acceder a tu cuenta y consultar tus pedidos.'
+  const lead = `Hola, ${name}. Gracias por crear tu cuenta en Onky’s. Puedes iniciar sesión con el correo que registraste para guardar y consultar tus pedidos.`
+  const action = 'Abrir la tienda'
 
   const message = `<!doctype html>
 <html lang="es-CR" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -277,8 +279,6 @@ export function welcomeEmailMessage(account: { name: string; email: string }, or
       .mail-outer{padding:16px 8px!important;} .mail-pad{padding-left:20px!important;padding-right:20px!important;}
       .mail-hero{padding-top:22px!important;padding-bottom:22px!important;} .hero-title{font-size:30px!important;line-height:33px!important;letter-spacing:-1px!important;}
       .hero-art{width:92px!important;padding-left:14px!important;} .hero-art img{width:92px!important;height:auto!important;}
-      .discount-card-inner{padding:18px 16px!important;} .discount-badge{width:70px!important;padding-right:12px!important;}
-      .discount-num{font-size:30px!important;line-height:32px!important;}
       .mail-button{display:block!important;text-align:center!important;}
     }
     @media only screen and (max-width:360px){
@@ -288,8 +288,6 @@ export function welcomeEmailMessage(account: { name: string; email: string }, or
   </style>
 </head>
 <body bgcolor="#f1eef3" style="margin:0;padding:0;width:100%;background-color:#f1eef3;font-family:Arial,Helvetica,sans-serif;color:#211d25;">
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheader)}</div>
-  <div style="display:none;font-size:1px;line-height:1px;color:#f1eef3;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${'&zwnj;&nbsp;'.repeat(80)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1eef3" style="width:100%;">
   <tr><td align="center" class="mail-outer" style="padding:28px 16px;">
     <!--[if mso]><table role="presentation" width="680" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -299,6 +297,7 @@ export function welcomeEmailMessage(account: { name: string; email: string }, or
           <td style="color:#382448;font-size:34px;line-height:38px;font-weight:800;letter-spacing:-2px;">Onky’s<span style="color:#9c7bb1;">.</span></td>
           <td align="right" style="color:#716b76;font-size:11px;line-height:17px;">Gomitas<br>enchiladas</td>
         </tr></table>
+        <p style="margin:12px 0 0;color:#716b76;font-size:12px;line-height:19px;">${esc(preheader)}</p>
       </td></tr>
       <tr><td class="mail-pad mail-hero" bgcolor="#f2edf5" style="padding:24px 36px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -313,46 +312,17 @@ export function welcomeEmailMessage(account: { name: string; email: string }, or
         </tr></table>
       </td></tr>
       <tr><td class="mail-pad" style="padding:24px 36px 0;">
-        <!-- Tarjeta de beneficio 10% -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-          <tr><td class="discount-card-inner" bgcolor="#f8f4fa" style="padding:22px 24px;border:1px solid #e7ddeb;border-radius:12px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-              <td class="discount-badge" valign="middle" style="width:90px;padding-right:18px;border-right:1px dashed #cfb9dc;">
-                <span class="discount-num" style="display:block;font-size:38px;line-height:40px;font-weight:800;color:#382448;letter-spacing:-1.8px;">10<span style="font-size:22px;letter-spacing:-0.5px;">%</span></span>
-                <span style="display:block;font-size:10px;line-height:14px;font-weight:700;color:#65447a;text-transform:uppercase;letter-spacing:0.8px;">DESCUENTO</span>
-              </td>
-              <td valign="middle" style="padding-left:18px;">
-                <h3 style="margin:0 0 5px;color:#382448;font-size:16px;line-height:22px;font-weight:700;">10% de descuento en tu primer pedido</h3>
-                <p style="margin:0;font-size:13px;line-height:20px;color:#5d5664;">Se aplica de forma automática al subtotal de productos en tu carrito. Sin cupones ni códigos que recordar.</p>
-              </td>
-            </tr></table>
-          </td></tr>
-        </table>
-      </td></tr>
-      <tr><td class="mail-pad" style="padding:16px 36px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-          <tr><td bgcolor="#fbfaf9" style="padding:20px 22px;border-radius:10px;font-size:13px;line-height:21px;color:#5d5664;">
-            <h2 style="margin:0 0 10px;color:#382448;font-size:14px;line-height:20px;font-weight:700;">¿Cómo funciona tu beneficio?</h2>
-            <p style="margin:0 0 8px;"><strong>1. Elige tus favoritas:</strong> Explora nuestras gomitas enchiladas, uvarindas o personaliza tu mezcla ideal.</p>
-            <p style="margin:0 0 8px;"><strong>2. Tu descuento se aplica solo:</strong> Inicia sesión con este correo (<strong>${email}</strong>) y verás reflejado el 10% menos de inmediato en los productos de tu carrito.</p>
-            <p style="margin:0 0 8px;"><strong>3. Paga fácil con SINPE Móvil:</strong> Registra tu pedido, usa el código asignado en la transferencia y sube tu comprobante para prepararlo.</p>
-            <p style="margin:0;color:#716b76;font-size:12px;line-height:18px;">* El beneficio aplica exclusivamente a los productos de tu primer pedido; el costo de envío no está incluido.</p>
-          </td></tr>
-        </table>
+        <h2 style="margin:0 0 10px;color:#382448;font-size:16px;line-height:22px;font-weight:700;">Datos de tu cuenta</h2>
+        <p style="margin:0;color:#211d25;font-size:14px;line-height:22px;"><strong>Nombre:</strong> ${esc(account.name)}<br><strong>Correo electrónico:</strong> <span style="word-break:break-word;">${email}</span></p>
       </td></tr>
       <tr><td class="mail-pad" style="padding:20px 36px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;">
-          <tr><td style="padding:16px 0;border-top:1px solid #e5e0e6;border-bottom:1px solid #e5e0e6;">
-            <p style="margin:0 0 4px;color:#716b76;font-size:12px;line-height:18px;">Datos de tu cuenta</p>
-            <p style="margin:0;color:#211d25;font-size:14px;line-height:22px;"><strong>Nombre:</strong> ${esc(account.name)}<br><strong>Correo electrónico:</strong> ${email}</p>
-          </td></tr>
-        </table>
+        ${noteBox('Beneficio de bienvenida', '<p style="margin:0;">Tu primer pedido incluye un <strong>10% de descuento</strong> que se aplica automáticamente al subtotal de productos al iniciar sesión. El costo de envío no está incluido.</p>')}
       </td></tr>
       ${origin ? `<tr><td align="center" class="mail-pad" style="padding:24px 36px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr><td align="center" bgcolor="#382448" style="border:1px solid #382448;border-radius:8px;mso-padding-alt:14px 28px;">
           <a class="mail-button" href="${esc(origin)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-decoration:none;border-radius:8px;">${action}</a>
         </td></tr></table>
-        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Abre la tienda desde tu navegador para comenzar.</p>
+        <p style="margin:10px 0 0;color:#716b76;font-size:11px;line-height:18px;">Entra a <a href="${esc(origin)}" style="color:#65447a;word-break:break-word;">${esc(origin)}</a> e inicia sesión con el correo registrado para consultar tus pedidos.</p>
       </td></tr>` : ''}
       <tr><td align="center" class="mail-pad" style="padding:24px 36px;">
         <p style="margin:0;color:#382448;font-size:14px;line-height:22px;font-weight:700;">Gracias por dejarnos ser parte de tu antojo.</p>
@@ -364,7 +334,7 @@ export function welcomeEmailMessage(account: { name: string; email: string }, or
     </table>
     <!--[if mso]></td></tr></table><![endif]-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;"><tr><td align="center" style="padding:16px 16px 0;color:#716b76;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;">
-      Recibiste este correo porque creaste una cuenta en Onky’s.<br>Tu correo registrado es <span style="word-break:break-word;">${email}</span>.
+      Recibiste este correo porque creaste una cuenta en Onky’s.
     </td></tr></table>
   </td></tr></table>
 </body></html>`
@@ -372,28 +342,23 @@ export function welcomeEmailMessage(account: { name: string; email: string }, or
   const text = `Onky’s · ${title}
 Hola, ${account.name}.
 
-¡Qué gusto tenerte aquí! Tu cuenta en Onky’s ya está lista.
-
-TU BENEFICIO DE BIENVENIDA: 10% DE DESCUENTO
-Tu primer pedido tiene un 10% de descuento automático en el subtotal de productos. Sin cupones ni códigos: solo añade tus gomitas favoritas al carrito con tu sesión iniciada y el descuento se aplicará de inmediato.
-
-¿Cómo funciona tu beneficio?
-1. Elige tus favoritas: Explora nuestras gomitas enchiladas, uvarindas o personaliza tu mezcla ideal.
-2. Tu descuento se aplica solo: Inicia sesión con este correo (${account.email}) y verás reflejado el 10% menos de inmediato en los productos de tu carrito.
-3. Paga fácil con SINPE Móvil: Registra tu pedido, usa el código asignado en la transferencia y sube tu comprobante para prepararlo.
-
-* El beneficio aplica exclusivamente a los productos de tu primer pedido; el costo de envío no está incluido.
-
-${origin ? `Ir a la tienda: ${origin}\nAbre la tienda desde tu navegador para comenzar.` : 'Visita la tienda desde tu navegador.'}
+Gracias por crear tu cuenta en Onky’s. Puedes iniciar sesión con el correo que registraste para guardar y consultar tus pedidos.
 
 Datos de tu cuenta:
 Nombre: ${account.name}
-Correo: ${account.email}
+Correo: ${recipient}
+
+Beneficio de bienvenida:
+Tu primer pedido incluye un 10% de descuento que se aplica automáticamente al subtotal de productos al iniciar sesión. El costo de envío no está incluido.
+
+${origin ? `Ir a la tienda: ${origin}\nInicia sesión con el correo registrado para consultar tus pedidos.` : 'Visita la tienda e inicia sesión para consultar tus pedidos.'}
 
 Gracias por dejarnos ser parte de tu antojo.
-El equipo de Onky’s · Dulce. Ácido. Picosito.`
+El equipo de Onky’s · Dulce. Ácido. Picosito.
 
-  return { subject: '¡Te damos la bienvenida a Onky’s! · 10% de descuento en tu primer pedido', html: message, text }
+Recibiste este correo porque creaste una cuenta en Onky’s.`
+
+  return { subject: `Onky’s · ${title}`, html: message, text }
 }
 
 export interface OrderMailer {
@@ -411,6 +376,12 @@ export function createOrderMailer(env: NodeJS.ProcessEnv = process.env, deliver?
         host: config.host, port: config.port, secure: config.secure, auth: { user: config.user, pass: config.pass },
         connectionTimeout: 6_000, greetingTimeout: 6_000, socketTimeout: 10_000,
       })
+  const send = (to: string, message: MailContent) => transport.sendMail({
+    from: config.from, to: to.trim(), replyTo: config.replyTo, bcc: config.bcc, ...message,
+    // RFC 3834: these messages are generated by an account/order action.
+    // This identifies automation to responders; it does not override spam filters.
+    headers: { 'Auto-Submitted': 'auto-generated' },
+  })
   const sent = new Map<string, number>()
   const first = (key: string) => {
     if (sent.has(key)) return false
@@ -426,7 +397,7 @@ export function createOrderMailer(env: NodeJS.ProcessEnv = process.env, deliver?
       const message = orderEmailMessage(event, order, origin)
       if (!message) return Promise.resolve()
       const to = order.customer.email
-      return transport.sendMail({ from: config.from, to, bcc: config.bcc, subject: message.subject, html: message.html, text: message.text })
+      return send(to, message)
         .then(() => { sent.set(key, Date.now()) })
         .catch(error => {
           sent.delete(key)
@@ -439,7 +410,7 @@ export function createOrderMailer(env: NodeJS.ProcessEnv = process.env, deliver?
       const message = welcomeEmailMessage(account, origin)
       if (!message) return Promise.resolve()
       const to = account.email.trim()
-      return transport.sendMail({ from: config.from, to, bcc: config.bcc, subject: message.subject, html: message.html, text: message.text })
+      return send(to, message)
         .then(() => { sent.set(key, Date.now()) })
         .catch(error => {
           sent.delete(key)

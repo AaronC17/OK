@@ -21,7 +21,7 @@ export function Header({ count, onCart, signedIn = false, onAccount }: { count: 
 
   return <>
     <span ref={sentinel} aria-hidden="true" style={{ position: 'absolute', top: 24, left: 0, width: 1, height: 0, pointerEvents: 'none' }} />
-    <div className="announcement shipping-announcement"><p>Envío GRATIS a todo Costa Rica en compras superiores a {freeShippingThreshold}</p></div>
+    <div className="announcement shipping-announcement"><p>Envío GRATIS a todo Costa Rica en compras de {freeShippingThreshold} o más</p></div>
     <header className={`site-header ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="container header-inner">
         <SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink>

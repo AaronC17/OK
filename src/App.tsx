@@ -127,7 +127,7 @@ export default function App() {
         <div className="questions-list">
           <details><summary>¿Cómo se confirma mi pedido?<Icon name="plus" size={19} /></summary><p>Haces tu pedido en la página, pagas por SINPE Móvil con el código asignado y subes tu comprobante. Revisamos el pago y de inmediato empezamos a preparar tu antojo.</p></details>
           <details><summary>¿Puedo combinar tipos de gomita?<Icon name="plus" size={19} /></summary><p>¡Claro! Puedes elegir un solo tipo o armar un mix con dos o tres opciones en presentaciones de {weightList}.</p></details>
-          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos por ₡2.800 (¡gratis en compras mayores a ₡15.000!). También puedes retirar sin costo en Orotina Centro.{store.demo ? ' Los precios son de demostración; no envíes dinero real todavía.' : ''}</p></details>
+          <details><summary>¿Cómo funciona la entrega?<Icon name="plus" size={19} /></summary><p>Enviamos a todo Costa Rica por Correos por ₡2.800 (¡gratis en compras de ₡15.000 o más!). También puedes retirar sin costo en Orotina Centro.{store.demo ? ' Los precios son de demostración; no envíes dinero real todavía.' : ''}</p></details>
         </div>
       </section>
     </main>
@@ -160,7 +160,7 @@ export default function App() {
         <button className="icon-button modal-close" aria-label="Cerrar información" onClick={() => setInfoOpen(false)}><Icon name="close" /></button>
         <span className="eyebrow">CONOCE LOS DETALLES</span><h2 id="info-title">Información de la tienda</h2>
         <p>Explora, personaliza y prepara tu carrito. Este catálogo utiliza datos de demostración.</p>
-        <ul><li>Productos, disponibilidad y precios de catálogo son de ejemplo y deben confirmarse.</li><li>Precios en colones costarricenses (CRC).</li><li>Correos a todo Costa Rica: ₡2.800; gratis en compras mayores a ₡15.000.</li><li>Puedes elegir un solo tipo de gomita o pedirlas mixtas; el peso es el total de la bolsa.</li><li>Los pedidos se registran en esta tienda y se pagan mediante SINPE Móvil, después de confirmar el destino y el total.</li></ul>
+        <ul><li>Productos, disponibilidad y precios de catálogo son de ejemplo y deben confirmarse.</li><li>Precios en colones costarricenses (CRC).</li><li>Correos a todo Costa Rica: ₡2.800; gratis en compras de ₡15.000 o más.</li><li>Puedes elegir un solo tipo de gomita o pedirlas mixtas; el peso es el total de la bolsa.</li><li>Los pedidos se registran en esta tienda y se pagan mediante SINPE Móvil, después de confirmar el destino y el total.</li></ul>
         <p>El comprobante y el código se revisan antes de confirmar el pago. En esta demostración no envíes dinero real.</p>
         <button className="button button-primary" onClick={() => setInfoOpen(false)}>Seguir explorando <Icon name="arrow" size={18} /></button>
       </div>

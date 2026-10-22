@@ -130,11 +130,11 @@ test('quoted, free and fixed delivery have honest totals with integer math', () 
   assert.equal(normalize(money(125000, store)), '₡1 250')
 })
 
-test('Correos costs CRC 2800 through CRC 15000 and is free strictly above the product threshold', () => {
+test('Correos costs CRC 2800 below CRC 15000 and is free at or above the product threshold', () => {
   const delivery = store.deliveryMethods.find(method => method.id === 'delivery')!
   assert.equal(shippingFee(1, delivery), 280000)
   assert.equal(shippingFee(1499999, delivery), 280000)
-  assert.equal(shippingFee(1500000, delivery), 280000)
+  assert.equal(shippingFee(1500000, delivery), 0)
   assert.equal(shippingFee(1500001, delivery), 0)
   assert.equal(shippingFee(2000000, delivery), 0)
   assert.equal(shippingFee(120000, { ...delivery, enabled: false }), null)
@@ -187,6 +187,8 @@ test('freeShippingStatus calculates remaining amount and percentage correctly', 
   assert.deepEqual(freeShippingStatus(0, store), { threshold: 1500000, isFree: false, remainingMinor: 1500000, percent: 0 })
   assert.deepEqual(freeShippingStatus(750000, store), { threshold: 1500000, isFree: false, remainingMinor: 750000, percent: 50 })
   assert.deepEqual(freeShippingStatus(1200000, store), { threshold: 1500000, isFree: false, remainingMinor: 300000, percent: 80 })
-  assert.deepEqual(freeShippingStatus(1500000, store), { threshold: 1500000, isFree: false, remainingMinor: 0, percent: 99 })
+  assert.deepEqual(freeShippingStatus(1499999, store), { threshold: 1500000, isFree: false, remainingMinor: 1, percent: 99 })
+  assert.deepEqual(freeShippingStatus(1500000, store), { threshold: 1500000, isFree: true, remainingMinor: 0, percent: 100 })
+  assert.deepEqual(freeShippingStatus(1500001, store), { threshold: 1500000, isFree: true, remainingMinor: 0, percent: 100 })
   assert.deepEqual(freeShippingStatus(1560000, store), { threshold: 1500000, isFree: true, remainingMinor: 0, percent: 100 })
 })

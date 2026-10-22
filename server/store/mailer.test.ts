@@ -19,9 +19,10 @@ const order = (overrides: Partial<ShopOrder> = {}): ShopOrder => ({
 test('mailer: configuration requires host, user and pass and supports DirectMail SMTP defaults', () => {
   assert.equal(readSmtpConfig({}), null)
   const config = readSmtpConfig({ SMTP_HOST: 'smtpdm.aliyun.com', SMTP_USER: 'pedidos@onkys.com', SMTP_PASS: 'secret' })
-  assert.deepEqual(config, { host: 'smtpdm.aliyun.com', port: 465, secure: true, user: 'pedidos@onkys.com', pass: 'secret', from: 'Onky’s <pedidos@onkys.com>', bcc: undefined })
-  const custom = readSmtpConfig({ SMTP_HOST: 'mail.ejemplo', SMTP_USER: 'hola@onkys.com', SMTP_PASS: 's', SMTP_PORT: '587', SMTP_SECURE: 'false', MAIL_FROM: 'Onky’s Tienda <hola@onkys.com>', MAIL_BCC: 'duena@onkys.com' })
+  assert.deepEqual(config, { host: 'smtpdm.aliyun.com', port: 465, secure: true, user: 'pedidos@onkys.com', pass: 'secret', from: 'Onky’s <pedidos@onkys.com>', replyTo: undefined, bcc: undefined })
+  const custom = readSmtpConfig({ SMTP_HOST: 'mail.ejemplo', SMTP_USER: 'hola@onkys.com', SMTP_PASS: 's', SMTP_PORT: '587', SMTP_SECURE: 'false', MAIL_FROM: 'Onky’s Tienda <hola@onkys.com>', MAIL_REPLY_TO: ' Soporte <soporte@onkys.com> ', MAIL_BCC: 'duena@onkys.com' })
   assert.equal(custom?.secure, false)
+  assert.equal(custom?.replyTo, 'Soporte <soporte@onkys.com>')
   assert.equal(custom?.bcc, 'duena@onkys.com')
   assert.throws(() => readSmtpConfig({ SMTP_HOST: 'smtp', SMTP_USER: 'u', SMTP_PASS: 'p', SMTP_PORT: 'no' }), /SMTP_PORT/)
 })
@@ -33,7 +34,9 @@ test('mailer: message per event carries code, state copy and skips orders withou
   assert.match(created.html, /8888-0000/)
   assert.match(created.text, /sube el comprobante/)
   const review = orderEmailMessage('receipt.submitted', order())!
-  assert.match(review.html, /En revisión/)
+  assert.match(review.subject, /Onky’s · Pago en revisión/)
+  assert.match(review.html, /Pago en revisión/)
+  assert.match(review.text, /Estado: pago en revisión/)
   assert.match(review.html, /ONK-01234567-999999/)
   const confirmed = orderEmailMessage('payment.confirmed_manual', order({ status: 'ready', paymentConfirmedAt: '2026-01-15T15:00:00.000Z' }), 'https://tienda.example')!
   assert.match(confirmed.html, /confirmado/)
@@ -58,9 +61,9 @@ test('mailer: welcome discount is explicit in both HTML and plain-text order tot
 })
 
 test('mailer: sends one email per order-state version, with bcc copy and brand sender', async () => {
-  const outbox: Array<{ from: string; to: string; bcc?: string; subject: string; html: string }> = []
+  const outbox: Array<{ from: string; to: string; replyTo?: string; bcc?: string; subject: string; html: string; headers: Record<string, string> }> = []
   const mailer = createOrderMailer({
-    SMTP_HOST: 'smtpdm.aliyuncs.com', SMTP_USER: 'pedidos@onkys.com', SMTP_PASS: 'secret', MAIL_BCC: 'duena@onkys.com', STORE_PUBLIC_ORIGIN: 'https://onkys.example',
+    SMTP_HOST: 'smtpdm.aliyuncs.com', SMTP_USER: 'pedidos@onkys.com', SMTP_PASS: 'secret', MAIL_REPLY_TO: 'soporte@onkys.com', MAIL_BCC: 'duena@onkys.com', STORE_PUBLIC_ORIGIN: 'https://onkys.example',
   }, message => { outbox.push(message); return Promise.resolve({ messageId: 'test' }) })
   const reviewing = order()
   await mailer!.notify('receipt.submitted', reviewing)
@@ -68,7 +71,9 @@ test('mailer: sends one email per order-state version, with bcc copy and brand s
   assert.equal(outbox.length, 1)
   assert.equal(outbox[0]!.from, 'Onky’s <pedidos@onkys.com>')
   assert.equal(outbox[0]!.to, 'ana@ejemplo.cr')
+  assert.equal(outbox[0]!.replyTo, 'soporte@onkys.com')
   assert.equal(outbox[0]!.bcc, 'duena@onkys.com')
+  assert.equal(outbox[0]!.headers['Auto-Submitted'], 'auto-generated')
   assert.match(outbox[0]!.subject, /en revisión/)
   await mailer!.notify('payment.confirmed_manual', order({ status: 'ready', paymentConfirmedAt: '2026-01-15T15:00:00.000Z' }))
   assert.equal(outbox.length, 2)
@@ -79,16 +84,16 @@ test('mailer: sends one email per order-state version, with bcc copy and brand s
   assert.match(outbox[2]!.html, /SINPE Móvil/)
 })
 
-test('mailer: welcome email highlights the 10% discount and validates email', () => {
+test('mailer: welcome confirms the account, explains its benefit and validates email', () => {
   const message = welcomeEmailMessage({ name: 'Ana Pérez', email: 'ana@ejemplo.cr' }, 'https://onkys.example')!
   assert.ok(message)
-  assert.match(message.subject, /10% de descuento/)
-  assert.match(message.html, /10% de descuento en tu primer pedido/)
-  assert.match(message.html, /DESCUENTO/)
+  assert.equal(message.subject, 'Onky’s · Tu cuenta está lista')
+  assert.match(message.html, /Datos de tu cuenta/)
+  assert.match(message.html, /10% de descuento/)
   assert.match(message.html, /Ana/)
   assert.match(message.html, /ana@ejemplo.cr/)
   assert.ok(message.html.includes('href="https://onkys.example"'))
-  assert.match(message.text, /10% DE DESCUENTO/)
+  assert.match(message.text, /10% de descuento/)
   assert.match(message.text, /https:\/\/onkys\.example/)
 
   assert.equal(welcomeEmailMessage({ name: 'Ana', email: '' }), null)
@@ -96,7 +101,7 @@ test('mailer: welcome email highlights the 10% discount and validates email', ()
 })
 
 test('mailer: sends welcome email upon account registration with deduplication', async () => {
-  const outbox: Array<{ from: string; to: string; bcc?: string; subject: string; html: string }> = []
+  const outbox: Array<{ from: string; to: string; bcc?: string; subject: string; html: string; headers: Record<string, string> }> = []
   const mailer = createOrderMailer({
     SMTP_HOST: 'smtpdm.aliyuncs.com', SMTP_USER: 'pedidos@onkys.com', SMTP_PASS: 'secret', MAIL_BCC: 'duena@onkys.com', STORE_PUBLIC_ORIGIN: 'https://onkys.example',
   }, message => { outbox.push(message); return Promise.resolve({ messageId: 'test-welcome' }) })
@@ -104,6 +109,7 @@ test('mailer: sends welcome email upon account registration with deduplication',
   await mailer!.notifyWelcome({ name: 'Carlos Mora', email: 'carlos@ejemplo.cr' })
   assert.equal(outbox.length, 1)
   assert.equal(outbox[0]!.to, 'carlos@ejemplo.cr')
-  assert.match(outbox[0]!.subject, /10% de descuento/)
+  assert.equal(outbox[0]!.subject, 'Onky’s · Tu cuenta está lista')
+  assert.equal(outbox[0]!.headers['Auto-Submitted'], 'auto-generated')
   assert.match(outbox[0]!.html, /Carlos/)
 })

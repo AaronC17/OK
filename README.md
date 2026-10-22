@@ -43,7 +43,7 @@ El frontend se compila en `dist/`, pero **publicar solo esa carpeta ya no basta*
 - Se permite **un solo tipo** o **mixto**, eligiendo dos o tres tipos.
 - Nombre utilizado: **Onky’s**, tomado originalmente de la carpeta.
 
-`demo: true` señala que **nombres de productos, disponibilidad, recetas de postres, presentaciones y precios de productos son ejemplos**. La tarifa nacional por Correos sí está confirmada: ₡2.800, gratis en compras mayores a ₡15.000. Las fotografías son de referencia.
+`demo: true` señala que **nombres de productos, disponibilidad, recetas de postres, presentaciones y precios de productos son ejemplos**. La tarifa nacional por Correos sí está confirmada: ₡2.800, gratis en compras de ₡15.000 o más. Las fotografías son de referencia.
 
 ## Cambiar los datos del negocio
 
@@ -130,10 +130,10 @@ En `deliveryMethods`:
 - `feeMinor: null`: **Envío por confirmar**; se muestra subtotal y se omite un total definitivo.
 - `feeMinor: 0`: sin cargo; permite calcular total.
 - `feeMinor: 150000`: ejemplo de cargo fijo de ₡1.500.
-- `freeAboveMinor`: el envío pasa a cero solo cuando el subtotal de productos supera ese umbral (sin incluir el envío).
+- `freeAboveMinor`: el envío pasa a cero cuando el subtotal de productos alcanza o supera ese umbral (sin incluir el envío).
 - `coverage`, `conditions`, `pickupPoint`: cobertura, condiciones y punto real de recogida.
 
-El método actual **Envío por Correos** cubre todo Costa Rica: `feeMinor: 280000` (₡2.800), `freeAboveMinor: 1500000` (gratis por compras mayores a ₡15.000). A exactamente ₡15.000 se cobra el envío. Se calcula automáticamente en carrito y backend y se anuncia arriba de la tienda; no se cotiza desde administración. No se inventaron plazos de entrega. La recogida sin cargo conserva su configuración actual.
+El método actual **Envío por Correos** cubre todo Costa Rica: `feeMinor: 280000` (₡2.800), `freeAboveMinor: 1500000` (gratis por compras de ₡15.000 o más, incluidos ₡15.000 exactos). Se calcula automáticamente en carrito y backend y se anuncia arriba de la tienda; no se cotiza desde administración. No se inventaron plazos de entrega. La recogida sin cargo conserva su configuración actual.
 
 ### Pedidos con SINPE Móvil
 

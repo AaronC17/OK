@@ -1,11 +1,12 @@
 # Avisos por correo con Alibaba Cloud DirectMail
 
-La tienda envía correos automáticos al cliente en cuatro momentos del pedido, usando **DirectMail** de Alibaba Cloud por SMTP. Es SMTP estándar con `nodemailer`: si algún día cambia el proveedor, sirve cualquier otro servidor SMTP.
+La tienda envía una confirmación de cuenta y correos automáticos al cliente en cuatro momentos del pedido, usando **DirectMail** de Alibaba Cloud por SMTP. Es SMTP estándar con `nodemailer`: si algún día cambia el proveedor, sirve cualquier otro servidor SMTP.
 
 | Estado del pedido | Correo al cliente |
 | --- | --- |
+| Cuenta creada | «Onky’s · Tu cuenta está lista»: confirma los datos de registro y explica el beneficio de bienvenida. |
 | `awaiting_payment` / `pending_details` | «Recibimos tu pedido» con las instrucciones SINPE: número, beneficiario, monto exacto y el código para la descripción. |
-| `pending_review` (comprobante subido) | «Tu pedido está en revisión» — confirma que llegó el comprobante y que **apenas se confirme el pago, el pedido se prepara para la entrega**. |
+| `pending_review` (comprobante subido) | «Onky’s · Pago en revisión (código)» — confirma que llegó el comprobante y que **apenas se confirme el pago, el pedido se prepara para la entrega**. |
 | `ready` (admin lo confirma) | «¡Pago confirmado!»: entra a preparación; entrega a domicilio o punto de retiro según el método. |
 | `rejected` (pide corrección) | «Revisemos tu comprobante» con el motivo exacto y la instrucción de subirlo de nuevo con el mismo código. |
 
@@ -34,6 +35,7 @@ SMTP_PORT=465                                # SSL; no uses el 25, muchos hosts 
 SMTP_USER=pedidos@onkys.shop                 # dirección de remitente de DirectMail
 SMTP_PASS=<contraseña SMTP del paso 1.5>
 MAIL_FROM="Onky's <pedidos@onkys.shop>"
+# MAIL_REPLY_TO=<buzón real atendido por la tienda; opcional>
 ```
 
 Sin estas variables el correo queda **deshabilitado y el flujo de pedidos funciona igual** (útil para pruebas y para el modo demo).
@@ -49,15 +51,17 @@ Sin estas variables el correo queda **deshabilitado y el flujo de pedidos funcio
 - Dependencias: `nodemailer` (producción) + `@types/nodemailer` (dev). El bundle de `api/index.js` deja `nodemailer` como dependencia externa y Vercel lo resuelve desde `node_modules`.
 - El envío hacia `smtpdm-ap-southeast-1.aliyun.com:465` ocurre **durante la misma solicitud** de crear pedido / confirmar pago / revisar admin: en serverless (Vercel) las promesas en segundo plano se congelan tras responder, así que reconocer el envío dentro de la solicitud evita correos perdidos.
 - Pedidos sin correo del cliente (compatibilidad con pedidos previos) simplemente no disparan envío.
-- El remitente solo puede ser la dirección aprobada en DirectMail; para respuestas usa `MAIL_BCC` o el contacto de la tienda del pie del sitio.
-- Las plantillas y textos de los cuatro avisos viven en `server/store/mailer.ts`.
+- El remitente debe ser la dirección aprobada en DirectMail. `MAIL_REPLY_TO` permite dirigir respuestas a un buzón real atendido por la tienda; si no está configurado se omite. `MAIL_BCC` únicamente recibe copias, no dirige respuestas.
+- Las plantillas y textos de los cinco avisos viven en `server/store/mailer.ts`.
+- Todos los avisos usan `Auto-Submitted: auto-generated` para identificar que se generan automáticamente. Nodemailer genera `Date`, `Message-ID` y el MIME con alternativas de texto y HTML. Esa cabecera describe el envío, no obliga a los filtros a aceptarlo.
 
 ## 5. Diseño y vistas previas
 
 - Los cuatro avisos comparten la identidad de la tienda: blanco cálido, violeta `#382448`, marca tipográfica y fotografía de las gomitas. La confirmación destaca el pago verificado, la preparación, el total y los datos de entrega.
 - HTML con tablas de presentación, estilos inline, ajustes móviles y versión de texto. La información del pedido sigue siendo legible aunque el cliente de correo bloquee las imágenes.
+- Resumen visible, sin relleno invisible de caracteres repetidos. Los asuntos identifican la tienda y el evento; en la bienvenida, los datos de la cuenta son el contenido principal y el descuento se explica en un único párrafo.
 - La foto optimizada para correo es `public/images/mail-gomitas-v1.png` (PNG, 268 × 358, derivada de `bolsa-mix.webp`). Se publica junto con la aplicación y se muestra a la mitad de su tamaño para pantallas de alta densidad.
-- `npm run mail:preview` regenera los cuatro ejemplos en `docs/mail-previews/`. Abre `3-confirmado.html` para revisar la confirmación de compra; sus imágenes son locales, por lo que puedes revisarla antes de desplegar.
+- `npm run mail:preview` regenera los cinco ejemplos en `docs/mail-previews/`. Abre `2-en-revision.html` y `5-bienvenida.html` para revisar los avisos de pago y cuenta; sus imágenes son locales, por lo que puedes revisarlos antes de desplegar.
 - El botón lleva a `STORE_PUBLIC_ORIGIN`, o a `https://onkys.shop` cuando no está configurado. El seguimiento se consulta desde el navegador donde se realizó la compra.
 
 ## 6. Foto del remitente (avatar en Gmail)

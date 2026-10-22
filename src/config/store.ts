@@ -106,7 +106,7 @@ export const store: StoreConfig = {
     {
       id: 'delivery', name: 'Envío por Correos', description: '₡2.800 · Todo Costa Rica', enabled: true,
       requiresAddress: true, addressLabel: 'Dirección o punto de entrega', feeMinor: 280000, freeAboveMinor: 1500000,
-      coverage: 'Todo Costa Rica', conditions: 'Correos de Costa Rica: ₡2.800. Envío gratis en compras mayores a ₡15.000, sin contar el envío.',
+      coverage: 'Todo Costa Rica', conditions: 'Correos de Costa Rica: ₡2.800. Envío gratis en compras de ₡15.000 o más, sin contar el envío.',
     },
     {
       id: 'pickup', name: 'Recoger', description: 'Orotina Centro', enabled: true,
