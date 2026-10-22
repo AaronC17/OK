@@ -2577,10 +2577,10 @@ function orderEmailMessage(event, order, origin = storeOrigin) {
     headline = "Tu pago,<br>en revisi\xF3n.";
     status = "Pago en revisi\xF3n";
     preheader = `Recibimos el comprobante de tu pedido ${order.code}.`;
-    lead = `Hola, ${name}. Estamos revisando el pago de tu pedido. Este proceso suele tardar de 10 a 30 minutos.`;
+    lead = `Hola, ${name}. Estamos revisando el pago de tu pedido. Este proceso suele tardar de 5 a 10 minutos.`;
     const reviewNext = order.delivery.requiresAddress ? "En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo." : "En cuanto confirmemos el pago, nuestro equipo te contactar\xE1 por WhatsApp para coordinar la entrega.";
     body2 = noteBox("\xBFQu\xE9 sigue?", `<p style="margin:0;">Por ahora no necesitas hacer nada m\xE1s. ${reviewNext}</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ""}`);
-    detailText = `Estado: pago en revisi\xF3n. Recibimos tu comprobante; revisarlo suele tardar de 10 a 30 minutos. Por ahora no necesitas hacer nada m\xE1s. ${reviewNext}${order.receipt?.bankReference ? `
+    detailText = `Estado: pago en revisi\xF3n. Recibimos tu comprobante; revisarlo suele tardar de 5 a 10 minutos. Por ahora no necesitas hacer nada m\xE1s. ${reviewNext}${order.receipt?.bankReference ? `
 Referencia del comprobante: ${order.receipt.bankReference}` : ""}`;
   } else if (paid) {
     title = "\xA1Pago confirmado!";

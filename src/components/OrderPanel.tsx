@@ -69,7 +69,7 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
         <p className="small-note">
           {isReady
             ? (isPickup ? '¡Pago verificado! Nuestro equipo te contactará por WhatsApp para coordinar la entrega.' : 'La tienda preparará tu pedido para enviarlo por el método elegido.')
-            : (isPickup ? 'La revisión del abono tarda de 10 a 30 minutos. Al completarse el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.' : 'La revisión del abono tarda de 10 a 30 minutos antes de preparar tu pedido.')}
+            : (isPickup ? 'La revisión del abono tarda de 5 a 10 minutos. Al completarse el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.' : 'La revisión del abono tarda de 5 a 10 minutos antes de preparar tu pedido.')}
         </p>
       </div>
     </div>
@@ -150,8 +150,8 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy, checkoutTo
 
   const subtitle = order.status === 'pending_review'
     ? (isPickup
-        ? 'Recibimos tu comprobante. La tienda revisará el abono (tarda de 10 a 30 minutos) y al completarse el pago te contactará por WhatsApp para coordinar la entrega.'
-        : 'Recibimos tu comprobante. La tienda revisará el abono (tarda de 10 a 30 minutos) y te avisará cuando confirme el pago.')
+        ? 'Recibimos tu comprobante. La tienda revisará el abono (tarda de 5 a 10 minutos) y al completarse el pago te contactará por WhatsApp para coordinar la entrega.'
+        : 'Recibimos tu comprobante. La tienda revisará el abono (tarda de 5 a 10 minutos) y te avisará cuando confirme el pago.')
     : order.status === 'ready'
       ? (isPickup
           ? '¡Pago verificado! Nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
@@ -245,7 +245,7 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy, checkoutTo
         <div className="receipt-form-header">
           <div>
             <h4>Comprobante de pago</h4>
-            <p>Adjunta la captura o PDF del comprobante generado por tu banco (la revisión tarda de 10 a 30 minutos).</p>
+            <p>Adjunta la captura o PDF del comprobante generado por tu banco (la revisión tarda de 5 a 10 minutos).</p>
           </div>
         </div>
         <fieldset disabled={sending}>

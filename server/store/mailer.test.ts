@@ -37,6 +37,8 @@ test('mailer: message per event carries code, state copy and skips orders withou
   assert.match(review.subject, /Onky’s · Pago en revisión/)
   assert.match(review.html, /Pago en revisión/)
   assert.match(review.text, /Estado: pago en revisión/)
+  assert.match(review.html, /de 5 a 10 minutos/)
+  assert.match(review.text, /de 5 a 10 minutos/)
   assert.match(review.html, /ONK-01234567-999999/)
   const confirmed = orderEmailMessage('payment.confirmed_manual', order({ status: 'ready', paymentConfirmedAt: '2026-01-15T15:00:00.000Z' }), 'https://tienda.example')!
   assert.match(confirmed.html, /confirmado/)

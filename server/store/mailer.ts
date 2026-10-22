@@ -111,12 +111,12 @@ export function orderEmailMessage(event: OrderMailEvent, order: ShopOrder, origi
     headline = 'Tu pago,<br>en revisión.'
     status = 'Pago en revisión'
     preheader = `Recibimos el comprobante de tu pedido ${order.code}.`
-    lead = `Hola, ${name}. Estamos revisando el pago de tu pedido. Este proceso suele tardar de 10 a 30 minutos.`
+    lead = `Hola, ${name}. Estamos revisando el pago de tu pedido. Este proceso suele tardar de 5 a 10 minutos.`
     const reviewNext = order.delivery.requiresAddress
       ? 'En cuanto confirmemos el pago, prepararemos tu pedido para la entrega y te avisaremos por este correo.'
       : 'En cuanto confirmemos el pago, nuestro equipo te contactará por WhatsApp para coordinar la entrega.'
     body = noteBox('¿Qué sigue?', `<p style="margin:0;">Por ahora no necesitas hacer nada más. ${reviewNext}</p>${order.receipt?.bankReference ? `<p style="margin:12px 0 0;font-size:12px;line-height:19px;color:#716b76;word-break:break-word;">Referencia del comprobante: ${esc(order.receipt.bankReference)}</p>` : ''}`)
-    detailText = `Estado: pago en revisión. Recibimos tu comprobante; revisarlo suele tardar de 10 a 30 minutos. Por ahora no necesitas hacer nada más. ${reviewNext}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
+    detailText = `Estado: pago en revisión. Recibimos tu comprobante; revisarlo suele tardar de 5 a 10 minutos. Por ahora no necesitas hacer nada más. ${reviewNext}${order.receipt?.bankReference ? `\nReferencia del comprobante: ${order.receipt.bankReference}` : ''}`
   } else if (paid) {
     title = '¡Pago confirmado!'
     headline = 'Tu antojo,<br>confirmado.'
