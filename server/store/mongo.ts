@@ -4,7 +4,7 @@ import type { ClientSession, Db } from 'mongodb'
 import type { StoreConfig } from '../../src/types.ts'
 import type { AdminOrders, OrderAudit, OrderReceipt, ShopOrder, ShopOrderStatus, SinpeDestination, SinpeSettings } from '../../src/order-types.ts'
 import { bankReference, fields, minorAmount, orderCode, parseNewOrder, parseSettings, record, StoreError, text, version } from './validation.ts'
-import { constantEqual, generateSession, passwordHash, passwordMatches, tokenHash } from './security.ts'
+import { constantEqual, generateSession, newToken, passwordHash, passwordMatches, tokenHash } from './security.ts'
 import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { shippingFee } from '../../src/lib/shop.ts'
@@ -12,6 +12,7 @@ import type { CustomerSession, ShopRepository, StoredReceipt } from './repositor
 import type { AdminCustomers, CustomerAccount, CustomerOrders, CustomerReferralsData } from '../../src/account-types.ts'
 import { accountIdFromOwner, accountOwner, accountPage, accountPasswordHash, accountPasswordMatches, parseAccountLogin, parseRegistration, requireAccount, requireGuest } from './accounts.ts'
 import { welcomeDiscount } from '../../src/lib/welcome.ts'
+import { paymentPreview, readPaymentPreview } from './checkout.ts'
 
 const statuses: ShopOrderStatus[] = ['pending_details', 'awaiting_payment', 'pending_review', 'ready', 'rejected']
 const timestamp = () => new Date().toISOString()
@@ -201,13 +202,33 @@ export class MongoShopDatabase implements ShopRepository {
     return `ONKY-${Date.now().toString(36).toUpperCase().slice(-4)}`
   }
 
-  private accountFromDoc(row: Record<string, any>, creditBalanceMinor = 0): CustomerAccount {
+  private async consumedWelcomeOrder(id: string | null | undefined, session?: ClientSession): Promise<string | null> {
+    if (!id) return null
+    const order = await this.collection('shop_orders').findOne({ id }, { session, projection: { id: 1, current_receipt_id: 1, payment_confirmed_at: 1, status: 1 } })
+    if (order?.current_receipt_id || order?.payment_confirmed_at || ['pending_review', 'rejected', 'ready'].includes(order?.status)) return id
+    const receipt = await this.collection('receipts').findOne({ order_id: id }, { session, projection: { id: 1 } })
+    return receipt ? id : null
+  }
+
+  private async consumeWelcome(order: ShopOrder, session: ClientSession): Promise<void> {
+    if (!order.customerAccountId || !order.discountMinor) return
+    const account = await this.collection('customers').findOne({ id: order.customerAccountId }, { session })
+    if (!account) throw new StoreError(409, 'No se encontró la cuenta del pedido.')
+    const consumed = await this.consumedWelcomeOrder(account.welcome_order_id, session)
+    if (consumed && consumed !== order.id) throw new StoreError(409, 'El 10% de bienvenida ya se usó en otro pedido. Crea un nuevo pedido para obtener el total actualizado.')
+    // Always write the account, even for a legacy reservation of this same order:
+    // concurrent receipt submissions must conflict and retry with fresh eligibility.
+    await this.collection('customers').updateOne({ id: order.customerAccountId }, { $set: { welcome_order_id: order.id }, $inc: { welcome_revision: 1 } }, { session })
+    if (!consumed) await this.audit(order.id, 'welcome.consumed', 'system', 'Beneficio de bienvenida aplicado al enviar el comprobante o confirmar el pago.', session)
+  }
+
+  private async accountFromDoc(row: Record<string, any>, creditBalanceMinor = 0): Promise<CustomerAccount> {
     return {
       id: row.id,
       name: row.name,
       email: row.email,
       createdAt: row.created_at,
-      welcomeAvailable: !row.welcome_order_id,
+      welcomeAvailable: !await this.consumedWelcomeOrder(row.welcome_order_id),
       referralCode: row.referral_code || undefined,
       creditBalanceMinor,
     }
@@ -460,7 +481,7 @@ export class MongoShopDatabase implements ShopRepository {
       { $group: { _id: '$account_id', count: { $sum: 1 } } },
     ]).toArray() : []
     const byCustomer = new Map(counts.map(row => [row._id, row.count]))
-    const customers = rows.map(row => ({ ...this.accountFromDoc(row), orderCount: byCustomer.get(row.id) ?? 0 }))
+    const customers = await Promise.all(rows.map(async row => ({ ...await this.accountFromDoc(row), orderCount: byCustomer.get(row.id) ?? 0 })))
     return { customers, total, page, pageSize: 50 }
   }
 
@@ -587,6 +608,69 @@ export class MongoShopDatabase implements ShopRepository {
     return row ? this.fromDoc(row) : null
   }
 
+  private async checkoutSecret(session?: ClientSession): Promise<string> {
+    const row = await this.collection('metadata').findOneAndUpdate(
+      { key: 'checkout_secret' }, { $setOnInsert: { value: newToken() } }, { upsert: true, returnDocument: 'after', session }
+    )
+    return row!.value as string
+  }
+
+  async previewOrder(value: unknown, owner: string) {
+    const parsed = parseNewOrder(value, this.catalog)
+    return this.transaction(async session => {
+      const accountId = accountIdFromOwner(owner)
+      const account = accountId ? await this.collection('customers').findOne({ id: accountId }, { session }) : null
+      if (accountId && !account) throw new StoreError(401, 'Inicia sesión de nuevo para continuar al pago.')
+      const eligible = !!account && !await this.consumedWelcomeOrder(account.welcome_order_id, session)
+      return paymentPreview(parsed, owner, eligible, await this.destination(session), this.catalog.demo, await this.nextOrderCode(session), await this.checkoutSecret(session))
+    })
+  }
+
+  async completeCheckout(token: unknown, owner: string, key: unknown, file: PreparedReceipt): Promise<ShopOrder> {
+    const preview = readPaymentPreview(token, owner, await this.checkoutSecret())
+    const hash = tokenHash(`${token}:${file.rawHash}`)
+    return this.transaction(async session => {
+      const previous = await this.collection('shop_orders').findOne({ id: preview.id, owner_hash: owner }, { session })
+      if (previous) {
+        if (previous.request_hash !== hash) throw new StoreError(409, 'Ya recibimos este pedido con otro comprobante. Actualiza su estado.')
+        return this.fromDoc(previous, session)
+      }
+      const now = timestamp()
+      await this.collection('shop_orders').insertOne({
+        _id: preview.id, id: preview.id, code: preview.code, owner_hash: owner,
+        idempotency_key: preview.id, request_hash: hash, version: 1, status: 'awaiting_payment',
+        demo: preview.demo ? 1 : 0, created_at: now, updated_at: now,
+        lines_json: JSON.stringify(preview.lines), customer_json: JSON.stringify(preview.customer),
+        delivery_json: JSON.stringify(preview.delivery), destination_json: JSON.stringify(preview.destination),
+        subtotal_minor: preview.subtotalMinor, shipping_minor: preview.shippingMinor, total_minor: preview.totalMinor,
+        discount_minor: preview.discountMinor ?? 0, account_id: preview.customerAccountId ?? null,
+        current_receipt_id: null, customer_message: null, payment_confirmed_at: null,
+        privacy_version: 'sinpe-checkout-v2', privacy_accepted_at: preview.createdAt,
+      }, { session })
+      await this.audit(preview.id, 'order.created', 'customer', 'Pedido registrado al recibir el comprobante de pago.', session)
+      await this.event(await this.getOrder(preview.id, session), 'order.created', session)
+      return this.saveReceipt(preview.id, owner, preview.code, null, key, 1, file, session)
+    })
+  }
+
+  private async nextOrderCode(session: ClientSession): Promise<string> {
+    let nextNum = 1001
+    const meta = await this.collection('metadata').findOne({ key: 'order_number' }, { session })
+    if (meta && typeof meta.seq === 'number' && meta.seq >= nextNum) {
+      nextNum = meta.seq + 1
+    } else {
+      const last = await this.collection('shop_orders').find({ code: /^ONK-\d+$/ }, { projection: { code: 1 }, session }).sort({ created_at: -1 }).limit(50).toArray()
+      for (const doc of last) {
+        const match = /^ONK-(\d+)$/.exec(doc.code)
+        if (match && Number(match[1]) >= nextNum) nextNum = Number(match[1]) + 1
+      }
+    }
+    while (await this.collection('shop_orders').findOne({ code: `ONK-${nextNum}` }, { session })) nextNum++
+    await this.collection('metadata').updateOne({ key: 'order_number' }, { $set: { seq: nextNum } }, { upsert: true, session })
+    return `ONK-${nextNum}`
+  }
+
+  // Legacy integrations/fixtures only; the public API uses completeCheckout.
   async createOrder(value: unknown, owner: string, key: string): Promise<ShopOrder> {
     if (!/^[A-Za-z0-9-]{16,128}$/.test(key)) throw new StoreError(422, 'Falta una clave de idempotencia válida.')
     record(value)
@@ -601,30 +685,14 @@ export class MongoShopDatabase implements ShopRepository {
       const accountId = accountIdFromOwner(owner)
       const account = accountId ? await this.collection('customers').findOne({ id: accountId }, { session }) : null
       if (accountId && !account) throw new StoreError(401, 'Inicia sesión de nuevo para registrar el pedido.')
-      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !account.welcome_order_id)
+      const eligible = !!account && !await this.consumedWelcomeOrder(account.welcome_order_id, session)
+      if (eligible) await this.collection('customers').updateOne({ id: accountId }, { $inc: { welcome_revision: 1 } }, { session })
+      const discount = welcomeDiscount(parsed.amounts.subtotal, eligible)
       const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount
       const destination = await this.destination(session)
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      let nextNum = 1001
-      const meta = await this.collection('metadata').findOne({ key: 'order_number' }, { session })
-      if (meta && typeof meta.seq === 'number' && meta.seq >= nextNum) {
-        nextNum = meta.seq + 1
-      } else {
-        const last = await this.collection('shop_orders').find({ code: /^ONK-\d+$/ }, { projection: { code: 1 }, session }).sort({ created_at: -1 }).limit(50).toArray()
-        for (const doc of last) {
-          const match = /^ONK-(\d+)$/.exec(doc.code)
-          if (match) {
-            const n = Number(match[1])
-            if (n >= nextNum) nextNum = n + 1
-          }
-        }
-      }
-      while (await this.collection('shop_orders').findOne({ code: `ONK-${nextNum}` }, { session })) {
-        nextNum++
-      }
-      await this.collection('metadata').updateOne({ key: 'order_number' }, { $set: { seq: nextNum } }, { upsert: true, session })
-      const code = `ONK-${nextNum}`
+      const code = await this.nextOrderCode(session)
       const now = timestamp()
       const newOrder = {
         _id: id,
@@ -654,7 +722,6 @@ export class MongoShopDatabase implements ShopRepository {
         privacy_accepted_at: now,
       }
       await this.collection('shop_orders').insertOne(newOrder, { session })
-      if (accountId && !account?.welcome_order_id) await this.collection('customers').updateOne({ id: accountId, welcome_order_id: null }, { $set: { welcome_order_id: id } }, { session })
       await this.audit(id, 'order.created', 'customer', ready ? 'Pedido registrado. Pendiente de pago; no se ha verificado ningún abono.' : 'Pedido registrado. No solicitar pago hasta confirmar destino y total.', session)
       const order = await this.getOrder(id, session)
       await this.event(order, 'order.created', session)
@@ -675,52 +742,55 @@ export class MongoShopDatabase implements ShopRepository {
   }
 
   async addReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt): Promise<ShopOrder> {
+    return this.transaction(session => this.saveReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file, session))
+  }
+
+  private async saveReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt, session: ClientSession): Promise<ShopOrder> {
     const key = text(uploadKey, 16, 128, 'Identificador de carga')
     const expectedVersion = version(suppliedVersion)
-    return this.transaction(async session => {
-      const order = await this.checkUpload(id, owner, suppliedCode, session)
-      const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
-        ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
-        : bankReference(suppliedReference)
-      const previous = await this.collection('receipts').findOne({ order_id: id, upload_key: key }, { session })
-      if (previous) {
-        if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, 'La carga repetida contiene datos distintos. Actualiza el pedido.')
-        return order
-      }
-      if (order.version !== expectedVersion) throw new StoreError(409, 'El pedido cambió mientras adjuntabas el comprobante. Actualiza su estado.')
-      if (order.status !== 'awaiting_payment' && order.status !== 'rejected') throw new StoreError(409, 'Este pedido no admite un nuevo comprobante en su estado actual.')
-      if (!order.destination || order.totalMinor === null) throw new StoreError(409, 'Primero deben confirmarse el destino SINPE y el total.')
-      const duplicate = await this.collection('receipts').findOne({ raw_hash: file.rawHash, order_id: { $ne: id } }, { session })
-      if (duplicate) throw new StoreError(409, 'Este comprobante ya está asociado a otro pedido. Adjunta el comprobante correspondiente.')
-      const count = await this.collection('receipts').countDocuments({ order_id: id }, { session })
-      if (count >= 5) throw new StoreError(409, 'Este pedido alcanzó el límite de correcciones. La tienda debe revisar el historial.')
-      const receiptId = randomUUID()
-      const now = timestamp()
-      await this.collection('receipts').insertOne({
-        _id: receiptId,
-        id: receiptId,
-        order_id: id,
-        upload_key: key,
-        raw_hash: file.rawHash,
-        content_type: file.contentType,
-        size: file.data.length,
-        data: file.data,
-        submitted_at: now,
-        bank_reference: reference,
-      }, { session })
-      await this.collection('shop_orders').updateOne(
-        { id },
-        {
-          $set: { current_receipt_id: receiptId, status: 'pending_review', customer_message: null, updated_at: now },
-          $inc: { version: 1 },
-        },
-        { session }
-      )
-      await this.audit(id, 'receipt.submitted', 'customer', 'Código validado y comprobante recibido. Esto no confirma el pago.', session)
-      const updated = await this.getOrder(id, session)
-      await this.event(updated, 'payment.review_requested', session)
-      return updated
-    })
+    const order = await this.checkUpload(id, owner, suppliedCode, session)
+    const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
+      ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
+      : bankReference(suppliedReference)
+    const previous = await this.collection('receipts').findOne({ order_id: id, upload_key: key }, { session })
+    if (previous) {
+      if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, 'La carga repetida contiene datos distintos. Actualiza el pedido.')
+      return order
+    }
+    if (order.version !== expectedVersion) throw new StoreError(409, 'El pedido cambió mientras adjuntabas el comprobante. Actualiza su estado.')
+    if (order.status !== 'awaiting_payment' && order.status !== 'rejected') throw new StoreError(409, 'Este pedido no admite un nuevo comprobante en su estado actual.')
+    if (!order.destination || order.totalMinor === null) throw new StoreError(409, 'Primero deben confirmarse el destino SINPE y el total.')
+    const duplicate = await this.collection('receipts').findOne({ raw_hash: file.rawHash, order_id: { $ne: id } }, { session })
+    if (duplicate) throw new StoreError(409, 'Este comprobante ya está asociado a otro pedido. Adjunta el comprobante correspondiente.')
+    const count = await this.collection('receipts').countDocuments({ order_id: id }, { session })
+    if (count >= 5) throw new StoreError(409, 'Este pedido alcanzó el límite de correcciones. La tienda debe revisar el historial.')
+    await this.consumeWelcome(order, session)
+    const receiptId = randomUUID()
+    const now = timestamp()
+    await this.collection('receipts').insertOne({
+      _id: receiptId,
+      id: receiptId,
+      order_id: id,
+      upload_key: key,
+      raw_hash: file.rawHash,
+      content_type: file.contentType,
+      size: file.data.length,
+      data: file.data,
+      submitted_at: now,
+      bank_reference: reference,
+    }, { session })
+    await this.collection('shop_orders').updateOne(
+      { id },
+      {
+        $set: { current_receipt_id: receiptId, status: 'pending_review', customer_message: null, updated_at: now },
+        $inc: { version: 1 },
+      },
+      { session }
+    )
+    await this.audit(id, 'receipt.submitted', 'customer', 'Código validado y comprobante recibido. Esto no confirma el pago.', session)
+    const updated = await this.getOrder(id, session)
+    await this.event(updated, 'payment.review_requested', session)
+    return updated
   }
 
   async receipt(orderId: string, receiptId: string): Promise<StoredReceipt> {
@@ -747,11 +817,15 @@ export class MongoShopDatabase implements ShopRepository {
       const useReceipt = order.receipt && order.status === 'pending_review' ? order.receipt : null
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
       const amount = minorAmount(order.totalMinor)
-      const note = useReceipt
+      const auto = actor.startsWith('auto:')
+      const note = auto
+        ? 'Confirmado automáticamente por n8n al coincidir un abono bancario con el código/referencia y el monto exacto del pedido. Sin intervención del administrador.'
+        : useReceipt
         ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
         : 'Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria automática.'
       const dup = await this.collection('manual_payments').findOne({ bank_reference: reference, order_id: { $ne: id } }, { session })
       if (dup) throw new StoreError(409, 'Esta referencia bancaria ya fue utilizada para confirmar otro pedido.')
+      await this.consumeWelcome(order, session)
       const now = timestamp()
       await this.collection('manual_payments').insertOne({
         _id: id,

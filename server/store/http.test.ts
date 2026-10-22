@@ -6,7 +6,7 @@ import test from 'node:test'
 import type { TestContext } from 'node:test'
 import sharp from 'sharp'
 import { store } from '../../src/config/store.ts'
-import type { CheckoutConfig, ShopOrder } from '../../src/order-types.ts'
+import type { CheckoutConfig, CheckoutPreview, ShopOrder } from '../../src/order-types.ts'
 import type { AdminCustomers, CustomerAuth, CustomerOrders } from '../../src/account-types.ts'
 import { ShopDatabase } from './database.ts'
 import { makeShopHandler } from './http.ts'
@@ -53,20 +53,28 @@ async function setup(t: TestContext) {
   const buyer = client()
   const config = await buyer.call<CheckoutConfig>('/api/checkout')
   assert.equal(config.status, 200)
-  const create = async () => {
-    const response = await buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': randomUUID() })
+  const previews = new Map<string, CheckoutPreview>()
+  const create = async (recipient = buyer) => {
+    const response = await recipient.call<CheckoutPreview>('/api/checkout/preview', input())
     assert.equal(response.status, 200)
-    return response.data
+    previews.set(response.data.order.id, response.data)
+    return response.data.order
   }
   const png = await sharp({ create: { width: 30, height: 20, channels: 3, background: '#76538a' } }).png().toBuffer()
-  const upload = (order: ShopOrder, overrides: Partial<{ code: string; reference: string; file: Buffer; type: string }> = {}) => {
+  const upload = (order: ShopOrder, overrides: Partial<{ code: string; reference: string; file: Buffer; type: string }> = {}, recipient = buyer) => {
     const form = new FormData()
-    form.set('code', overrides.code ?? order.code)
-    form.set('bankReference', overrides.reference ?? `BANK-${randomUUID()}`)
+    const preview = previews.get(order.id)!
+    let token = preview.token
+    if (overrides.code) {
+      const [payload, signature] = token.split('.')
+      const data = JSON.parse(Buffer.from(payload, 'base64url').toString())
+      data.order.code = overrides.code
+      token = `${Buffer.from(JSON.stringify(data)).toString('base64url')}.${signature}`
+    }
+    form.set('checkoutToken', token)
     form.set('uploadKey', randomUUID())
-    form.set('version', String(order.version))
     form.set('receipt', new Blob([new Uint8Array(overrides.file ?? png)], { type: overrides.type ?? 'image/png' }), '../../unsafe-name.svg')
-    return buyer.call<ShopOrder>(`/api/orders/${order.id}/receipt`, form)
+    return recipient.call<ShopOrder>('/api/orders', form)
   }
   return { db, base, admin, buyer, client, create, upload }
 }
@@ -74,6 +82,9 @@ async function setup(t: TestContext) {
 test('store HTTP: real multipart, sanitized private receipt, manual review and ready status end-to-end', async t => {
   const { admin, buyer, create, upload, client, db } = await setup(t)
   const order = await create()
+  assert.equal(db.list(new URLSearchParams()).total, 0)
+  assert.equal((await buyer.call<{ order: ShopOrder | null }>('/api/orders/current')).data.order, null)
+  assert.equal((await buyer.call(`/api/orders/${order.id}`)).status, 404)
   const submitted = await upload(order)
   assert.equal(submitted.status, 200)
   assert.equal(submitted.data.status, 'pending_review')
@@ -107,7 +118,8 @@ test('store HTTP: backend rejects wrong code, invalid MIME and oversize files wi
   assert.equal((await upload(order, { type: 'image/svg+xml', file: Buffer.from('<svg/>') })).status, 415)
   assert.equal((await upload(order, { file: Buffer.alloc(5 * 1024 * 1024 + 1) })).status, 413)
   assert.equal(db.database.prepare('SELECT count(*) AS count FROM receipts').get()!.count, 0)
-  assert.equal(db.getOrder(order.id).status, 'awaiting_payment')
+  assert.equal(db.list(new URLSearchParams()).total, 0)
+  assert.throws(() => db.getOrder(order.id), /no encontrado/)
 })
 
 test('store HTTP: admin sessions, CSRF, cross-site requests and logout protect all private operations', async t => {
@@ -141,20 +153,47 @@ test('store HTTP: PDFs are authenticated attachments, never inline documents', a
   assert.match(result.headers.get('content-security-policy')!, /sandbox/)
 })
 
-test('store HTTP: simultaneous idempotent requests create one order; no direct status update exists', async t => {
-  const { buyer } = await setup(t)
-  const key = randomUUID()
-  const replies = await Promise.all(Array.from({ length: 4 }, () => buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': key })))
+test('store HTTP: simultaneous receipt retries create one order; bare creation and direct status updates are rejected', async t => {
+  const { buyer, create, upload, db } = await setup(t)
+  const preview = await create()
+  const replies = await Promise.all(Array.from({ length: 4 }, () => upload(preview)))
   assert.ok(replies.every(reply => reply.status === 200))
   assert.equal(new Set(replies.map(reply => reply.data.id)).size, 1)
-  assert.equal((await buyer.call('/api/orders', { ...input(), totalMinor: 1 }, 'POST', { 'Idempotency-Key': randomUUID() })).status, 422)
+  assert.equal(db.list(new URLSearchParams()).total, 1)
+  assert.equal(db.database.prepare('SELECT count(*) AS count FROM receipts').get()!.count, 1)
+  assert.equal((await buyer.call('/api/orders', input())).status, 415)
+  assert.equal((await buyer.call('/api/checkout/preview', { ...input(), totalMinor: 1 })).status, 422)
   assert.equal((await buyer.call(`/api/orders/${replies[0].data.id}/confirm`, { status: 'ready' })).status, 404)
+})
+
+test('store HTTP: failed receipt persistence rolls back the order, audit, events and welcome benefit', async t => {
+  const { buyer, client, db, create, upload } = await setup(t)
+  await buyer.call('/api/account/register', customerRegistration())
+  const preview = await create()
+  const outsider = client()
+  await outsider.call('/api/checkout')
+  assert.equal((await upload(preview, {}, outsider)).status, 403)
+  db.database.exec("CREATE TRIGGER reject_receipt BEFORE INSERT ON receipts BEGIN SELECT RAISE(ABORT, 'test failure'); END")
+  assert.equal((await upload(preview)).status, 500)
+  assert.equal((await buyer.call<CustomerOrders>('/api/account/orders')).data.total, 0)
+  assert.equal((await buyer.call<CheckoutConfig>('/api/checkout')).data.account!.welcomeAvailable, true)
+  assert.equal(db.database.prepare('SELECT count(*) AS count FROM shop_events').get()!.count, 0)
+  assert.equal(db.database.prepare('SELECT count(*) AS count FROM shop_audit WHERE order_id IS NOT NULL').get()!.count, 0)
+  db.database.exec('DROP TRIGGER reject_receipt')
+  const saved = await upload(preview)
+  assert.equal(saved.status, 200)
+  assert.equal(saved.data.status, 'pending_review')
+  assert.equal((await buyer.call<CustomerOrders>('/api/account/orders')).data.total, 1)
+  assert.equal((await buyer.call<CheckoutConfig>('/api/checkout')).data.account!.welcomeAvailable, false)
+  // Reusing the same receipt for another checkout must not leave a new order.
+  assert.equal((await upload(await create())).status, 409)
+  assert.equal(db.list(new URLSearchParams()).total, 1)
 })
 
 const customerRegistration = () => ({ name: 'Cliente con cuenta', email: 'cuenta@ejemplo.cr', password: 'Una-frase-segura-2026!', privacyAccepted: true })
 
 test('accounts HTTP: registration and logout rotate HttpOnly sessions and CSRF; guests cannot access private history or the directory', async t => {
-  const { buyer, client, admin } = await setup(t)
+  const { buyer, client, admin, create, upload } = await setup(t)
   const outsider = client()
   await outsider.call('/api/checkout')
   assert.equal((await outsider.call('/api/account/orders')).status, 401)
@@ -166,7 +205,9 @@ test('accounts HTTP: registration and logout rotate HttpOnly sessions and CSRF; 
   assert.ok(signed.data.user?.id)
   assert.ok(!JSON.stringify(signed.data).includes('password'))
   assert.match(signed.headers.get('set-cookie')!, /HttpOnly; SameSite=Strict/)
-  const order = await buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': randomUUID() })
+  const preview = await create()
+  assert.equal((await buyer.call<CustomerOrders>('/api/account/orders')).data.total, 0)
+  const order = await upload(preview)
   assert.equal(order.data.discountMinor, 12500)
   assert.equal((await buyer.call<CustomerOrders>('/api/account/orders')).data.total, 1)
   assert.equal((await outsider.call(`/api/orders/${order.data.id}`)).status, 404)
@@ -184,25 +225,36 @@ test('accounts HTTP: registration and logout rotate HttpOnly sessions and CSRF; 
   assert.equal((await buyer.call<ShopOrder>(`/api/orders/${order.data.id}`)).data.totalMinor, 112500)
 })
 
-test('accounts HTTP: simultaneous orders and idempotent retries cannot duplicate a welcome discount', async t => {
-  const { buyer, client } = await setup(t)
+test('accounts HTTP: welcome survives drafts and failed uploads; simultaneous receipts consume it once', async t => {
+  const { buyer, client, upload, create, db } = await setup(t)
   const signed = await buyer.call<CustomerAuth>('/api/account/register', customerRegistration())
   const secondDevice = client()
   await secondDevice.call('/api/checkout')
   const login = await secondDevice.call<CustomerAuth>('/api/account/login', { email: customerRegistration().email, password: customerRegistration().password })
   assert.equal(login.data.user!.id, signed.data.user!.id)
-  const key = randomUUID()
   const [first, second] = await Promise.all([
-    buyer.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': key }),
-    secondDevice.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': randomUUID() }),
+    create(),
+    create(secondDevice),
   ])
-  assert.equal(first.status, 200)
-  assert.equal(second.status, 200)
-  assert.equal(first.data.discountMinor! + second.data.discountMinor!, 12500)
-  const retried = await secondDevice.call<ShopOrder>('/api/orders', input(), 'POST', { 'Idempotency-Key': key })
-  assert.equal(retried.data.id, first.data.id)
-  assert.equal(retried.data.totalMinor, first.data.totalMinor)
-  assert.equal((await secondDevice.call<CustomerOrders>('/api/account/orders')).data.total, 2)
+  assert.equal(first.discountMinor, 12500)
+  assert.equal(second.discountMinor, 12500)
+  assert.equal((await buyer.call<CheckoutConfig>('/api/checkout')).data.account!.welcomeAvailable, true)
+  assert.equal((await secondDevice.call<CustomerOrders>('/api/account/orders')).data.total, 0)
+  assert.equal((await upload(first, { file: Buffer.from('not an image') })).status, 422)
+  assert.equal((await buyer.call<CheckoutConfig>('/api/checkout')).data.account!.welcomeAvailable, true)
+  const otherImage = await sharp({ create: { width: 31, height: 21, channels: 3, background: '#123456' } }).png().toBuffer()
+  const submissions = await Promise.all([
+    upload(first),
+    upload(second, { file: otherImage }, secondDevice),
+  ])
+  assert.deepEqual(submissions.map(result => result.status).sort(), [200, 409])
+  assert.match((submissions.find(result => result.status === 409)!.data as unknown as { error: string }).error, /ya se usó en otro pedido/)
+  assert.equal((await buyer.call<CheckoutConfig>('/api/checkout')).data.account!.welcomeAvailable, false)
+  assert.equal((await secondDevice.call<CheckoutConfig>('/api/checkout')).data.account!.welcomeAvailable, false)
+  assert.equal(db.list(new URLSearchParams()).total, 1)
+  const next = await create(secondDevice)
+  assert.equal(next.discountMinor, 0)
+  assert.equal(next.totalMinor, 125000)
 })
 
 test('accounts HTTP: credential failures are generic and account brute-force attempts are bounded', async t => {

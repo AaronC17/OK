@@ -36,7 +36,7 @@ En el panel, abre **Configuración** e introduce:
 
 El banco se identifica como BAC Credomatic. No se solicita IBAN ni acceso bancario. **No se asumió que el número del antiguo WhatsApp sea tu SINPE.**
 
-Sin configuración, se pueden registrar pedidos con su entrega calculada, pero quedan **«Por coordinar»** y no se muestran instrucciones para transferir. Al habilitar SINPE, esos pedidos pasan automáticamente a pendientes de pago. Cambiar el destino después no modifica las instrucciones de pedidos ya emitidos: cada pedido conserva su propio snapshot.
+Sin configuración, se conserva el carrito y se informa que el pago todavía no está disponible. Abrir la pantalla de pago no registra un pedido. Cambiar el destino después no modifica las instrucciones ya emitidas: cada vista de pago conserva una instantánea firmada por el servidor. Los pedidos pendientes de versiones anteriores conservan su seguimiento.
 
 **El catálogo sigue con `demo: true`: los precios de productos siguen siendo ejemplos. La tarifa de Correos ya fue confirmada: ₡2.800 y gratis por compras de ₡15.000 o más. No envíes ni solicites dinero real hasta confirmar el resto de los datos comerciales y el beneficiario.**
 
@@ -45,14 +45,14 @@ Sin configuración, se pueden registrar pedidos con su entrega calculada, pero q
 1. Añade productos al carrito.
 2. Elige entrega e introduce nombre, teléfono de contacto y dirección cuando corresponda. El teléfono no abre WhatsApp ni recibe mensajes automáticos.
 3. Acepta que sus datos y comprobante se guarden de forma privada para gestionar el pedido.
-4. Pulsa **«Crear pedido con SINPE»**.
-5. El servidor valida el carrito, calcula precios y genera el código único `ONK-` seguido de 16 caracteres hexadecimales. El cliente no define el código, el precio ni el estado.
-6. Si el total y el destino están confirmados, ve el número receptor, beneficiario, monto exacto y código para el detalle de la transferencia.
-7. Introduce el código del pedido y la referencia bancaria y adjunta su comprobante.
-8. El backend comprueba que ese código corresponde exactamente al pedido de esa sesión y guarda el archivo. El estado cambia a **«Comprobante en revisión»**, no a pagado.
+4. Pulsa **«Continuar al pago»**.
+5. El servidor valida el carrito, calcula precios y reserva un código único `ONK-` seguido de un número. Devuelve las instrucciones firmadas, sin guardar un pedido ni sus datos personales. Los códigos reservados pueden dejar saltos en la numeración.
+6. Ve el número receptor, beneficiario, monto exacto y código para el detalle de la transferencia. **Volver a mis datos y productos**, o Atrás en el navegador, conserva el carrito y permite editarlo. **Cancelar pedido** descarta la compra y vacía el carrito.
+7. Hace la transferencia con ese código y adjunta el comprobante.
+8. Al pulsar **«Enviar comprobante para revisión»**, el backend valida la firma y el comprador y guarda pedido y comprobante en una sola transacción. El estado inicial es **«Comprobante en revisión»**, no pagado. Una carga fallida no deja un pedido pendiente.
 9. Tras la confirmación administrativa, verá **«Pago confirmado» / «Listo para preparar»** al actualizar o mediante la consulta periódica mientras el carrito esté abierto.
 
-El carrito se vacía únicamente cuando el backend confirma que registró el pedido. Se usan claves de idempotencia para evitar duplicados si se pierde la respuesta. El navegador conserva una cookie de compra de hasta siete días: el último pedido puede recuperarse abriendo el carrito en ese mismo navegador. Borrar cookies, cambiar de dispositivo o expirar la sesión impide ese seguimiento; no hay cuentas de cliente ni recuperación por código público en esta fase.
+El carrito se vacía cuando el backend confirma que registró pedido y comprobante, o cuando el comprador cancela explícitamente. Reenviar las mismas instrucciones y el mismo comprobante devuelve el pedido existente sin duplicarlo. El navegador conserva una cookie de compra de hasta siete días: el último pedido puede recuperarse abriendo el carrito en ese mismo navegador. Los clientes registrados también tienen historial entre dispositivos (ver `cuentas-clientes.md`). Las instrucciones aún no enviadas se conservan en memoria mientras la página permanezca abierta.
 
 Nombre, teléfono, dirección y comprobante se guardan en el servidor, no en `localStorage`. El carrito sigue guardando solo IDs y cantidades. Los archivos y datos de otros compradores no pueden consultarse conociendo únicamente el código o ID del pedido.
 
@@ -116,7 +116,8 @@ Carpeta predeterminada: **`.data/store/`**, ignorada por Git y bloqueada por Vit
 | Ruta | Acceso | Función |
 | --- | --- | --- |
 | `GET /api/checkout` | Público, crea/recupera cookie de compra | Configuración y CSRF del comprador. |
-| `POST /api/orders` | Comprador + CSRF + Idempotency-Key | Registrar pedido con precios del servidor. |
+| `POST /api/checkout/preview` | Comprador + CSRF | Validar carrito y devolver instrucciones firmadas sin registrar un pedido. |
+| `POST /api/orders` | Comprador + CSRF | Multipart con `checkoutToken`, `uploadKey` y `receipt`; registrar pedido y comprobante de forma atómica e idempotente. |
 | `GET /api/orders/current` | Comprador | Su último pedido. |
 | `GET /api/orders/:id` | Comprador propietario | Seguimiento de su pedido. |
 | `POST /api/orders/:id/receipt` | Propietario + CSRF | Comprobante multipart, código, referencia, versión y clave de carga. |

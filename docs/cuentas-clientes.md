@@ -7,16 +7,18 @@
 - Sin sesión iniciada, la franja bajo la portada muestra **«Obtén un 10% de descuento al registrarte»** y abre el registro al pulsarla. Con sesión iniciada conserva la franja animada original y sus ositos. La comprobación inicial reserva su altura para evitar saltos.
 - **Mi cuenta** muestra el nombre, correo, beneficio disponible e historial privado paginado. Cada pedido abre el seguimiento y comprobante existentes, sin vaciar un carrito pendiente.
 - El checkout autocompleta nombre y correo. La compra como invitado sigue disponible.
+- **Continuar al pago** solo prepara las instrucciones SINPE. Volver atrás conserva datos, entrega y productos editables; **Cancelar pedido** vacía el carrito sin crear un pedido pendiente. El pedido aparece en el historial al enviar el comprobante y pasa a pagado tras verificar el abono.
 - `/admin` → **Clientes** lista cuentas, fecha de registro, uso del beneficio y número de pedidos. Se puede buscar por nombre/correo y filtrar pedidos por ID de cuenta; nunca por coincidencias de correo.
 
 ## Regla del 10%
 
 1. Cada cuenta obtiene una bienvenida del 10%, calculada por el servidor sobre el subtotal de productos en céntimos enteros de CRC y redondeada al céntimo más cercano.
-2. Se aplica automáticamente **al crear el primer pedido autenticado**, aunque aún esté pendiente de pago. Para continuarlo, se abre desde Mis pedidos. No se vuelve a conceder al salir, entrar desde otro navegador o crear otro pedido.
+2. Se muestra automáticamente en los pedidos autenticados mientras esté disponible. **Se consume al enviar correctamente el primer comprobante con descuento**, no al abrir la pantalla de pago ni al seleccionar el archivo. Volver atrás o «Cancelar pedido» conserva el beneficio hasta ese envío. Una confirmación manual de un pedido anterior también lo consume si no se había enviado comprobante.
 3. El envío no recibe descuento. Su tarifa y umbral de envío gratis siguen calculándose sobre el subtotal de productos antes del descuento, conservando las reglas existentes.
-4. Los pedidos previos no se recalculan. Reintentar la misma solicitud devuelve el mismo pedido y descuento.
-5. Pedido y consumo del beneficio se guardan en una misma transacción. Si falla, ninguno se conserva. Los importes del navegador no son de confianza; no se acepta enviar un descuento, ID de cliente o estado pagado en el formulario.
+4. Los pedidos previos no se recalculan. Reintentar la misma solicitud devuelve el mismo pedido y descuento. Solo uno puede consumir la bienvenida: si ya se envió el comprobante de otro pedido con descuento, un borrador anterior debe reemplazarse por un pedido con el total vigente. Las correcciones de comprobante conservan el descuento del pedido que lo consumió.
+5. Pedido, comprobante y consumo del beneficio se guardan en una misma transacción. Si falla la carga o su registro, no queda un pedido nuevo y el beneficio sigue disponible. Las instrucciones son una instantánea firmada por el servidor y vinculada al comprador; no se acepta alterar el descuento, ID de cliente o estado pagado en el formulario.
 6. El desglose se muestra en carrito, seguimiento, detalle administrativo y correos de pedido existentes.
+7. Las reservas creadas por versiones anteriores solo cuentan como usadas si tienen comprobante enviado o pago confirmado. Las cuentas con pedidos abandonados recuperan automáticamente la disponibilidad, también en MongoDB.
 
 El beneficio se limita **por cuenta**, no por persona o domicilio. Sin verificación de correo no debe presentarse como un sistema antifraude contra múltiples registros.
 

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes, randomUUID } from 'node:crypto'
 import sharp from 'sharp'
-import type { AdminAuth, ShopOrder } from '../../src/order-types.ts'
+import type { AdminAuth, CheckoutPreview, ShopOrder } from '../../src/order-types.ts'
 
 // Test-only credentials, used exclusively with the isolated ONKYS_E2E_DIR database.
 export const adminCredentials = { username: 'admin-pruebas', password: 'Clave-unica-de-pruebas-2026!' }
@@ -47,15 +47,20 @@ export async function checkoutOrder(page: Page, delivery: 'pickup' | 'delivery' 
   await page.getByLabel('Correo electrónico').fill(`cliente-${randomUUID().slice(0, 6)}@ejemplo.cr`)
   if (delivery === 'delivery') await page.getByLabel('Dirección o punto de entrega').fill('Dirección ficticia para la prueba de envío.')
   await page.getByLabel(/Acepto que la tienda guarde/).check()
-  await page.getByRole('button', { name: 'Crear pedido con SINPE' }).click()
+  const response = page.waitForResponse(response => response.url().endsWith('/api/checkout/preview') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Continuar al pago' }).click()
   await page.locator('#assigned-order-code').waitFor({ state: 'visible' })
-  return await (await page.request.get('/api/orders/current')).json().then((result: { order: ShopOrder }) => result.order)
+  return ((await (await response).json()) as CheckoutPreview).order
 }
 
 export async function sendReceipt(page: Page, order: ShopOrder) {
   await expect(page.locator('#assigned-order-code')).toHaveText(order.code)
   await page.locator('#receipt-file').setInputFiles(await testReceipt())
+  const response = page.waitForResponse(response => /\/api\/orders(?:\/[^/]+\/receipt)?$/.test(response.url()) && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Enviar comprobante para revisión' }).click()
+  const result = await response
+  expect(result.ok()).toBe(true)
+  return await result.json() as ShopOrder
 }
 
 export async function loginAdminPage(page: Page) {

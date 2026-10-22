@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { randomUUID } from 'node:crypto'
-import { adminCredentials, testAdmin } from './helpers/store.ts'
+import { adminCredentials, sendReceipt, testAdmin, testReceipt } from './helpers/store.ts'
 import type { ShopOrder } from '../src/order-types.ts'
 
 const password = 'Una-frase-de-prueba-2026!'
@@ -158,17 +158,20 @@ test('accounts: welcome discount, saved order, cross-device history and customer
   const cart = page.locator('.cart-drawer')
   await expect(cart.getByRole('textbox', { name: 'Tu nombre', exact: true })).toHaveValue(name)
   await expect(cart.getByLabel('Correo electrónico', { exact: false })).toHaveValue(email)
-  await expect(cart.locator('.welcome-discount-row')).toContainText('−₡120')
+  await expect(cart.locator('.welcome-discount-row')).toContainText('−₡125')
   await cart.getByRole('radio', { name: /Recoger/ }).check()
-  await expect(cart.locator('.total-row')).toContainText('₡1 080')
+  await expect(cart.locator('.total-row')).toContainText('₡1 125')
   await cart.getByLabel('Teléfono de contacto').fill('61551234')
   await cart.getByRole('checkbox', { name: /Acepto que la tienda guarde/ }).check()
-  await cart.getByRole('button', { name: 'Crear pedido con SINPE' }).click()
+  const response = page.waitForResponse('**/api/checkout/preview')
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
   await expect(cart.locator('#assigned-order-code')).toBeVisible()
-  const order = (await (await page.request.get('/api/orders/current')).json()).order as ShopOrder
-  expect(order.discountMinor).toBe(12000)
-  expect(order.totalMinor).toBe(108000)
+  const order = (await (await response).json()).order as ShopOrder
+  expect(order.discountMinor).toBe(12500)
+  expect(order.totalMinor).toBe(112500)
   await expect(cart.locator('.gateway-summary-totals')).toContainText('Bienvenida · 10%')
+  expect((await (await page.request.get('/api/account/orders')).json()).total).toBe(0)
+  await sendReceipt(page, order)
   await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
   await page.getByRole('button', { name: 'Abrir mi cuenta', exact: true }).click()
   const member = page.locator('.account-dialog')
@@ -218,6 +221,72 @@ test('accounts: welcome discount, saved order, cross-device history and customer
   await expect(page.locator('.admin-customer-filter')).toContainText(name)
   await expect(page.locator('.admin-order-card')).toHaveCount(1)
   await expect(page.locator('.admin-order-card')).toContainText(order.code)
-  await page.getByRole('button', { name: 'Ver detalle', exact: true }).click()
+  await page.getByRole('button', { name: 'Ver comprobante', exact: true }).click()
   await expect(page.locator('.admin-order-dialog')).toContainText('Bienvenida · 10%')
+})
+
+test('accounts: cancellation leaves no order and keeps 10% until a receipt is sent', async ({ page, request, context }) => {
+  test.setTimeout(60_000)
+  await testAdmin(request)
+  await page.goto('/')
+  await expect(page.locator('.welcome-marquee-link')).toBeEnabled()
+  const config = await (await page.request.get('/api/checkout')).json()
+  const email = `bienvenida-${randomUUID()}@ejemplo.cr`
+  const registered = await page.request.post('/api/account/register', {
+    headers: { 'X-CSRF-Token': config.csrfToken },
+    data: { name: 'Cliente Bienvenida', email, password, privacyAccepted: true },
+  })
+  expect(registered.ok()).toBe(true)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Abrir mi cuenta', exact: true })).toBeVisible()
+  const cart = page.locator('.cart-drawer')
+  const addProduct = async () => {
+    await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
+    await page.getByRole('button', { name: 'Añadir al carrito', exact: true }).click()
+    await page.getByRole('button', { name: 'Abrir carrito, 1 artículos' }).click()
+    await cart.getByRole('radio', { name: /Recoger/ }).check()
+  }
+  const available = async () => (await (await page.request.get('/api/checkout')).json()).account.welcomeAvailable
+  await addProduct()
+  await expect(cart.locator('.welcome-discount-row')).toContainText('−₡125')
+  await cart.getByLabel('Teléfono de contacto').fill('61551234')
+  await cart.getByRole('checkbox', { name: /Acepto que la tienda guarde/ }).check()
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
+  await expect(cart.locator('#assigned-order-code')).toBeVisible()
+  expect(await available()).toBe(true)
+  expect((await (await page.request.get('/api/account/orders')).json()).total).toBe(0)
+  await cart.getByRole('button', { name: 'Cancelar pedido', exact: true }).click()
+  expect((await (await page.request.get('/api/account/orders')).json()).total).toBe(0)
+
+  await addProduct()
+  await expect(cart.locator('.welcome-discount-row')).toContainText('−₡125')
+  await expect(cart.locator('.total-row')).toContainText('₡1 125')
+  await cart.getByRole('checkbox', { name: /Acepto que la tienda guarde/ }).check()
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
+  await expect(cart.locator('#assigned-order-code')).toBeVisible()
+  await cart.locator('#receipt-file').setInputFiles(await testReceipt())
+  expect(await available()).toBe(true)
+
+  const otherTab = await context.newPage()
+  await otherTab.goto('/')
+  await otherTab.getByRole('button', { name: 'Abrir mi cuenta', exact: true }).click()
+  await expect(otherTab.locator('.member-welcome')).toBeVisible()
+
+  await page.route('**/api/orders', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'No se pudo guardar el comprobante.' }) }))
+  await cart.getByRole('button', { name: 'Enviar comprobante para revisión' }).click()
+  await expect(cart.getByRole('alert')).toHaveText('No se pudo guardar el comprobante.')
+  expect(await available()).toBe(true)
+  expect((await (await page.request.get('/api/account/orders')).json()).total).toBe(0)
+  await page.unroute('**/api/orders')
+  await cart.getByRole('button', { name: 'Enviar comprobante para revisión' }).click()
+  await expect(cart.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
+  expect(await available()).toBe(false)
+  expect((await (await page.request.get('/api/account/orders')).json()).total).toBe(1)
+  await expect(otherTab.locator('.member-welcome')).toHaveCount(0)
+  await otherTab.close()
+  await cart.getByRole('button', { name: 'Seguir comprando', exact: true }).click()
+
+  await addProduct()
+  await expect(cart.locator('.welcome-discount-row')).toHaveCount(0)
+  await expect(cart.locator('.total-row')).toContainText('₡1 250')
 })

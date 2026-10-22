@@ -163,7 +163,7 @@ var store = {
 };
 
 // server/store/database.ts
-import { createHash as createHash2, randomUUID } from "node:crypto";
+import { createHash as createHash2, randomUUID as randomUUID2 } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 // server/store/schema.ts
@@ -636,6 +636,53 @@ function welcomeDiscount(subtotalMinor, eligible) {
   return eligible ? Math.round(subtotalMinor / 10) : 0;
 }
 
+// server/store/checkout.ts
+import { createHmac, randomUUID } from "node:crypto";
+var signature = (payload, secret) => createHmac("sha256", secret).update(payload).digest("base64url");
+function paymentPreview(parsed, owner, welcomeAvailable, destination, demo, code, secret) {
+  if (!destination) throw new StoreError(409, "El pago con SINPE a\xFAn no est\xE1 disponible. Vuelve a intentarlo cuando la tienda confirme los datos de pago.");
+  if (parsed.amounts.total === null) throw new StoreError(409, "Falta confirmar el costo de env\xEDo. Elige otro m\xE9todo de entrega para continuar al pago.");
+  const discount = welcomeDiscount(parsed.amounts.subtotal, welcomeAvailable);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const order = {
+    id: randomUUID(),
+    code,
+    version: 1,
+    status: "awaiting_payment",
+    demo,
+    createdAt: now,
+    updatedAt: now,
+    lines: parsed.lines,
+    customer: parsed.customer,
+    delivery: parsed.delivery,
+    destination,
+    subtotalMinor: parsed.amounts.subtotal,
+    shippingMinor: parsed.amounts.shipping,
+    discountMinor: discount,
+    totalMinor: parsed.amounts.total - discount,
+    customerAccountId: accountIdFromOwner(owner),
+    receipt: null,
+    customerMessage: null,
+    paymentConfirmedAt: null,
+    paymentVerification: null
+  };
+  const payload = Buffer.from(JSON.stringify({ owner, order })).toString("base64url");
+  return { order, token: `${payload}.${signature(payload, secret)}` };
+}
+function readPaymentPreview(value, owner, secret) {
+  const token = text2(value, 40, 64 * 1024, "Datos de pago");
+  const [payload, supplied, extra] = token.split(".");
+  if (!payload || !supplied || extra !== void 0 || !constantEqual(signature(payload, secret), supplied)) throw new StoreError(422, "Los datos de pago no son v\xE1lidos. Vuelve al carrito para revisarlos.");
+  let snapshot;
+  try {
+    snapshot = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    throw new StoreError(422, "No se pudieron leer los datos de pago.");
+  }
+  if (snapshot.owner !== owner) throw new StoreError(403, "Estos datos de pago pertenecen a otra sesi\xF3n. Vuelve al carrito.");
+  return snapshot.order;
+}
+
 // server/store/database.ts
 var statuses = ["pending_details", "awaiting_payment", "pending_review", "ready", "rejected"];
 var timestamp = () => (/* @__PURE__ */ new Date()).toISOString();
@@ -695,7 +742,7 @@ var ShopDatabase = class {
     this.database.prepare("INSERT INTO shop_audit (order_id, event, actor, detail, created_at) VALUES (?, ?, ?, ?, ?)").run(orderId, event, actor, detail, timestamp());
   }
   event(order, event) {
-    this.database.prepare("INSERT INTO shop_events (id, order_id, version, event, created_at) VALUES (?, ?, ?, ?, ?)").run(randomUUID(), order.id, order.version, event, timestamp());
+    this.database.prepare("INSERT INTO shop_events (id, order_id, version, event, created_at) VALUES (?, ?, ?, ?, ?)").run(randomUUID2(), order.id, order.version, event, timestamp());
   }
   initialized() {
     return !!this.database.prepare("SELECT id FROM admin WHERE id = 1").get();
@@ -748,11 +795,29 @@ var ShopDatabase = class {
   }
   generateReferralCode() {
     for (let i = 0; i < 20; i++) {
-      const code = `ONKY-${randomUUID().slice(0, 6).toUpperCase()}`;
+      const code = `ONKY-${randomUUID2().slice(0, 6).toUpperCase()}`;
       const exists = this.database.prepare("SELECT id FROM customers WHERE referral_code = ?").get(code);
       if (!exists) return code;
     }
-    return `ONKY-${randomUUID().slice(0, 8).toUpperCase()}`;
+    return `ONKY-${randomUUID2().slice(0, 8).toUpperCase()}`;
+  }
+  consumedWelcomeOrder(id) {
+    if (!id) return null;
+    const row = this.database.prepare(`SELECT id FROM shop_orders WHERE id = ? AND (
+      current_receipt_id IS NOT NULL OR payment_confirmed_at IS NOT NULL
+      OR status IN ('pending_review', 'rejected', 'ready')
+      OR EXISTS (SELECT 1 FROM receipts WHERE order_id = shop_orders.id)
+    )`).get(id);
+    return row ? row.id : null;
+  }
+  consumeWelcome(order) {
+    if (!order.customerAccountId || !order.discountMinor) return;
+    const account = this.database.prepare("SELECT welcome_order_id FROM customers WHERE id = ?").get(order.customerAccountId);
+    if (!account) throw new StoreError(409, "No se encontr\xF3 la cuenta del pedido.");
+    const consumed = this.consumedWelcomeOrder(account.welcome_order_id);
+    if (consumed && consumed !== order.id) throw new StoreError(409, "El 10% de bienvenida ya se us\xF3 en otro pedido. Crea un nuevo pedido para obtener el total actualizado.");
+    this.database.prepare("UPDATE customers SET welcome_order_id = ? WHERE id = ?").run(order.id, order.customerAccountId);
+    if (!consumed) this.audit(order.id, "welcome.consumed", "system", "Beneficio de bienvenida aplicado al enviar el comprobante o confirmar el pago.");
   }
   accountFromRow(row) {
     const id = row.id;
@@ -767,7 +832,7 @@ var ShopDatabase = class {
       name: row.name,
       email: row.email,
       createdAt: row.created_at,
-      welcomeAvailable: row.welcome_order_id === null,
+      welcomeAvailable: !this.consumedWelcomeOrder(row.welcome_order_id),
       referralCode,
       creditBalanceMinor: Number(balance?.balance ?? 0)
     };
@@ -797,12 +862,12 @@ var ShopDatabase = class {
         if (referrer.email.toLowerCase() === data.email.toLowerCase()) throw new StoreError(422, "No puedes usar tu propio c\xF3digo de referido.");
         referrerId = referrer.id;
       }
-      const id = randomUUID();
+      const id = randomUUID2();
       const referralCode = this.generateReferralCode();
       const now = timestamp();
       this.database.prepare("INSERT INTO customers (id, name, email, password_hash, referral_code, created_at, privacy_version, privacy_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 'customer-account-v1', ?)").run(id, data.name, data.email, hash, referralCode, now, now);
       if (referrerId) {
-        this.database.prepare("INSERT INTO referrals (id, referrer_id, referred_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)").run(randomUUID(), referrerId, id, now);
+        this.database.prepare("INSERT INTO referrals (id, referrer_id, referred_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)").run(randomUUID2(), referrerId, id, now);
         this.audit(null, "customer.referral_pending", id, `Referido por ${referrerId}. Pendiente de primera compra.`);
       }
       const result = this.signInCustomer(id, previous);
@@ -906,6 +971,76 @@ var ShopDatabase = class {
     const row = this.database.prepare("SELECT * FROM shop_orders WHERE owner_hash = ? ORDER BY created_at DESC, rowid DESC LIMIT 1").get(owner);
     return row ? this.fromRow(row) : null;
   }
+  checkoutSecret() {
+    this.database.prepare("INSERT INTO metadata (key, value) VALUES ('checkout_secret', ?) ON CONFLICT(key) DO NOTHING").run(newToken());
+    return this.database.prepare("SELECT value FROM metadata WHERE key = 'checkout_secret'").get().value;
+  }
+  previewOrder(value, owner) {
+    const parsed = parseNewOrder(value, this.catalog);
+    return this.transaction(() => {
+      const accountId = accountIdFromOwner(owner);
+      const account = accountId ? this.database.prepare("SELECT welcome_order_id FROM customers WHERE id = ?").get(accountId) : null;
+      if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para continuar al pago.");
+      return paymentPreview(parsed, owner, !!account && !this.consumedWelcomeOrder(account.welcome_order_id), this.destination(), this.catalog.demo, this.nextOrderCode(), this.checkoutSecret());
+    });
+  }
+  completeCheckout(token, owner, key, file) {
+    const preview = readPaymentPreview(token, owner, this.checkoutSecret());
+    const hash = tokenHash(`${token}:${file.rawHash}`);
+    return this.transaction(() => {
+      const previous = this.database.prepare("SELECT * FROM shop_orders WHERE id = ? AND owner_hash = ?").get(preview.id, owner);
+      if (previous) {
+        if (previous.request_hash !== hash) throw new StoreError(409, "Ya recibimos este pedido con otro comprobante. Actualiza su estado.");
+        return this.fromRow(previous);
+      }
+      const now = timestamp();
+      this.database.prepare(`INSERT INTO shop_orders
+        (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
+         destination_json, subtotal_minor, shipping_minor, total_minor, privacy_version, privacy_accepted_at, account_id, discount_minor)
+         VALUES (?, ?, ?, ?, ?, 'awaiting_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sinpe-checkout-v2', ?, ?, ?)`).run(
+        preview.id,
+        preview.code,
+        owner,
+        preview.id,
+        hash,
+        preview.demo ? 1 : 0,
+        now,
+        now,
+        JSON.stringify(preview.lines),
+        JSON.stringify(preview.customer),
+        JSON.stringify(preview.delivery),
+        JSON.stringify(preview.destination),
+        preview.subtotalMinor,
+        preview.shippingMinor,
+        preview.totalMinor,
+        preview.createdAt,
+        preview.customerAccountId ?? null,
+        preview.discountMinor ?? 0
+      );
+      this.audit(preview.id, "order.created", "customer", "Pedido registrado al recibir el comprobante de pago.");
+      this.event(this.getOrder(preview.id), "order.created");
+      return this.saveReceipt(preview.id, owner, preview.code, null, key, 1, file);
+    });
+  }
+  nextOrderCode() {
+    let nextNum = 1001;
+    const meta = this.database.prepare("SELECT value FROM metadata WHERE key = 'order_number'").get();
+    if (meta?.value) {
+      const parsedNum = Number(meta.value);
+      if (Number.isSafeInteger(parsedNum) && parsedNum >= nextNum) nextNum = parsedNum + 1;
+    } else {
+      const rows = this.database.prepare("SELECT code FROM shop_orders WHERE code LIKE 'ONK-%'").all();
+      for (const r of rows) {
+        const match = /^ONK-(\d+)$/.exec(r.code);
+        if (match && Number(match[1]) >= nextNum) nextNum = Number(match[1]) + 1;
+      }
+    }
+    while (this.database.prepare("SELECT 1 FROM shop_orders WHERE code = ?").get(`ONK-${nextNum}`)) nextNum++;
+    this.database.prepare("INSERT INTO metadata (key, value) VALUES ('order_number', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(nextNum));
+    return `ONK-${nextNum}`;
+  }
+  // Legacy order creation is retained for existing integrations and data fixtures.
+  // The public checkout API requires a receipt and uses completeCheckout instead.
   createOrder(value, owner, key) {
     if (!/^[A-Za-z0-9-]{16,128}$/.test(key)) throw new StoreError(422, "Falta una clave de idempotencia v\xE1lida.");
     record(value);
@@ -920,31 +1055,12 @@ var ShopDatabase = class {
       const accountId = accountIdFromOwner(owner);
       const account = accountId ? this.database.prepare("SELECT welcome_order_id FROM customers WHERE id = ?").get(accountId) : null;
       if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para registrar el pedido.");
-      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && account.welcome_order_id === null);
+      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !this.consumedWelcomeOrder(account.welcome_order_id));
       const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount;
       const destination = this.destination();
       const ready = destination !== null && parsed.amounts.total !== null;
-      const id = randomUUID();
-      let nextNum = 1001;
-      const meta = this.database.prepare("SELECT value FROM metadata WHERE key = 'order_number'").get();
-      if (meta?.value) {
-        const parsedNum = Number(meta.value);
-        if (Number.isSafeInteger(parsedNum) && parsedNum >= nextNum) nextNum = parsedNum + 1;
-      } else {
-        const rows = this.database.prepare("SELECT code FROM shop_orders WHERE code LIKE 'ONK-%'").all();
-        for (const r of rows) {
-          const match = /^ONK-(\d+)$/.exec(r.code);
-          if (match) {
-            const n = Number(match[1]);
-            if (n >= nextNum) nextNum = n + 1;
-          }
-        }
-      }
-      while (this.database.prepare("SELECT 1 FROM shop_orders WHERE code = ?").get(`ONK-${nextNum}`)) {
-        nextNum++;
-      }
-      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('order_number', ?) ON CONFLICT(key) DO UPDATE SET value = ?").run(String(nextNum), String(nextNum));
-      const code = `ONK-${nextNum}`;
+      const id = randomUUID2();
+      const code = this.nextOrderCode();
       const now = timestamp();
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
@@ -970,7 +1086,6 @@ var ShopDatabase = class {
         accountId,
         discount
       );
-      if (accountId && account?.welcome_order_id === null) this.database.prepare("UPDATE customers SET welcome_order_id = ? WHERE id = ? AND welcome_order_id IS NULL").run(id, accountId);
       this.audit(id, "order.created", "customer", ready ? "Pedido registrado. Pendiente de pago; no se ha verificado ning\xFAn abono." : "Pedido registrado. No solicitar pago hasta confirmar destino y total.");
       const order = this.getOrder(id);
       this.event(order, "order.created");
@@ -986,32 +1101,34 @@ var ShopDatabase = class {
     return order;
   }
   addReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file) {
+    return this.transaction(() => this.saveReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file));
+  }
+  saveReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file) {
     const key = text2(uploadKey, 16, 128, "Identificador de carga");
     const expectedVersion = version(suppliedVersion);
-    return this.transaction(() => {
-      const order = this.checkUpload(id, owner, suppliedCode);
-      const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
-      const previous = this.database.prepare("SELECT * FROM receipts WHERE order_id = ? AND upload_key = ?").get(id, key);
-      if (previous) {
-        if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, "La carga repetida contiene datos distintos. Actualiza el pedido.");
-        return order;
-      }
-      if (order.version !== expectedVersion) throw new StoreError(409, "El pedido cambi\xF3 mientras adjuntabas el comprobante. Actualiza su estado.");
-      if (order.status !== "awaiting_payment" && order.status !== "rejected") throw new StoreError(409, "Este pedido no admite un nuevo comprobante en su estado actual.");
-      if (!order.destination || order.totalMinor === null) throw new StoreError(409, "Primero deben confirmarse el destino SINPE y el total.");
-      const duplicate = this.database.prepare("SELECT order_id FROM receipts WHERE raw_hash = ? AND order_id != ?").get(file.rawHash, id);
-      if (duplicate) throw new StoreError(409, "Este comprobante ya est\xE1 asociado a otro pedido. Adjunta el comprobante correspondiente.");
-      const count = Number(this.database.prepare("SELECT count(*) AS count FROM receipts WHERE order_id = ?").get(id).count);
-      if (count >= 5) throw new StoreError(409, "Este pedido alcanz\xF3 el l\xEDmite de correcciones. La tienda debe revisar el historial.");
-      const receiptId = randomUUID();
-      const now = timestamp();
-      this.database.prepare("INSERT INTO receipts (id, order_id, upload_key, raw_hash, content_type, size, data, submitted_at, bank_reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(receiptId, id, key, file.rawHash, file.contentType, file.data.length, file.data, now, reference);
-      this.database.prepare("UPDATE shop_orders SET current_receipt_id = ?, status = 'pending_review', customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(receiptId, now, id);
-      this.audit(id, "receipt.submitted", "customer", "C\xF3digo validado y comprobante recibido. Esto no confirma el pago.");
-      const updated = this.getOrder(id);
-      this.event(updated, "payment.review_requested");
-      return updated;
-    });
+    const order = this.checkUpload(id, owner, suppliedCode);
+    const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
+    const previous = this.database.prepare("SELECT * FROM receipts WHERE order_id = ? AND upload_key = ?").get(id, key);
+    if (previous) {
+      if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, "La carga repetida contiene datos distintos. Actualiza el pedido.");
+      return order;
+    }
+    if (order.version !== expectedVersion) throw new StoreError(409, "El pedido cambi\xF3 mientras adjuntabas el comprobante. Actualiza su estado.");
+    if (order.status !== "awaiting_payment" && order.status !== "rejected") throw new StoreError(409, "Este pedido no admite un nuevo comprobante en su estado actual.");
+    if (!order.destination || order.totalMinor === null) throw new StoreError(409, "Primero deben confirmarse el destino SINPE y el total.");
+    const duplicate = this.database.prepare("SELECT order_id FROM receipts WHERE raw_hash = ? AND order_id != ?").get(file.rawHash, id);
+    if (duplicate) throw new StoreError(409, "Este comprobante ya est\xE1 asociado a otro pedido. Adjunta el comprobante correspondiente.");
+    const count = Number(this.database.prepare("SELECT count(*) AS count FROM receipts WHERE order_id = ?").get(id).count);
+    if (count >= 5) throw new StoreError(409, "Este pedido alcanz\xF3 el l\xEDmite de correcciones. La tienda debe revisar el historial.");
+    this.consumeWelcome(order);
+    const receiptId = randomUUID2();
+    const now = timestamp();
+    this.database.prepare("INSERT INTO receipts (id, order_id, upload_key, raw_hash, content_type, size, data, submitted_at, bank_reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(receiptId, id, key, file.rawHash, file.contentType, file.data.length, file.data, now, reference);
+    this.database.prepare("UPDATE shop_orders SET current_receipt_id = ?, status = 'pending_review', customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(receiptId, now, id);
+    this.audit(id, "receipt.submitted", "customer", "C\xF3digo validado y comprobante recibido. Esto no confirma el pago.");
+    const updated = this.getOrder(id);
+    this.event(updated, "payment.review_requested");
+    return updated;
   }
   receipt(orderId, receiptId) {
     const row = this.database.prepare("SELECT data, content_type FROM receipts WHERE order_id = ? AND id = ?").get(orderId, receiptId);
@@ -1035,8 +1152,10 @@ var ShopDatabase = class {
       const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
       const amount = minorAmount(order.totalMinor);
-      const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
+      const auto = actor.startsWith("auto:");
+      const note = auto ? "Confirmado autom\xE1ticamente por n8n al coincidir un abono bancario con el c\xF3digo/referencia y el monto exacto del pedido. Sin intervenci\xF3n del administrador." : useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
       if (this.database.prepare("SELECT order_id FROM manual_payments WHERE bank_reference = ? AND order_id != ?").get(reference, id)) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
+      this.consumeWelcome(order);
       const now = timestamp();
       this.database.prepare("INSERT INTO manual_payments (order_id, bank_reference, amount_minor, receipt_id, confirmed_by, confirmed_at, note) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, reference, amount, useReceipt?.id ?? null, actor, now, note);
       this.database.prepare("UPDATE shop_orders SET status = 'ready', payment_confirmed_at = ?, customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(now, now, id);
@@ -1220,7 +1339,7 @@ var ShopDatabase = class {
 };
 
 // server/store/mongo.ts
-import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
+import { createHash as createHash3, randomUUID as randomUUID3 } from "node:crypto";
 import { MongoClient } from "mongodb";
 var statuses2 = ["pending_details", "awaiting_payment", "pending_review", "ready", "rejected"];
 var timestamp2 = () => (/* @__PURE__ */ new Date()).toISOString();
@@ -1285,7 +1404,7 @@ var MongoShopDatabase = class {
     }
   }
   async audit(orderId, event, actor, detail, session) {
-    const docId = `audit_${randomUUID2()}`;
+    const docId = `audit_${randomUUID3()}`;
     await this.collection("shop_audit").insertOne({
       _id: docId,
       id: docId,
@@ -1297,7 +1416,7 @@ var MongoShopDatabase = class {
     }, { session });
   }
   async event(order, event, session) {
-    const id = randomUUID2();
+    const id = randomUUID3();
     await this.collection("shop_events").insertOne({
       _id: id,
       id,
@@ -1394,13 +1513,29 @@ var MongoShopDatabase = class {
     }
     return `ONKY-${Date.now().toString(36).toUpperCase().slice(-4)}`;
   }
-  accountFromDoc(row, creditBalanceMinor = 0) {
+  async consumedWelcomeOrder(id, session) {
+    if (!id) return null;
+    const order = await this.collection("shop_orders").findOne({ id }, { session, projection: { id: 1, current_receipt_id: 1, payment_confirmed_at: 1, status: 1 } });
+    if (order?.current_receipt_id || order?.payment_confirmed_at || ["pending_review", "rejected", "ready"].includes(order?.status)) return id;
+    const receipt = await this.collection("receipts").findOne({ order_id: id }, { session, projection: { id: 1 } });
+    return receipt ? id : null;
+  }
+  async consumeWelcome(order, session) {
+    if (!order.customerAccountId || !order.discountMinor) return;
+    const account = await this.collection("customers").findOne({ id: order.customerAccountId }, { session });
+    if (!account) throw new StoreError(409, "No se encontr\xF3 la cuenta del pedido.");
+    const consumed = await this.consumedWelcomeOrder(account.welcome_order_id, session);
+    if (consumed && consumed !== order.id) throw new StoreError(409, "El 10% de bienvenida ya se us\xF3 en otro pedido. Crea un nuevo pedido para obtener el total actualizado.");
+    await this.collection("customers").updateOne({ id: order.customerAccountId }, { $set: { welcome_order_id: order.id }, $inc: { welcome_revision: 1 } }, { session });
+    if (!consumed) await this.audit(order.id, "welcome.consumed", "system", "Beneficio de bienvenida aplicado al enviar el comprobante o confirmar el pago.", session);
+  }
+  async accountFromDoc(row, creditBalanceMinor = 0) {
     return {
       id: row.id,
       name: row.name,
       email: row.email,
       createdAt: row.created_at,
-      welcomeAvailable: !row.welcome_order_id,
+      welcomeAvailable: !await this.consumedWelcomeOrder(row.welcome_order_id),
       referralCode: row.referral_code || void 0,
       creditBalanceMinor
     };
@@ -1441,7 +1576,7 @@ var MongoShopDatabase = class {
           if (referrer.email.toLowerCase() === data.email.toLowerCase()) throw new StoreError(422, "No puedes usar tu propio c\xF3digo de referido.");
           referrerId = referrer.id;
         }
-        const id = randomUUID2();
+        const id = randomUUID3();
         const referralCode = await this.generateReferralCode(session);
         const now = timestamp2();
         await this.collection("customers").insertOne({
@@ -1457,7 +1592,7 @@ var MongoShopDatabase = class {
           privacy_accepted_at: now
         }, { session });
         if (referrerId) {
-          const refId = randomUUID2();
+          const refId = randomUUID3();
           await this.collection("referrals").insertOne({
             _id: refId,
             id: refId,
@@ -1600,7 +1735,7 @@ var MongoShopDatabase = class {
     );
     await this.collection("customer_credit_ledger").insertOne(
       {
-        _id: randomUUID2(),
+        _id: randomUUID3(),
         customer_id: referral.referrer_id,
         type: "referral_reward",
         amount_minor: rewardMinor,
@@ -1627,7 +1762,7 @@ var MongoShopDatabase = class {
       { $group: { _id: "$account_id", count: { $sum: 1 } } }
     ]).toArray() : [];
     const byCustomer = new Map(counts.map((row) => [row._id, row.count]));
-    const customers = rows.map((row) => ({ ...this.accountFromDoc(row), orderCount: byCustomer.get(row.id) ?? 0 }));
+    const customers = await Promise.all(rows.map(async (row) => ({ ...await this.accountFromDoc(row), orderCount: byCustomer.get(row.id) ?? 0 })));
     return { customers, total, page, pageSize: 50 };
   }
   async settings(session) {
@@ -1741,6 +1876,83 @@ var MongoShopDatabase = class {
     const row = await this.collection("shop_orders").findOne({ owner_hash: owner }, { sort: { created_at: -1, _id: -1 } });
     return row ? this.fromDoc(row) : null;
   }
+  async checkoutSecret(session) {
+    const row = await this.collection("metadata").findOneAndUpdate(
+      { key: "checkout_secret" },
+      { $setOnInsert: { value: newToken() } },
+      { upsert: true, returnDocument: "after", session }
+    );
+    return row.value;
+  }
+  async previewOrder(value, owner) {
+    const parsed = parseNewOrder(value, this.catalog);
+    return this.transaction(async (session) => {
+      const accountId = accountIdFromOwner(owner);
+      const account = accountId ? await this.collection("customers").findOne({ id: accountId }, { session }) : null;
+      if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para continuar al pago.");
+      const eligible = !!account && !await this.consumedWelcomeOrder(account.welcome_order_id, session);
+      return paymentPreview(parsed, owner, eligible, await this.destination(session), this.catalog.demo, await this.nextOrderCode(session), await this.checkoutSecret(session));
+    });
+  }
+  async completeCheckout(token, owner, key, file) {
+    const preview = readPaymentPreview(token, owner, await this.checkoutSecret());
+    const hash = tokenHash(`${token}:${file.rawHash}`);
+    return this.transaction(async (session) => {
+      const previous = await this.collection("shop_orders").findOne({ id: preview.id, owner_hash: owner }, { session });
+      if (previous) {
+        if (previous.request_hash !== hash) throw new StoreError(409, "Ya recibimos este pedido con otro comprobante. Actualiza su estado.");
+        return this.fromDoc(previous, session);
+      }
+      const now = timestamp2();
+      await this.collection("shop_orders").insertOne({
+        _id: preview.id,
+        id: preview.id,
+        code: preview.code,
+        owner_hash: owner,
+        idempotency_key: preview.id,
+        request_hash: hash,
+        version: 1,
+        status: "awaiting_payment",
+        demo: preview.demo ? 1 : 0,
+        created_at: now,
+        updated_at: now,
+        lines_json: JSON.stringify(preview.lines),
+        customer_json: JSON.stringify(preview.customer),
+        delivery_json: JSON.stringify(preview.delivery),
+        destination_json: JSON.stringify(preview.destination),
+        subtotal_minor: preview.subtotalMinor,
+        shipping_minor: preview.shippingMinor,
+        total_minor: preview.totalMinor,
+        discount_minor: preview.discountMinor ?? 0,
+        account_id: preview.customerAccountId ?? null,
+        current_receipt_id: null,
+        customer_message: null,
+        payment_confirmed_at: null,
+        privacy_version: "sinpe-checkout-v2",
+        privacy_accepted_at: preview.createdAt
+      }, { session });
+      await this.audit(preview.id, "order.created", "customer", "Pedido registrado al recibir el comprobante de pago.", session);
+      await this.event(await this.getOrder(preview.id, session), "order.created", session);
+      return this.saveReceipt(preview.id, owner, preview.code, null, key, 1, file, session);
+    });
+  }
+  async nextOrderCode(session) {
+    let nextNum = 1001;
+    const meta = await this.collection("metadata").findOne({ key: "order_number" }, { session });
+    if (meta && typeof meta.seq === "number" && meta.seq >= nextNum) {
+      nextNum = meta.seq + 1;
+    } else {
+      const last = await this.collection("shop_orders").find({ code: /^ONK-\d+$/ }, { projection: { code: 1 }, session }).sort({ created_at: -1 }).limit(50).toArray();
+      for (const doc of last) {
+        const match = /^ONK-(\d+)$/.exec(doc.code);
+        if (match && Number(match[1]) >= nextNum) nextNum = Number(match[1]) + 1;
+      }
+    }
+    while (await this.collection("shop_orders").findOne({ code: `ONK-${nextNum}` }, { session })) nextNum++;
+    await this.collection("metadata").updateOne({ key: "order_number" }, { $set: { seq: nextNum } }, { upsert: true, session });
+    return `ONK-${nextNum}`;
+  }
+  // Legacy integrations/fixtures only; the public API uses completeCheckout.
   async createOrder(value, owner, key) {
     if (!/^[A-Za-z0-9-]{16,128}$/.test(key)) throw new StoreError(422, "Falta una clave de idempotencia v\xE1lida.");
     record(value);
@@ -1755,30 +1967,14 @@ var MongoShopDatabase = class {
       const accountId = accountIdFromOwner(owner);
       const account = accountId ? await this.collection("customers").findOne({ id: accountId }, { session }) : null;
       if (accountId && !account) throw new StoreError(401, "Inicia sesi\xF3n de nuevo para registrar el pedido.");
-      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !account.welcome_order_id);
+      const eligible = !!account && !await this.consumedWelcomeOrder(account.welcome_order_id, session);
+      if (eligible) await this.collection("customers").updateOne({ id: accountId }, { $inc: { welcome_revision: 1 } }, { session });
+      const discount = welcomeDiscount(parsed.amounts.subtotal, eligible);
       const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount;
       const destination = await this.destination(session);
       const ready = destination !== null && parsed.amounts.total !== null;
-      const id = randomUUID2();
-      let nextNum = 1001;
-      const meta = await this.collection("metadata").findOne({ key: "order_number" }, { session });
-      if (meta && typeof meta.seq === "number" && meta.seq >= nextNum) {
-        nextNum = meta.seq + 1;
-      } else {
-        const last = await this.collection("shop_orders").find({ code: /^ONK-\d+$/ }, { projection: { code: 1 }, session }).sort({ created_at: -1 }).limit(50).toArray();
-        for (const doc of last) {
-          const match = /^ONK-(\d+)$/.exec(doc.code);
-          if (match) {
-            const n = Number(match[1]);
-            if (n >= nextNum) nextNum = n + 1;
-          }
-        }
-      }
-      while (await this.collection("shop_orders").findOne({ code: `ONK-${nextNum}` }, { session })) {
-        nextNum++;
-      }
-      await this.collection("metadata").updateOne({ key: "order_number" }, { $set: { seq: nextNum } }, { upsert: true, session });
-      const code = `ONK-${nextNum}`;
+      const id = randomUUID3();
+      const code = await this.nextOrderCode(session);
       const now = timestamp2();
       const newOrder = {
         _id: id,
@@ -1808,7 +2004,6 @@ var MongoShopDatabase = class {
         privacy_accepted_at: now
       };
       await this.collection("shop_orders").insertOne(newOrder, { session });
-      if (accountId && !account?.welcome_order_id) await this.collection("customers").updateOne({ id: accountId, welcome_order_id: null }, { $set: { welcome_order_id: id } }, { session });
       await this.audit(id, "order.created", "customer", ready ? "Pedido registrado. Pendiente de pago; no se ha verificado ning\xFAn abono." : "Pedido registrado. No solicitar pago hasta confirmar destino y total.", session);
       const order = await this.getOrder(id, session);
       await this.event(order, "order.created", session);
@@ -1826,50 +2021,52 @@ var MongoShopDatabase = class {
     return order;
   }
   async addReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file) {
+    return this.transaction((session) => this.saveReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file, session));
+  }
+  async saveReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file, session) {
     const key = text2(uploadKey, 16, 128, "Identificador de carga");
     const expectedVersion = version(suppliedVersion);
-    return this.transaction(async (session) => {
-      const order = await this.checkUpload(id, owner, suppliedCode, session);
-      const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
-      const previous = await this.collection("receipts").findOne({ order_id: id, upload_key: key }, { session });
-      if (previous) {
-        if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, "La carga repetida contiene datos distintos. Actualiza el pedido.");
-        return order;
-      }
-      if (order.version !== expectedVersion) throw new StoreError(409, "El pedido cambi\xF3 mientras adjuntabas el comprobante. Actualiza su estado.");
-      if (order.status !== "awaiting_payment" && order.status !== "rejected") throw new StoreError(409, "Este pedido no admite un nuevo comprobante en su estado actual.");
-      if (!order.destination || order.totalMinor === null) throw new StoreError(409, "Primero deben confirmarse el destino SINPE y el total.");
-      const duplicate = await this.collection("receipts").findOne({ raw_hash: file.rawHash, order_id: { $ne: id } }, { session });
-      if (duplicate) throw new StoreError(409, "Este comprobante ya est\xE1 asociado a otro pedido. Adjunta el comprobante correspondiente.");
-      const count = await this.collection("receipts").countDocuments({ order_id: id }, { session });
-      if (count >= 5) throw new StoreError(409, "Este pedido alcanz\xF3 el l\xEDmite de correcciones. La tienda debe revisar el historial.");
-      const receiptId = randomUUID2();
-      const now = timestamp2();
-      await this.collection("receipts").insertOne({
-        _id: receiptId,
-        id: receiptId,
-        order_id: id,
-        upload_key: key,
-        raw_hash: file.rawHash,
-        content_type: file.contentType,
-        size: file.data.length,
-        data: file.data,
-        submitted_at: now,
-        bank_reference: reference
-      }, { session });
-      await this.collection("shop_orders").updateOne(
-        { id },
-        {
-          $set: { current_receipt_id: receiptId, status: "pending_review", customer_message: null, updated_at: now },
-          $inc: { version: 1 }
-        },
-        { session }
-      );
-      await this.audit(id, "receipt.submitted", "customer", "C\xF3digo validado y comprobante recibido. Esto no confirma el pago.", session);
-      const updated = await this.getOrder(id, session);
-      await this.event(updated, "payment.review_requested", session);
-      return updated;
-    });
+    const order = await this.checkUpload(id, owner, suppliedCode, session);
+    const reference = suppliedReference === void 0 || suppliedReference === null || suppliedReference === "" ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase()}`) : bankReference(suppliedReference);
+    const previous = await this.collection("receipts").findOne({ order_id: id, upload_key: key }, { session });
+    if (previous) {
+      if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, "La carga repetida contiene datos distintos. Actualiza el pedido.");
+      return order;
+    }
+    if (order.version !== expectedVersion) throw new StoreError(409, "El pedido cambi\xF3 mientras adjuntabas el comprobante. Actualiza su estado.");
+    if (order.status !== "awaiting_payment" && order.status !== "rejected") throw new StoreError(409, "Este pedido no admite un nuevo comprobante en su estado actual.");
+    if (!order.destination || order.totalMinor === null) throw new StoreError(409, "Primero deben confirmarse el destino SINPE y el total.");
+    const duplicate = await this.collection("receipts").findOne({ raw_hash: file.rawHash, order_id: { $ne: id } }, { session });
+    if (duplicate) throw new StoreError(409, "Este comprobante ya est\xE1 asociado a otro pedido. Adjunta el comprobante correspondiente.");
+    const count = await this.collection("receipts").countDocuments({ order_id: id }, { session });
+    if (count >= 5) throw new StoreError(409, "Este pedido alcanz\xF3 el l\xEDmite de correcciones. La tienda debe revisar el historial.");
+    await this.consumeWelcome(order, session);
+    const receiptId = randomUUID3();
+    const now = timestamp2();
+    await this.collection("receipts").insertOne({
+      _id: receiptId,
+      id: receiptId,
+      order_id: id,
+      upload_key: key,
+      raw_hash: file.rawHash,
+      content_type: file.contentType,
+      size: file.data.length,
+      data: file.data,
+      submitted_at: now,
+      bank_reference: reference
+    }, { session });
+    await this.collection("shop_orders").updateOne(
+      { id },
+      {
+        $set: { current_receipt_id: receiptId, status: "pending_review", customer_message: null, updated_at: now },
+        $inc: { version: 1 }
+      },
+      { session }
+    );
+    await this.audit(id, "receipt.submitted", "customer", "C\xF3digo validado y comprobante recibido. Esto no confirma el pago.", session);
+    const updated = await this.getOrder(id, session);
+    await this.event(updated, "payment.review_requested", session);
+    return updated;
   }
   async receipt(orderId, receiptId) {
     const row = await this.collection("receipts").findOne({ order_id: orderId, id: receiptId });
@@ -1894,9 +2091,11 @@ var MongoShopDatabase = class {
       const useReceipt = order.receipt && order.status === "pending_review" ? order.receipt : null;
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`;
       const amount = minorAmount(order.totalMinor);
-      const note = useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
+      const auto = actor.startsWith("auto:");
+      const note = auto ? "Confirmado autom\xE1ticamente por n8n al coincidir un abono bancario con el c\xF3digo/referencia y el monto exacto del pedido. Sin intervenci\xF3n del administrador." : useReceipt ? "Confirmado manualmente por el administrador al revisar el pedido, su c\xF3digo y el comprobante. Sin consulta bancaria autom\xE1tica." : "Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria autom\xE1tica.";
       const dup = await this.collection("manual_payments").findOne({ bank_reference: reference, order_id: { $ne: id } }, { session });
       if (dup) throw new StoreError(409, "Esta referencia bancaria ya fue utilizada para confirmar otro pedido.");
+      await this.consumeWelcome(order, session);
       const now = timestamp2();
       await this.collection("manual_payments").insertOne({
         _id: id,
@@ -2185,13 +2384,10 @@ function makeShopHandler(store2, options = {}) {
         json(response, 200, { order: await store2.currentOrder(orderOwner(await requireSession("customer"))) });
         return;
       }
-      if (path === "/api/orders" && method === "POST") {
+      if (path === "/api/checkout/preview" && method === "POST") {
         const session = await requireSession("customer", true);
-        limits.check(`order:${session.hash}`, 20, 15 * 6e4);
-        const key = request.headers["idempotency-key"];
-        if (typeof key !== "string") throw new StoreError(422, "Falta Idempotency-Key.");
-        const created = await store2.createOrder(await jsonBody(request), orderOwner(session), key);
-        json(response, 200, created);
+        limits.check(`preview:${session.hash}`, 60, 15 * 6e4);
+        json(response, 200, await store2.previewOrder(await jsonBody(request), orderOwner(session)));
         return;
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path);
@@ -2200,13 +2396,13 @@ function makeShopHandler(store2, options = {}) {
         return;
       }
       const uploadPath = new RegExp(`^/api/orders/(${ID})/receipt$`).exec(path);
-      if (uploadPath && method === "POST") {
+      if ((uploadPath || path === "/api/orders") && method === "POST") {
         const session = await requireSession("customer", true);
         limits.check(`upload:${session.hash}`, 20, 36e5);
         limits.check(`upload-ip:${ip}`, 60, 36e5);
         const type = request.headers["content-type"] ?? "";
-        if (!type.toLowerCase().startsWith("multipart/form-data;")) throw new StoreError(415, "Env\xEDa el comprobante como multipart/form-data.");
-        const bytes = await body(request, MAX_RECEIPT_BYTES + 64 * 1024);
+        if (!type.toLowerCase().startsWith("multipart/form-data;")) throw new StoreError(415, "Para registrar el pedido debes enviar el comprobante. Actualiza la tienda y contin\xFAa al pago.");
+        const bytes = await body(request, MAX_RECEIPT_BYTES + 128 * 1024);
         let form;
         try {
           form = await new Response(new Uint8Array(bytes), { headers: { "Content-Type": type } }).formData();
@@ -2215,15 +2411,17 @@ function makeShopHandler(store2, options = {}) {
         }
         const entries = [...form.entries()];
         const keys = entries.map(([key]) => key);
-        if (new Set(keys).size !== entries.length || keys.some((key) => !["code", "bankReference", "uploadKey", "version", "receipt"].includes(key)) || !["uploadKey", "version", "receipt"].every((req) => keys.includes(req))) throw new StoreError(422, "El formulario contiene campos ausentes, repetidos o no permitidos.");
-        await store2.checkUpload(uploadPath[1], orderOwner(session), form.get("code"));
+        const allowed = uploadPath ? ["code", "bankReference", "uploadKey", "version", "receipt"] : ["checkoutToken", "uploadKey", "receipt"];
+        const required = uploadPath ? ["uploadKey", "version", "receipt"] : allowed;
+        if (new Set(keys).size !== entries.length || keys.some((key) => !allowed.includes(key)) || !required.every((req) => keys.includes(req))) throw new StoreError(422, "El formulario contiene campos ausentes, repetidos o no permitidos.");
+        if (uploadPath) await store2.checkUpload(uploadPath[1], orderOwner(session), form.get("code"));
         const file = form.get("receipt");
         if (!(file instanceof Blob)) throw new StoreError(422, "Selecciona un comprobante.");
         if (file.size > MAX_RECEIPT_BYTES) throw new StoreError(413, "El comprobante no puede superar 5 MB.");
         const version2 = form.get("version");
-        if (typeof version2 !== "string" || !/^[1-9]\d{0,8}$/.test(version2)) throw new StoreError(422, "Versi\xF3n del pedido inv\xE1lida.");
+        if (uploadPath && (typeof version2 !== "string" || !/^[1-9]\d{0,8}$/.test(version2))) throw new StoreError(422, "Versi\xF3n del pedido inv\xE1lida.");
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type);
-        const received = await store2.addReceipt(uploadPath[1], orderOwner(session), form.get("code"), form.get("bankReference"), form.get("uploadKey"), Number(version2), prepared);
+        const received = uploadPath ? await store2.addReceipt(uploadPath[1], orderOwner(session), form.get("code"), form.get("bankReference"), form.get("uploadKey"), Number(version2), prepared) : await store2.completeCheckout(form.get("checkoutToken"), orderOwner(session), form.get("uploadKey"), prepared);
         await options.mailer?.notify("receipt.submitted", received);
         json(response, 200, received);
         return;

@@ -48,7 +48,7 @@ export function useCustomer() {
     register: (data: Registration) => change(() => registerCustomer(data)),
     login: (email: string, password: string) => change(() => loginCustomer(email, password)),
     logout: () => change(logoutCustomer),
-    orderCreated: () => { channel.current?.postMessage('changed'); void refresh() },
+    orderChanged: () => { channel.current?.postMessage('changed'); void refresh() },
   }
 }
 export type Customer = ReturnType<typeof useCustomer>

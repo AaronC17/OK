@@ -6,26 +6,25 @@ import type { CheckoutConfig, ShopOrder } from '../src/order-types.ts'
 
 test.describe.configure({ timeout: 45_000 })
 
-test('SINPE: order, backend code validation, private upload and admin confirmation without WhatsApp', async ({ page, context, request }, testInfo) => {
+test('SINPE: preview, private upload and manual confirmation create an order only with a receipt', async ({ page, context, request }, testInfo) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await testAdmin(request)
   const order = await checkoutOrder(page)
   expect(order.code).toMatch(/^ONK-\d{4,}$/)
-  expect(order.totalMinor).toBe(240000)
+   expect(order.totalMinor).toBe(250000)
   expect(order.status).toBe('awaiting_payment')
   await expect(page.locator('a[href*="wa.me"], a[href*="whatsapp"]')).toHaveCount(0)
-  await expect(page.locator('body')).not.toContainText('WhatsApp')
+  expect((await (await page.request.get('/api/orders/current')).json()).order).toBeNull()
+  expect((await page.request.get(`/api/orders/${order.id}`)).status()).toBe(404)
   await expect(page.locator('.sinpe-pay-card')).toContainText('8000-0000')
+  await sendReceipt(page, order)
   const config = await (await page.request.get('/api/checkout')).json() as CheckoutConfig
   const invalid = await page.request.post(`/api/orders/${order.id}/receipt`, {
     headers: { 'X-CSRF-Token': config.csrfToken },
     multipart: { code: 'ONK-0000000000000000', bankReference: 'TEST-WRONG-CODE-123', uploadKey: randomUUID(), version: String(order.version), receipt: await testReceipt() },
   })
   expect(invalid.status()).toBe(422)
-  const before = await (await page.request.get(`/api/orders/${order.id}`)).json() as ShopOrder
-  expect(before.receipt).toBeNull()
-  await sendReceipt(page, order)
   await expect(page.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
   const pending = await (await page.request.get(`/api/orders/${order.id}`)).json() as ShopOrder
   expect(pending.status).toBe('pending_review')
@@ -34,6 +33,7 @@ test('SINPE: order, backend code validation, private upload and admin confirmati
   await page.getByRole('button', { name: 'Abrir carrito, 0 artículos' }).click()
   await expect(page.locator('#assigned-order-code')).toHaveText(order.code)
   await expect(page.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
+  await expect(page.locator('.sinpe-transit-card')).toHaveCSS('opacity', '1')
   const checkoutAccessibility = await new AxeBuilder({ page }).include('.cart-drawer').withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(checkoutAccessibility.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([])
   await page.screenshot({ path: testInfo.outputPath('sinpe-pending.png') })
@@ -83,18 +83,21 @@ test('SINPE: Correos delivery is calculated immediately and admin never has to q
   const order = await checkoutOrder(page, 'delivery')
   expect(order.status).toBe('awaiting_payment')
   expect(order.shippingMinor).toBe(280000)
-  expect(order.totalMinor).toBe(520000)
-  await expect(page.locator('.sinpe-pay-card')).toContainText('₡5 200')
+  expect(order.totalMinor).toBe(530000)
+  await expect(page.locator('.sinpe-pay-card')).toContainText('₡5 300')
   await expect(page.locator('#receipt-file')).toBeAttached()
+  expect((await (await page.request.get('/api/orders/current')).json()).order).toBeNull()
+  await sendReceipt(page, order)
   const adminPage = await context.newPage()
   await loginAdminPage(adminPage)
   await adminPage.getByLabel('Buscar por código o cliente').fill(order.code)
-  await adminPage.locator('.admin-order-card').filter({ hasText: order.code }).getByRole('button', { name: 'Ver detalle', exact: true }).click()
+  await adminPage.locator('.admin-order-card').filter({ hasText: order.code }).getByRole('button', { name: 'Ver comprobante', exact: true }).click()
   const dialog = adminPage.getByRole('dialog', { name: order.code })
   await expect(dialog.locator('#quote-shipping, #quote-note')).toHaveCount(0)
   await expect(dialog).toContainText('₡2 800')
-  await expect(dialog).toContainText('₡5 200')
-  await expect(dialog.locator('.status-awaiting_payment')).toBeVisible()
+  await expect(dialog).toContainText('₡5 300')
+  await expect(dialog.locator('.order-status')).toHaveText('Pendiente')
+  expect((await (await page.request.get(`/api/orders/${order.id}`)).json()).status).toBe('pending_review')
   const accessibility = await new AxeBuilder({ page: adminPage }).include('.admin-order-dialog').withTags(['wcag2a', 'wcag2aa']).analyze()
   expect(accessibility.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))).toEqual([])
   await adminPage.getByRole('button', { name: 'Cerrar detalle del pedido' }).click()
@@ -145,11 +148,16 @@ test('SINPE: free Correos shipping starts at exactly CRC 15000 in the banner, ca
   await cart.getByLabel('Correo electrónico').fill('envio-exacto@ejemplo.cr')
   await cart.getByLabel('Dirección o punto de entrega').fill('Dirección ficticia para la prueba de envío.')
   await cart.getByLabel(/Acepto que la tienda guarde/).check()
-  await cart.getByRole('button', { name: 'Crear pedido con SINPE' }).click()
+  const response = page.waitForResponse('**/api/checkout/preview')
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
   await expect(cart.locator('#assigned-order-code')).toBeVisible()
-  const { order } = await (await page.request.get('/api/orders/current')).json() as { order: ShopOrder }
+  const { order } = await (await response).json() as { order: ShopOrder }
   expect(order.subtotalMinor).toBe(1500000)
   expect(order.shippingMinor).toBe(0)
   expect(order.totalMinor).toBe(1500000)
   await expect(cart.locator('.sinpe-pay-card')).toContainText('₡15 000')
+  expect((await (await page.request.get('/api/orders/current')).json()).order).toBeNull()
+  const saved = await sendReceipt(page, order)
+  expect(saved.totalMinor).toBe(1500000)
+  expect(saved.shippingMinor).toBe(0)
 })

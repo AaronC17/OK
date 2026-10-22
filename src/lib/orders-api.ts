@@ -1,5 +1,5 @@
 import type { CartItem } from '../types.ts'
-import type { AdminAuth, AdminOrders, CheckoutConfig, OrderAudit, OrderCustomer, ShopOrder, SinpeSettings } from '../order-types.ts'
+import type { AdminAuth, AdminOrders, CheckoutConfig, CheckoutPreview, OrderAudit, OrderCustomer, ShopOrder, SinpeSettings } from '../order-types.ts'
 import type { AdminCustomers, CustomerAuth, CustomerOrders, CustomerReferralsData, Registration } from '../account-types.ts'
 
 export class ApiError extends Error {
@@ -68,16 +68,16 @@ export const customerReferrals = () => request<CustomerReferralsData>('/api/acco
 export const currentOrder = () => request<{ order: ShopOrder | null }>('/api/orders/current')
 export const fetchOrder = (id: string) => request<ShopOrder>(`/api/orders/${encodeURIComponent(id)}`)
 
-export async function createOrder(items: CartItem[], deliveryId: string, customer: OrderCustomer, privacyAccepted: boolean, key: string): Promise<ShopOrder> {
-  let response: Response
-  try {
-    response = await fetch('/api/orders', {
-      method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15_000),
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': customerCsrf, 'Idempotency-Key': key },
-      body: JSON.stringify({ items, deliveryId, customer, privacyAccepted }),
-    })
-  } catch { throw new ApiError('No recibimos la respuesta del servidor. Reintenta sin cambiar los datos; se conservará la misma solicitud para evitar duplicados.', 0) }
-  return readResponse<ShopOrder>(response)
+export function previewOrder(items: CartItem[], deliveryId: string, customer: OrderCustomer, privacyAccepted: boolean) {
+  return request<CheckoutPreview>('/api/checkout/preview', 'POST', { items, deliveryId, customer, privacyAccepted })
+}
+
+export function completeCheckout(token: string, file: File, key: string) {
+  const form = new FormData()
+  form.set('checkoutToken', token)
+  form.set('uploadKey', key)
+  form.set('receipt', file)
+  return request<ShopOrder>('/api/orders', 'POST', form)
 }
 
 export function uploadReceipt(order: ShopOrder, file: File, key: string) {

@@ -149,7 +149,7 @@ export default function App() {
       {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
     </Suspense>
     <Suspense fallback={null}>
-      {cartRequested && <CartDrawer key={`${customer.user?.id ?? 'guest'}:${selectedOrderId ?? 'cart'}`} open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} customerAccount={customer.user} selectedOrderId={selectedOrderId} onRegister={() => openAccount('register')} onOrderCreated={customer.orderCreated} />}
+      {cartRequested && <CartDrawer key={`${customer.user?.id ?? 'guest'}:${selectedOrderId ?? 'cart'}`} open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} customerAccount={customer.user} selectedOrderId={selectedOrderId} onRegister={() => openAccount('register')} onOrderChanged={customer.orderChanged} />}
     </Suspense>
     <Suspense fallback={null}>
       {accountRequested && <AccountDialog open={accountOpen} initialMode={accountMode} customer={customer} onClose={() => setAccountOpen(false)} onOrder={viewAccountOrder} onShop={shopFromAccount} />}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { amountFromInput, ApiError, checkoutConfig, createOrder, currentOrder, loginCustomer } from './orders-api.ts'
+import { amountFromInput, ApiError, checkoutConfig, previewOrder, currentOrder, loginCustomer } from './orders-api.ts'
 
 test('manual payment amounts convert decimal strings to integer CRC cents without rounding', () => {
   assert.equal(amountFromInput('8500'), 850000)
@@ -14,7 +14,7 @@ test('API: malformed and empty JSON responses report a recoverable error for rea
   for (const payload of ['{truncated', 'null', '[]']) {
     t.mock.method(globalThis, 'fetch', async () => new Response(payload, { headers: { 'Content-Type': 'application/json' } }))
     await assert.rejects(currentOrder(), error => error instanceof ApiError && error.status === 502)
-    await assert.rejects(createOrder([], 'pickup', { name: '', phone: '', email: '', address: '', notes: '' }, true, 'same-attempt-key'), error => error instanceof ApiError && error.status === 502)
+    await assert.rejects(previewOrder([], 'pickup', { name: '', phone: '', email: '', address: '', notes: '' }, true), error => error instanceof ApiError && error.status === 502)
     t.mock.restoreAll()
   }
 })
@@ -43,6 +43,6 @@ test('API: checkout reads wait for session rotation and mutations use the latest
   await changing
   await refresh
   assert.equal(calls.filter(call => call.path === '/api/checkout').length, 2)
-  await createOrder([], 'pickup', { name: '', phone: '', email: '', address: '', notes: '' }, true, 'test-attempt-key')
+  await previewOrder([], 'pickup', { name: '', phone: '', email: '', address: '', notes: '' }, true)
   assert.equal(calls.at(-1)!.csrf, 'member-token')
 })

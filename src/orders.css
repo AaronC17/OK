@@ -20,6 +20,7 @@
   flex-direction: column;
   gap: 16px;
 }
+.checkout-back { align-self: flex-start; min-height: 44px; }
 .sinpe-gateway-header {
   display: flex;
   flex-direction: column;

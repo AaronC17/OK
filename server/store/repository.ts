@@ -1,4 +1,4 @@
-import type { AdminOrders, OrderAudit, ShopOrder, SinpeSettings } from '../../src/order-types.ts'
+import type { AdminOrders, CheckoutPreview, OrderAudit, ShopOrder, SinpeSettings } from '../../src/order-types.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import type { Session } from './security.ts'
 import type { AdminCustomers, CustomerAccount, CustomerOrders, CustomerReferralsData } from '../../src/account-types.ts'
@@ -29,7 +29,8 @@ export interface ShopRepository {
   configure(value: unknown, actor: string): MaybePromise<SinpeSettings>
   isDemo(): boolean
   currentOrder(owner: string): MaybePromise<ShopOrder | null>
-  createOrder(value: unknown, owner: string, key: string): MaybePromise<ShopOrder>
+  previewOrder(value: unknown, owner: string): MaybePromise<CheckoutPreview>
+  completeCheckout(token: unknown, owner: string, key: unknown, file: PreparedReceipt): MaybePromise<ShopOrder>
   customerOrder(id: string, owner: string): MaybePromise<ShopOrder>
   checkUpload(id: string, owner: string, suppliedCode: unknown): MaybePromise<ShopOrder>
   addReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt): MaybePromise<ShopOrder>

@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { store } from '../config/store.ts'
 import { orderStatusLabels } from '../order-types.ts'
 import type { ShopOrder } from '../order-types.ts'
-import { errorMessage, uploadReceipt } from '../lib/orders-api.ts'
+import { completeCheckout, errorMessage, uploadReceipt } from '../lib/orders-api.ts'
 import { money } from '../lib/shop.ts'
 import { useVisibleAnimation } from '../hooks/useVisibleAnimation.ts'
 import { Icon } from './Icon.tsx'
@@ -76,8 +76,9 @@ function DeliveryTransitAnimation({ order }: { order: ShopOrder }) {
   )
 }
 
-export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
+export function OrderPanel({ order, onChange, onRefresh, onNew, busy, checkoutToken, onBack, onCancel }: {
   order: ShopOrder; onChange: (order: ShopOrder) => void; onRefresh: () => void; onNew: () => void; busy: boolean
+  checkoutToken?: string; onBack?: () => void; onCancel?: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
@@ -129,7 +130,7 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
     setSending(true)
     sendingRef.current = true
     try {
-      onChange(await uploadReceipt(order, file, uploadKey.current.key))
+      onChange(await (checkoutToken ? completeCheckout(checkoutToken, file, uploadKey.current.key) : uploadReceipt(order, file, uploadKey.current.key)))
       setFile(null)
     } catch (err) { setError(errorMessage(err)) }
     finally { setSending(false); sendingRef.current = false }
@@ -168,9 +169,11 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
   const showTransitAnimation = order.status === 'pending_review' || order.status === 'ready'
 
   return <section className="sinpe-order-panel" aria-labelledby="sinpe-order-title">
+    {onBack && <button type="button" className="text-button checkout-back" disabled={sending} onClick={onBack}><Icon name="arrow" size={16} style={{ transform: 'rotate(180deg)' }} />Volver a mis datos y productos</button>}
     <div className="sinpe-gateway-header">
-      <h3 id="sinpe-order-title">{title}</h3>
+      <h3 id="sinpe-order-title" tabIndex={-1}>{title}</h3>
       <p>{subtitle}</p>
+      {checkoutToken && <p>Tu pedido se registrará al enviar el comprobante. Puedes volver atrás para editar tus datos y productos.</p>}
     </div>
 
     {showTransitAnimation ? (
@@ -319,7 +322,7 @@ export function OrderPanel({ order, onChange, onRefresh, onNew, busy }: {
           {busy ? 'Consultando…' : 'Actualizar estado'}
         </button>
       )}
-      <button type="button" className="text-button" disabled={sending} onClick={onNew}>Hacer otro pedido</button>
+      <button type="button" className="text-button" disabled={sending} onClick={onCancel ?? onNew}>{onCancel ? 'Cancelar pedido' : 'Seguir comprando'}</button>
     </div>
   </section>
 }

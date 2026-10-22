@@ -161,13 +161,10 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         json(response, 200, { order: await store.currentOrder(orderOwner(await requireSession('customer'))) })
         return
       }
-      if (path === '/api/orders' && method === 'POST') {
+      if (path === '/api/checkout/preview' && method === 'POST') {
         const session = await requireSession('customer', true)
-        limits.check(`order:${session.hash}`, 20, 15 * 60_000)
-        const key = request.headers['idempotency-key']
-        if (typeof key !== 'string') throw new StoreError(422, 'Falta Idempotency-Key.')
-        const created = await store.createOrder(await jsonBody(request), orderOwner(session), key)
-        json(response, 200, created)
+        limits.check(`preview:${session.hash}`, 60, 15 * 60_000)
+        json(response, 200, await store.previewOrder(await jsonBody(request), orderOwner(session)))
         return
       }
       const orderPath = new RegExp(`^/api/orders/(${ID})$`).exec(path)
@@ -176,27 +173,31 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
         return
       }
       const uploadPath = new RegExp(`^/api/orders/(${ID})/receipt$`).exec(path)
-      if (uploadPath && method === 'POST') {
+      if ((uploadPath || path === '/api/orders') && method === 'POST') {
         const session = await requireSession('customer', true)
         limits.check(`upload:${session.hash}`, 20, 3600_000)
         limits.check(`upload-ip:${ip}`, 60, 3600_000)
         const type = request.headers['content-type'] ?? ''
-        if (!type.toLowerCase().startsWith('multipart/form-data;')) throw new StoreError(415, 'Envía el comprobante como multipart/form-data.')
-        const bytes = await body(request, MAX_RECEIPT_BYTES + 64 * 1024)
+        if (!type.toLowerCase().startsWith('multipart/form-data;')) throw new StoreError(415, 'Para registrar el pedido debes enviar el comprobante. Actualiza la tienda y continúa al pago.')
+        const bytes = await body(request, MAX_RECEIPT_BYTES + 128 * 1024)
         let form: FormData
         try { form = await new Response(new Uint8Array(bytes), { headers: { 'Content-Type': type } }).formData() }
         catch { throw new StoreError(400, 'No se pudo leer el formulario del comprobante.') }
         const entries = [...form.entries()]
         const keys = entries.map(([key]) => key)
-        if (new Set(keys).size !== entries.length || keys.some(key => !['code', 'bankReference', 'uploadKey', 'version', 'receipt'].includes(key)) || !['uploadKey', 'version', 'receipt'].every(req => keys.includes(req))) throw new StoreError(422, 'El formulario contiene campos ausentes, repetidos o no permitidos.')
-        await store.checkUpload(uploadPath[1], orderOwner(session), form.get('code'))
+        const allowed = uploadPath ? ['code', 'bankReference', 'uploadKey', 'version', 'receipt'] : ['checkoutToken', 'uploadKey', 'receipt']
+        const required = uploadPath ? ['uploadKey', 'version', 'receipt'] : allowed
+        if (new Set(keys).size !== entries.length || keys.some(key => !allowed.includes(key)) || !required.every(req => keys.includes(req))) throw new StoreError(422, 'El formulario contiene campos ausentes, repetidos o no permitidos.')
+        if (uploadPath) await store.checkUpload(uploadPath[1], orderOwner(session), form.get('code'))
         const file = form.get('receipt')
         if (!(file instanceof Blob)) throw new StoreError(422, 'Selecciona un comprobante.')
         if (file.size > MAX_RECEIPT_BYTES) throw new StoreError(413, 'El comprobante no puede superar 5 MB.')
         const version = form.get('version')
-        if (typeof version !== 'string' || !/^[1-9]\d{0,8}$/.test(version)) throw new StoreError(422, 'Versión del pedido inválida.')
+        if (uploadPath && (typeof version !== 'string' || !/^[1-9]\d{0,8}$/.test(version))) throw new StoreError(422, 'Versión del pedido inválida.')
         const prepared = await prepareReceipt(Buffer.from(await file.arrayBuffer()), file.type)
-        const received = await store.addReceipt(uploadPath[1], orderOwner(session), form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared)
+        const received = uploadPath
+          ? await store.addReceipt(uploadPath[1], orderOwner(session), form.get('code'), form.get('bankReference'), form.get('uploadKey'), Number(version), prepared)
+          : await store.completeCheckout(form.get('checkoutToken'), orderOwner(session), form.get('uploadKey'), prepared)
         await options.mailer?.notify('receipt.submitted', received)
         json(response, 200, received)
         return

@@ -49,6 +49,8 @@ export interface CheckoutConfig {
   demo: boolean
   maxReceiptBytes: number
 }
+/** Payment instructions only; no order exists until its receipt is submitted. */
+export interface CheckoutPreview { order: ShopOrder; token: string }
 export interface AdminAuth {
   initialized: boolean
   authenticated: boolean

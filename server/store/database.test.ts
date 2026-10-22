@@ -40,6 +40,40 @@ test('store: server generates the code and freezes catalog prices, details and d
   assert.equal(saved.paymentConfirmedAt, null)
 })
 
+test('store: payment previews save no order, reject tampering and freeze the instructions used for payment', t => {
+  const { db, catalog } = setup(t)
+  const preview = db.previewOrder(input(), 'customer-a')
+  assert.equal(db.currentOrder('customer-a'), null)
+  assert.equal(db.list(new URLSearchParams()).total, 0)
+  assert.equal(db.database.prepare('SELECT count(*) AS count FROM shop_events').get()!.count, 0)
+  const [payload, signature] = preview.token.split('.')
+  const forged = JSON.parse(Buffer.from(payload, 'base64url').toString())
+  forged.order.totalMinor = 1
+  assert.throws(() => db.completeCheckout(`${Buffer.from(JSON.stringify(forged)).toString('base64url')}.${signature}`, 'customer-a', randomUUID(), receipt()), /no son válidos/)
+  catalog.gummies.types[0].prices[100] = 999999
+  db.configure({ enabled: true, phone: '81111111', beneficiary: 'Otro destino ficticio' }, 'test-admin')
+  const file = receipt()
+  const saved = db.completeCheckout(preview.token, 'customer-a', randomUUID(), file)
+  assert.equal(saved.code, preview.order.code)
+  assert.equal(saved.totalMinor, preview.order.totalMinor)
+  assert.equal(saved.destination!.phone, '80000000')
+  assert.equal(saved.status, 'pending_review')
+  assert.equal(saved.paymentConfirmedAt, null)
+  assert.equal(db.completeCheckout(preview.token, 'customer-a', randomUUID(), file).id, saved.id)
+  assert.throws(() => db.completeCheckout(preview.token, 'customer-a', randomUUID(), receipt()), /otro comprobante/)
+  assert.equal(db.list(new URLSearchParams()).total, 1)
+})
+
+test('store: unavailable SINPE or unknown shipping cannot save a pending checkout', t => {
+  const { db, catalog } = setup(t, false)
+  assert.throws(() => db.previewOrder(input(), 'customer-a'), /aún no está disponible/)
+  db.configure({ enabled: true, phone: '80000000', beneficiary: 'Destino de prueba' }, 'test-admin')
+  const delivery = catalog.deliveryMethods.find(method => method.id === 'delivery')!
+  delivery.feeMinor = null
+  assert.throws(() => db.previewOrder({ ...input(), deliveryId: 'delivery', customer: { ...input().customer, address: 'Dirección para la prueba de envío.' } }, 'customer-a'), /costo de envío/)
+  assert.equal(db.list(new URLSearchParams()).total, 0)
+})
+
 test('store: no browser-supplied code, price or paid state, no invalid customer or consent', t => {
   const { create } = setup(t)
   for (const patch of [{ code: 'ONK-FORGED' }, { totalMinor: 1 }, { status: 'ready' }, { privacyAccepted: false }, { customer: { ...input().customer, phone: '123' } }, { customer: { ...input().customer, email: 'no-es-un-correo' } }, { customer: { ...input().customer, email: '' } }, { items: [] }]) assert.throws(() => create('customer-a', randomUUID(), { ...input(), ...patch }))
@@ -248,9 +282,13 @@ test('store: orders, receipt, sessions and manual confirmation persist after clo
   t.after(() => { db.close(); rmSync(directory, { recursive: true, force: true }) })
   db.configure({ enabled: true, phone: '80000000', beneficiary: 'Destino ficticio' }, 'test-admin')
   const buyer = db.customerSession(undefined)
-  const order = db.createOrder(input(), buyer.session.hash, randomUUID())
+  const preview = db.previewOrder(input(), buyer.session.hash)
+  db.close()
+  db = new ShopDatabase(path, store)
+  assert.equal(db.currentOrder(buyer.session.hash), null)
   const prepared = receipt()
-  const uploaded = db.addReceipt(order.id, buyer.session.hash, order.code, 'BANK-PERSIST-123456', randomUUID(), order.version, prepared)
+  const order = preview.order
+  const uploaded = db.completeCheckout(preview.token, buyer.session.hash, randomUUID(), prepared)
   db.confirm(order.id, { version: uploaded.version, receiptId: uploaded.receipt!.id }, 'test-admin')
   db.close()
   db = new ShopDatabase(path, store)

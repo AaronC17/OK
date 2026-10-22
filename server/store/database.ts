@@ -5,7 +5,7 @@ import type { StoreConfig } from '../../src/types.ts'
 import type { AdminOrders, OrderAudit, OrderReceipt, ShopOrder, ShopOrderStatus, SinpeDestination, SinpeSettings } from '../../src/order-types.ts'
 import { schema } from './schema.ts'
 import { bankReference, fields, minorAmount, orderCode, parseNewOrder, parseSettings, record, StoreError, text, version } from './validation.ts'
-import { constantEqual, createSession, findSession, passwordHash, passwordMatches, tokenHash } from './security.ts'
+import { constantEqual, createSession, findSession, newToken, passwordHash, passwordMatches, tokenHash } from './security.ts'
 import type { Session } from './security.ts'
 import type { PreparedReceipt } from './receipts.ts'
 import { shippingFee } from '../../src/lib/shop.ts'
@@ -13,6 +13,7 @@ import type { ShopRepository } from './repository.ts'
 import type { AdminCustomers, CustomerAccount, CustomerOrders, CustomerReferralsData } from '../../src/account-types.ts'
 import { accountIdFromOwner, accountOwner, accountPage, accountPasswordHash, accountPasswordMatches, parseAccountLogin, parseRegistration, requireAccount, requireGuest } from './accounts.ts'
 import { welcomeDiscount } from '../../src/lib/welcome.ts'
+import { paymentPreview, readPaymentPreview } from './checkout.ts'
 
 const statuses: ShopOrderStatus[] = ['pending_details', 'awaiting_payment', 'pending_review', 'ready', 'rejected']
 type Row = Record<string, SQLInputValue>
@@ -123,6 +124,28 @@ export class ShopDatabase implements ShopRepository {
     return `ONKY-${randomUUID().slice(0, 8).toUpperCase()}`
   }
 
+  private consumedWelcomeOrder(id: SQLInputValue): string | null {
+    if (!id) return null
+    // Older versions reserved the benefit at order creation. An unpaid draft
+    // without a submitted receipt must not make that reservation permanent.
+    const row = this.database.prepare(`SELECT id FROM shop_orders WHERE id = ? AND (
+      current_receipt_id IS NOT NULL OR payment_confirmed_at IS NOT NULL
+      OR status IN ('pending_review', 'rejected', 'ready')
+      OR EXISTS (SELECT 1 FROM receipts WHERE order_id = shop_orders.id)
+    )`).get(id)
+    return row ? row.id as string : null
+  }
+
+  private consumeWelcome(order: ShopOrder) {
+    if (!order.customerAccountId || !order.discountMinor) return
+    const account = this.database.prepare('SELECT welcome_order_id FROM customers WHERE id = ?').get(order.customerAccountId)
+    if (!account) throw new StoreError(409, 'No se encontró la cuenta del pedido.')
+    const consumed = this.consumedWelcomeOrder(account.welcome_order_id)
+    if (consumed && consumed !== order.id) throw new StoreError(409, 'El 10% de bienvenida ya se usó en otro pedido. Crea un nuevo pedido para obtener el total actualizado.')
+    this.database.prepare('UPDATE customers SET welcome_order_id = ? WHERE id = ?').run(order.id, order.customerAccountId)
+    if (!consumed) this.audit(order.id, 'welcome.consumed', 'system', 'Beneficio de bienvenida aplicado al enviar el comprobante o confirmar el pago.')
+  }
+
   private accountFromRow(row: Row): CustomerAccount {
     const id = row.id as string
     const balance = this.database.prepare('SELECT COALESCE(SUM(amount_minor), 0) AS balance FROM customer_credit_ledger WHERE customer_id = ?').get(id) as { balance: number | bigint } | undefined
@@ -136,7 +159,7 @@ export class ShopDatabase implements ShopRepository {
       name: row.name as string,
       email: row.email as string,
       createdAt: row.created_at as string,
-      welcomeAvailable: row.welcome_order_id === null,
+      welcomeAvailable: !this.consumedWelcomeOrder(row.welcome_order_id),
       referralCode,
       creditBalanceMinor: Number(balance?.balance ?? 0),
     }
@@ -269,6 +292,61 @@ export class ShopDatabase implements ShopRepository {
     const row = this.database.prepare('SELECT * FROM shop_orders WHERE owner_hash = ? ORDER BY created_at DESC, rowid DESC LIMIT 1').get(owner)
     return row ? this.fromRow(row) : null
   }
+  private checkoutSecret(): string {
+    this.database.prepare("INSERT INTO metadata (key, value) VALUES ('checkout_secret', ?) ON CONFLICT(key) DO NOTHING").run(newToken())
+    return this.database.prepare("SELECT value FROM metadata WHERE key = 'checkout_secret'").get()!.value as string
+  }
+  previewOrder(value: unknown, owner: string) {
+    const parsed = parseNewOrder(value, this.catalog)
+    return this.transaction(() => {
+      const accountId = accountIdFromOwner(owner)
+      const account = accountId ? this.database.prepare('SELECT welcome_order_id FROM customers WHERE id = ?').get(accountId) : null
+      if (accountId && !account) throw new StoreError(401, 'Inicia sesión de nuevo para continuar al pago.')
+      return paymentPreview(parsed, owner, !!account && !this.consumedWelcomeOrder(account.welcome_order_id), this.destination(), this.catalog.demo, this.nextOrderCode(), this.checkoutSecret())
+    })
+  }
+  completeCheckout(token: unknown, owner: string, key: unknown, file: PreparedReceipt): ShopOrder {
+    const preview = readPaymentPreview(token, owner, this.checkoutSecret())
+    const hash = tokenHash(`${token}:${file.rawHash}`)
+    return this.transaction(() => {
+      const previous = this.database.prepare('SELECT * FROM shop_orders WHERE id = ? AND owner_hash = ?').get(preview.id, owner)
+      if (previous) {
+        if (previous.request_hash !== hash) throw new StoreError(409, 'Ya recibimos este pedido con otro comprobante. Actualiza su estado.')
+        return this.fromRow(previous)
+      }
+      const now = timestamp()
+      this.database.prepare(`INSERT INTO shop_orders
+        (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
+         destination_json, subtotal_minor, shipping_minor, total_minor, privacy_version, privacy_accepted_at, account_id, discount_minor)
+         VALUES (?, ?, ?, ?, ?, 'awaiting_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sinpe-checkout-v2', ?, ?, ?)`)
+        .run(preview.id, preview.code, owner, preview.id, hash, preview.demo ? 1 : 0, now, now,
+          JSON.stringify(preview.lines), JSON.stringify(preview.customer), JSON.stringify(preview.delivery), JSON.stringify(preview.destination),
+          preview.subtotalMinor, preview.shippingMinor, preview.totalMinor, preview.createdAt, preview.customerAccountId ?? null, preview.discountMinor ?? 0)
+      this.audit(preview.id, 'order.created', 'customer', 'Pedido registrado al recibir el comprobante de pago.')
+      this.event(this.getOrder(preview.id), 'order.created')
+      // Both writes and the welcome benefit commit together, or nothing is saved.
+      return this.saveReceipt(preview.id, owner, preview.code, null, key, 1, file)
+    })
+  }
+  private nextOrderCode(): string {
+    let nextNum = 1001
+    const meta = this.database.prepare("SELECT value FROM metadata WHERE key = 'order_number'").get()
+    if (meta?.value) {
+      const parsedNum = Number(meta.value)
+      if (Number.isSafeInteger(parsedNum) && parsedNum >= nextNum) nextNum = parsedNum + 1
+    } else {
+      const rows = this.database.prepare("SELECT code FROM shop_orders WHERE code LIKE 'ONK-%'").all()
+      for (const r of rows) {
+        const match = /^ONK-(\d+)$/.exec(r.code as string)
+        if (match && Number(match[1]) >= nextNum) nextNum = Number(match[1]) + 1
+      }
+    }
+    while (this.database.prepare('SELECT 1 FROM shop_orders WHERE code = ?').get(`ONK-${nextNum}`)) nextNum++
+    this.database.prepare("INSERT INTO metadata (key, value) VALUES ('order_number', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(nextNum))
+    return `ONK-${nextNum}`
+  }
+  // Legacy order creation is retained for existing integrations and data fixtures.
+  // The public checkout API requires a receipt and uses completeCheckout instead.
   createOrder(value: unknown, owner: string, key: string): ShopOrder {
     if (!/^[A-Za-z0-9-]{16,128}$/.test(key)) throw new StoreError(422, 'Falta una clave de idempotencia válida.')
     record(value)
@@ -283,31 +361,12 @@ export class ShopDatabase implements ShopRepository {
       const accountId = accountIdFromOwner(owner)
       const account = accountId ? this.database.prepare('SELECT welcome_order_id FROM customers WHERE id = ?').get(accountId) : null
       if (accountId && !account) throw new StoreError(401, 'Inicia sesión de nuevo para registrar el pedido.')
-      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && account.welcome_order_id === null)
+      const discount = welcomeDiscount(parsed.amounts.subtotal, !!account && !this.consumedWelcomeOrder(account.welcome_order_id))
       const total = parsed.amounts.total === null ? null : parsed.amounts.total - discount
       const destination = this.destination()
       const ready = destination !== null && parsed.amounts.total !== null
       const id = randomUUID()
-      let nextNum = 1001
-      const meta = this.database.prepare("SELECT value FROM metadata WHERE key = 'order_number'").get()
-      if (meta?.value) {
-        const parsedNum = Number(meta.value)
-        if (Number.isSafeInteger(parsedNum) && parsedNum >= nextNum) nextNum = parsedNum + 1
-      } else {
-        const rows = this.database.prepare("SELECT code FROM shop_orders WHERE code LIKE 'ONK-%'").all()
-        for (const r of rows) {
-          const match = /^ONK-(\d+)$/.exec(r.code as string)
-          if (match) {
-            const n = Number(match[1])
-            if (n >= nextNum) nextNum = n + 1
-          }
-        }
-      }
-      while (this.database.prepare("SELECT 1 FROM shop_orders WHERE code = ?").get(`ONK-${nextNum}`)) {
-        nextNum++
-      }
-      this.database.prepare("INSERT INTO metadata (key, value) VALUES ('order_number', ?) ON CONFLICT(key) DO UPDATE SET value = ?").run(String(nextNum), String(nextNum))
-      const code = `ONK-${nextNum}`
+      const code = this.nextOrderCode()
       const now = timestamp()
       this.database.prepare(`INSERT INTO shop_orders
         (id, code, owner_hash, idempotency_key, request_hash, status, demo, created_at, updated_at, lines_json, customer_json, delivery_json,
@@ -316,7 +375,6 @@ export class ShopDatabase implements ShopRepository {
         .run(id, code, owner, key, hash, ready ? 'awaiting_payment' : 'pending_details', this.catalog.demo ? 1 : 0, now, now,
           JSON.stringify(parsed.lines), JSON.stringify(parsed.customer), JSON.stringify(parsed.delivery), destination ? JSON.stringify(destination) : null,
            parsed.amounts.subtotal, parsed.amounts.shipping, total, now, accountId, discount)
-      if (accountId && account?.welcome_order_id === null) this.database.prepare('UPDATE customers SET welcome_order_id = ? WHERE id = ? AND welcome_order_id IS NULL').run(id, accountId)
       this.audit(id, 'order.created', 'customer', ready ? 'Pedido registrado. Pendiente de pago; no se ha verificado ningún abono.' : 'Pedido registrado. No solicitar pago hasta confirmar destino y total.')
       const order = this.getOrder(id)
       this.event(order, 'order.created')
@@ -332,35 +390,37 @@ export class ShopDatabase implements ShopRepository {
     return order
   }
   addReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt): ShopOrder {
+    return this.transaction(() => this.saveReceipt(id, owner, suppliedCode, suppliedReference, uploadKey, suppliedVersion, file))
+  }
+  private saveReceipt(id: string, owner: string, suppliedCode: unknown, suppliedReference: unknown, uploadKey: unknown, suppliedVersion: unknown, file: PreparedReceipt): ShopOrder {
     const key = text(uploadKey, 16, 128, 'Identificador de carga')
     const expectedVersion = version(suppliedVersion)
-    return this.transaction(() => {
-      const order = this.checkUpload(id, owner, suppliedCode)
-      const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
-        ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
-        : bankReference(suppliedReference)
-      const previous = this.database.prepare('SELECT * FROM receipts WHERE order_id = ? AND upload_key = ?').get(id, key)
-      if (previous) {
-        if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, 'La carga repetida contiene datos distintos. Actualiza el pedido.')
-        return order
-      }
-      if (order.version !== expectedVersion) throw new StoreError(409, 'El pedido cambió mientras adjuntabas el comprobante. Actualiza su estado.')
-      if (order.status !== 'awaiting_payment' && order.status !== 'rejected') throw new StoreError(409, 'Este pedido no admite un nuevo comprobante en su estado actual.')
-      if (!order.destination || order.totalMinor === null) throw new StoreError(409, 'Primero deben confirmarse el destino SINPE y el total.')
-      const duplicate = this.database.prepare('SELECT order_id FROM receipts WHERE raw_hash = ? AND order_id != ?').get(file.rawHash, id)
-      if (duplicate) throw new StoreError(409, 'Este comprobante ya está asociado a otro pedido. Adjunta el comprobante correspondiente.')
-      const count = Number(this.database.prepare('SELECT count(*) AS count FROM receipts WHERE order_id = ?').get(id)!.count)
-      if (count >= 5) throw new StoreError(409, 'Este pedido alcanzó el límite de correcciones. La tienda debe revisar el historial.')
-      const receiptId = randomUUID()
-      const now = timestamp()
-      this.database.prepare('INSERT INTO receipts (id, order_id, upload_key, raw_hash, content_type, size, data, submitted_at, bank_reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(receiptId, id, key, file.rawHash, file.contentType, file.data.length, file.data, now, reference)
-      this.database.prepare("UPDATE shop_orders SET current_receipt_id = ?, status = 'pending_review', customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(receiptId, now, id)
-      this.audit(id, 'receipt.submitted', 'customer', 'Código validado y comprobante recibido. Esto no confirma el pago.')
-      const updated = this.getOrder(id)
-      this.event(updated, 'payment.review_requested')
-      return updated
-    })
+    const order = this.checkUpload(id, owner, suppliedCode)
+    const reference = suppliedReference === undefined || suppliedReference === null || suppliedReference === ''
+      ? bankReference(`${order.code}-${key.replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase()}`)
+      : bankReference(suppliedReference)
+    const previous = this.database.prepare('SELECT * FROM receipts WHERE order_id = ? AND upload_key = ?').get(id, key)
+    if (previous) {
+      if (previous.raw_hash !== file.rawHash || previous.bank_reference !== reference) throw new StoreError(409, 'La carga repetida contiene datos distintos. Actualiza el pedido.')
+      return order
+    }
+    if (order.version !== expectedVersion) throw new StoreError(409, 'El pedido cambió mientras adjuntabas el comprobante. Actualiza su estado.')
+    if (order.status !== 'awaiting_payment' && order.status !== 'rejected') throw new StoreError(409, 'Este pedido no admite un nuevo comprobante en su estado actual.')
+    if (!order.destination || order.totalMinor === null) throw new StoreError(409, 'Primero deben confirmarse el destino SINPE y el total.')
+    const duplicate = this.database.prepare('SELECT order_id FROM receipts WHERE raw_hash = ? AND order_id != ?').get(file.rawHash, id)
+    if (duplicate) throw new StoreError(409, 'Este comprobante ya está asociado a otro pedido. Adjunta el comprobante correspondiente.')
+    const count = Number(this.database.prepare('SELECT count(*) AS count FROM receipts WHERE order_id = ?').get(id)!.count)
+    if (count >= 5) throw new StoreError(409, 'Este pedido alcanzó el límite de correcciones. La tienda debe revisar el historial.')
+    this.consumeWelcome(order)
+    const receiptId = randomUUID()
+    const now = timestamp()
+    this.database.prepare('INSERT INTO receipts (id, order_id, upload_key, raw_hash, content_type, size, data, submitted_at, bank_reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(receiptId, id, key, file.rawHash, file.contentType, file.data.length, file.data, now, reference)
+    this.database.prepare("UPDATE shop_orders SET current_receipt_id = ?, status = 'pending_review', customer_message = NULL, version = version + 1, updated_at = ? WHERE id = ?").run(receiptId, now, id)
+    this.audit(id, 'receipt.submitted', 'customer', 'Código validado y comprobante recibido. Esto no confirma el pago.')
+    const updated = this.getOrder(id)
+    this.event(updated, 'payment.review_requested')
+    return updated
   }
   receipt(orderId: string, receiptId: string) {
     const row = this.database.prepare('SELECT data, content_type FROM receipts WHERE order_id = ? AND id = ?').get(orderId, receiptId)
@@ -385,10 +445,14 @@ export class ShopDatabase implements ShopRepository {
       const reference = useReceipt ? bankReference(useReceipt.bankReference) : `MANUAL-${order.code}`
       const amount = minorAmount(order.totalMinor)
       // This records the authenticated administrator's manual decision, not bank verification.
-      const note = useReceipt
+      const auto = actor.startsWith('auto:')
+      const note = auto
+        ? 'Confirmado automáticamente por n8n al coincidir un abono bancario con el código/referencia y el monto exacto del pedido. Sin intervención del administrador.'
+        : useReceipt
         ? 'Confirmado manualmente por el administrador al revisar el pedido, su código y el comprobante. Sin consulta bancaria automática.'
         : 'Confirmado manualmente por el administrador tras verificar el pago. Sin consulta bancaria automática.'
       if (this.database.prepare('SELECT order_id FROM manual_payments WHERE bank_reference = ? AND order_id != ?').get(reference, id)) throw new StoreError(409, 'Esta referencia bancaria ya fue utilizada para confirmar otro pedido.')
+      this.consumeWelcome(order)
       const now = timestamp()
       this.database.prepare('INSERT INTO manual_payments (order_id, bank_reference, amount_minor, receipt_id, confirmed_by, confirmed_at, note) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(id, reference, amount, useReceipt?.id ?? null, actor, now, note)

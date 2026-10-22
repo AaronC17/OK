@@ -1,20 +1,25 @@
 import { expect, test } from '@playwright/test'
-import { checkoutOrder, testAdmin } from './helpers/store.ts'
+import { checkoutOrder, sendReceipt, testAdmin, testReceipt } from './helpers/store.ts'
 import type { ShopOrder } from '../src/order-types.ts'
 
 test('checkout retries an uncertain response once and a later identical purchase gets a new order', async ({ page, request }) => {
   await testAdmin(request)
   const first = await checkoutOrder(page)
-  await page.getByRole('button', { name: 'Hacer otro pedido', exact: true }).click()
+  await sendReceipt(page, first)
+  await expect(page.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
+  await page.getByRole('button', { name: 'Seguir comprando', exact: true }).click()
   await page.getByRole('button', { name: 'Personalizar Ositos', exact: true }).click()
   await page.getByRole('button', { name: 'Aumentar cantidad de bolsas', exact: true }).click()
   await page.getByRole('button', { name: 'Añadir al carrito', exact: true }).click()
   await page.getByRole('button', { name: 'Abrir carrito, 2 artículos' }).click()
   await expect(page.getByLabel('Tu nombre')).toHaveValue(first.customer.name)
+  await page.getByRole('button', { name: 'Continuar al pago', exact: true }).click()
+  await expect(page.locator('#assigned-order-code')).toBeVisible()
+  await page.locator('#receipt-file').setInputFiles(await testReceipt())
   const keys: string[] = []
   let saved: ShopOrder | null = null
   await page.route('**/api/orders', async route => {
-    keys.push(route.request().headers()['idempotency-key'])
+    keys.push(/name="uploadKey"\r\n\r\n([^\r]+)/.exec(route.request().postData()!)![1])
     if (keys.length === 1) {
       const response = await route.fetch()
       expect(response.ok()).toBe(true)
@@ -22,11 +27,11 @@ test('checkout retries an uncertain response once and a later identical purchase
       await route.abort('failed')
     } else await route.continue()
   })
-  const submit = page.getByRole('button', { name: 'Crear pedido con SINPE', exact: true })
+  const submit = page.getByRole('button', { name: 'Enviar comprobante para revisión', exact: true })
   await submit.click()
-  await expect(page.getByRole('alert')).toContainText('No recibimos la respuesta del servidor')
+  await expect(page.getByRole('alert')).toContainText('No pudimos conectar con la tienda')
   await submit.click()
-  await expect(page.locator('#assigned-order-code')).toHaveText(/^ONK-\d{4,}$/)
+  await expect(page.getByRole('heading', { name: 'Estamos revisando tu pago.' })).toBeVisible()
   const second = (await (await page.request.get('/api/orders/current')).json()).order as ShopOrder
   expect(second.id).not.toBe(first.id)
   expect(second.id).toBe(saved!.id)
@@ -34,6 +39,55 @@ test('checkout retries an uncertain response once and a later identical purchase
   expect(second.lines).toEqual(first.lines)
   expect(keys).toHaveLength(2)
   expect(keys[0]).toBe(keys[1])
+})
+
+test('payment back navigation preserves editable products and data without saving pending orders', async ({ page, request }) => {
+  const admin = await testAdmin(request)
+  const preview = await checkoutOrder(page, 'delivery')
+  const cart = page.locator('.cart-drawer')
+  const noOrder = async (code = preview.code) => {
+    expect((await (await page.request.get('/api/orders/current')).json()).order).toBeNull()
+    expect((await (await admin.api.get(`/api/admin/orders?q=${code}`)).json()).total).toBe(0)
+  }
+  await noOrder()
+  await page.goBack()
+  await expect(cart.getByLabel('Tu nombre')).toHaveValue(preview.customer.name)
+  await expect(cart.getByLabel('Teléfono de contacto')).toHaveValue(preview.customer.phone)
+  await expect(cart.getByLabel('Correo electrónico')).toHaveValue(preview.customer.email)
+  await expect(cart.getByLabel('Dirección o punto de entrega')).toHaveValue(preview.customer.address)
+  await expect(cart.getByRole('checkbox', { name: /Acepto que la tienda guarde/ })).toBeChecked()
+  await expect(cart.locator('.cart-line input[type="number"]')).toHaveValue('2')
+  await noOrder()
+  await page.goForward()
+  await expect(cart.locator('#assigned-order-code')).toHaveText(preview.code)
+  await cart.getByRole('button', { name: 'Volver a mis datos y productos' }).click()
+  await expect(cart.getByLabel('Tu nombre')).toHaveValue(preview.customer.name)
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
+  await expect(cart.locator('#assigned-order-code')).toHaveText(preview.code)
+  await cart.getByRole('button', { name: 'Volver a mis datos y productos' }).click()
+  await cart.getByLabel('Tu nombre').fill('Datos corregidos')
+  await cart.getByLabel('¿Algo que debamos saber?').fill('Entregar por la tarde.')
+  await cart.getByRole('button', { name: /Aumentar cantidad de Ositos/i }).click()
+  const response = page.waitForResponse('**/api/checkout/preview')
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
+  const edited = (await (await response).json()).order as ShopOrder
+  expect(edited.customer.name).toBe('Datos corregidos')
+  expect(edited.customer.notes).toBe('Entregar por la tarde.')
+  expect(edited.lines[0].quantity).toBe(3)
+  expect(edited.totalMinor).toBe(655000)
+  await expect(cart.locator('#assigned-order-code')).toHaveText(edited.code)
+  await expect(cart.locator('.sinpe-pay-card')).toContainText('₡6 550')
+  await noOrder(edited.code)
+  await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
+  await page.getByRole('button', { name: 'Abrir carrito, 3 artículos' }).click()
+  await expect(cart.getByLabel('Tu nombre')).toHaveValue('Datos corregidos')
+  await cart.getByRole('button', { name: 'Continuar al pago' }).click()
+  await cart.getByRole('button', { name: 'Cancelar pedido', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Abrir carrito, 0 artículos' })).toBeVisible()
+  await noOrder(edited.code)
+  await page.reload()
+  await page.getByRole('button', { name: 'Abrir carrito, 0 artículos' }).click()
+  await expect(cart.getByText('Un buen momento por empezar.')).toBeVisible()
 })
 
 test('cart edits synchronize between tabs and skip navigation transfers keyboard focus', async ({ page, context }) => {
