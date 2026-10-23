@@ -302,17 +302,24 @@ button, a, input, textarea { outline-offset: 4px; }
 summary::-webkit-details-marker { display: none; }
 .questions-list details[open] summary svg { transform: rotate(45deg); }
 .questions-list details > p { font-size: 12px; line-height: 1.85; color: var(--muted); padding: 0 24px 20px 0; }
-.site-footer { border-top: 1px solid #e4dce9; background: #f5f1f7; padding: 32px 0 0; }
-.footer-main { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 32px; padding-bottom: 24px; }
+/* Footer minimalista: mismas tonalidades lila del sitio; los logotipos oficiales toman su color de marca solo al pasar el cursor. */
+.site-footer { border-top: 1px solid #e4dce9; background: #f5f1f7; padding: 44px 0 0; }
+.footer-main { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; align-items: start; gap: 32px; padding-bottom: 36px; }
 .footer-brand { display: grid; justify-items: start; gap: 9px; }
 .footer-brand .wordmark { font-size: 32px; letter-spacing: -2px; }
 .footer-brand p { color: #716379; font-size: 11px; line-height: 1.6; }
-.footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; }
-.footer-links > a, .footer-links > button { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; background: transparent; color: #5e4f68; font-size: 12px; line-height: 1.5; border-radius: 3px; }
+.footer-col { display: flex; flex-direction: column; align-items: flex-start; }
+.footer-col h3 { margin-bottom: 8px; color: var(--purple); font-size: 9px; font-weight: 650; letter-spacing: 1.8px; line-height: 1.5; text-transform: uppercase; }
+.footer-links > a, .footer-links > button { display: inline-flex; align-items: center; min-height: 34px; padding: 4px 0; background: transparent; color: #5e4f68; font-size: 12px; line-height: 1.5; border-radius: 3px; }
 .footer-links > a:hover, .footer-links > button:hover { color: var(--purple); text-decoration: underline; text-underline-offset: 4px; }
-.footer-socials { display: flex; align-items: center; justify-self: end; gap: 6px; }
-.footer-social-link { display: grid; place-items: center; width: 44px; height: 44px; color: var(--purple); border-radius: 50%; transition: background .18s; }
-.footer-social-link:hover { background: #e9e0ef; }
+.footer-info ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.footer-info li { display: flex; align-items: center; min-height: 34px; padding: 4px 0; color: #5e4f68; font-size: 12px; line-height: 1.5; }
+.footer-social-link { display: inline-flex; align-items: center; gap: 9px; min-height: 34px; padding: 4px 0; color: #5e4f68; font-size: 12px; line-height: 1.5; border-radius: 3px; }
+.footer-social-link .icon { color: var(--purple); transition: color .18s; }
+.footer-social-link small { color: #8a7b94; font-size: 11px; white-space: nowrap; }
+.footer-social-link:hover > span { color: var(--purple); text-decoration: underline; text-underline-offset: 4px; }
+.footer-social-link.is-whatsapp:hover .icon { color: #25d366; }
+.footer-social-link.is-instagram:hover .icon { color: #d6249f; }
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 20px; border-top: 1px solid #e5dce9; color: #716379; font-size: 10px; line-height: 1.5; gap: 16px; }
 .demo-link { display: flex; align-items: center; gap: 7px; font-size: 8px; background: transparent; color: #766581; min-height: 28px; }
 
@@ -957,6 +964,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 @media (min-width: 1500px) { .hero { min-height: 550px; } .hero-visual { height: 530px; } }
 @media (max-width: 1100px) {
   .container { width: calc(100% - 64px); }
+  .footer-main { grid-template-columns: repeat(3, 1fr); gap: 28px 24px; }
+  .footer-brand { grid-column: 1 / -1; }
   .hero-copy { padding: 36px 16px 36px 0; }
   .hero h1 { font-size: 52px; }
   .hero-copy > .eyebrow { font-size: 9px; letter-spacing: 1.5px; }
@@ -1119,13 +1128,13 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .questions-section h2 { font-size: 24px; }
   .questions-section h2 br { display: none; }
   .questions-list summary { font-size: 11px; padding: 19px 0; }
-  .site-footer { padding-top: 24px; }
-  .footer-main { grid-template-columns: 1fr auto; gap: 16px; padding-bottom: 14px; }
+  .site-footer { padding-top: 28px; }
+  .footer-main { grid-template-columns: 1fr 1fr; gap: 24px 16px; padding-bottom: 20px; }
+  .footer-brand { grid-column: 1 / -1; }
   .footer-brand .wordmark { font-size: 30px; }
   .footer-brand p { font-size: 10px; }
-  .footer-socials { grid-column: 2; grid-row: 1; }
-  .footer-links { grid-column: 1 / -1; gap: 8px 24px; }
-  .footer-links > a, .footer-links > button { font-size: 11px; }
+  .footer-socials { grid-column: 1 / -1; }
+  .footer-links > a, .footer-links > button, .footer-info li, .footer-social-link { min-height: 40px; font-size: 11px; }
   .footer-bottom { flex-wrap: wrap; font-size: 10px; gap: 8px; padding: 15px 0 18px; }
   .demo-link { font-size: 9px; }
   .modal { max-width: calc(100% - 24px); max-height: calc(100dvh - 28px); border-radius: 10px; }

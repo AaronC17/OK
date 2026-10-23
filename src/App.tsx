@@ -21,6 +21,16 @@ const ProductDialog = lazy(productDialog.load)
 const CartDrawer = lazy(cartDrawer.load)
 const AccountDialog = lazy(accountDialog.load)
 const weightList = new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))
+// Etiquetas legibles para el footer a partir de las URL configuradas en `store.contact`.
+const whatsappLabel = (() => {
+  const digits = store.contact.whatsappUrl?.match(/(?:wa\.me\/|phone=)(\d+)/)?.[1]
+  if (!digits) return 'Escríbenos'
+  return digits.length === 11 && digits.startsWith('506') ? `+506 ${digits.slice(3, 7)} ${digits.slice(7)}` : `+${digits}`
+})()
+const instagramLabel = (() => {
+  const handle = store.contact.instagramUrl?.match(/instagram\.com\/([^/?#]+)/)?.[1]
+  return handle ? `@${handle}` : 'Síguenos'
+})()
 
 export default function App() {
   useSectionNavigation()
@@ -137,18 +147,28 @@ export default function App() {
           <SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink>
           <p>Dulce. Ácido. Picosito.</p>
         </div>
-        <nav className="footer-links" aria-label="Enlaces de la tienda">
+        <nav className="footer-col footer-links" aria-label="Enlaces de la tienda">
+          <h3>Tienda</h3>
           <SectionLink section="gomitas">Gomitas enchiladas</SectionLink>
           {store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}
           {store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}
           <SectionLink section="como-pedir">Cómo pedir</SectionLink>
           <button type="button" {...cartDrawer.intent} onClick={openCart}>Mi pedido</button>
         </nav>
-        <nav className="footer-socials" aria-label="Contacto y redes sociales">
-          {store.contact.whatsappUrl && <a className="footer-social-link" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)" title="WhatsApp"><Icon name="whatsapp" size={22} /></a>}
-          {store.contact.instagramUrl && <a className="footer-social-link" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)" title="Instagram"><Icon name="instagram" size={22} /></a>}
-          {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo" title="Correo"><Icon name="mail" size={22} /></a>}
-        </nav>
+        <div className="footer-col footer-info">
+          <h3>Entregas</h3>
+          <ul>
+            <li>Envíos a todo Costa Rica</li>
+            <li>Retiro en Orotina Centro</li>
+            <li>Pago con SINPE Móvil</li>
+          </ul>
+        </div>
+        {(store.contact.whatsappUrl || store.contact.instagramUrl || store.contact.email) && <nav className="footer-col footer-socials" aria-label="Contacto y redes sociales">
+          <h3>Contacto</h3>
+          {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)"><Icon name="whatsapp" size={18} /><span>WhatsApp</span><small>{whatsappLabel}</small></a>}
+          {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)"><Icon name="instagram" size={17} /><span>Instagram</span><small>{instagramLabel}</small></a>}
+          {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo"><Icon name="mail" size={17} /><span>Correo</span><small>{store.contact.email}</small></a>}
+        </nav>}
       </div>
       <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
     </div></footer>

@@ -31,7 +31,7 @@ Las fotografías de producto y miniaturas de ingredientes tienen versiones AVIF 
 ## Iconos e ilustraciones
 
 - **Lucide React**: [Lucide](https://lucide.dev/), licencia ISC incluida con el paquete. Se importan únicamente los iconos utilizados.
-- Icono de WhatsApp: trazo vectorial con proporciones cuadradas; identifica el canal de contacto.
+- Logotipos de WhatsApp e Instagram: glifos oficiales de cada marca (blanco sobre verde `#25D366` / degradado de Instagram) en el footer; identifican los canales de contacto.
 - Favicon, imagen de sustitución, recipiente y bolsa animados: recursos SVG/CSS creados para este proyecto.
 - La secuencia de mezcla es una animación local; las fotografías optimizadas se sirven desde el proyecto, sin llamadas a servicios de generación durante la reproducción.
 
