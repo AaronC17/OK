@@ -316,11 +316,11 @@ summary::-webkit-details-marker { display: none; }
 .footer-info ul { display: grid; margin: 0; padding: 0; list-style: none; }
 .footer-info li { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 0; color: #5e4f68; font-size: 12px; line-height: 1.4; }
 .footer-info li .icon { color: #9c7bb1; }
-.footer-social-list { display: grid; gap: 2px; }
-.footer-social-link { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 0; color: #5e4f68; font-size: 12px; line-height: 1.4; border-radius: 3px; background: transparent; }
+.footer-social-list { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.footer-social-link { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: #5e4f68; background: transparent; transition: transform .18s, background .18s; }
+.footer-social-link:hover { transform: translateY(-2px); background: #eee7f3; }
 .footer-social-link .icon { flex-shrink: 0; }
 .footer-social-link.is-whatsapp .icon { color: #25d366; }
-.footer-social-link:hover > span { color: var(--purple); text-decoration: underline; text-underline-offset: 4px; }
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 18px; border-top: 1px solid #e5dce9; color: #716379; font-size: 10px; line-height: 1.5; gap: 8px 16px; }
 .demo-link { display: flex; align-items: center; gap: 7px; font-size: 8px; background: transparent; color: #766581; min-height: 28px; }
 
@@ -1129,15 +1129,21 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .questions-section h2 { font-size: 24px; }
   .questions-section h2 br { display: none; }
   .questions-list summary { font-size: 11px; padding: 19px 0; }
-  .site-footer { padding-top: 26px; }
-  .footer-main { grid-template-columns: 1fr 1fr; gap: 20px 16px; padding-bottom: 20px; }
-  .footer-brand { grid-column: 1 / -1; }
-  .footer-brand .wordmark { font-size: 28px; }
-  .footer-about { max-width: none; font-size: 10px; }
-  .footer-links > a, .footer-links > button, .footer-info li { min-height: 30px; font-size: 11px; }
-  .footer-socials { grid-column: 1 / -1; }
-  .footer-social-list { display: flex; flex-wrap: wrap; gap: 6px 20px; }
-  .footer-bottom { flex-wrap: wrap; font-size: 10px; padding: 12px 0 calc(16px + env(safe-area-inset-bottom)); }
+  .site-footer { padding-top: 32px; text-align: center; }
+  .footer-main { grid-template-columns: 1fr 1fr; gap: 26px 16px; padding-bottom: 24px; justify-items: center; }
+  .footer-brand { grid-column: 1 / -1; justify-items: center; text-align: center; gap: 6px; }
+  .footer-brand .wordmark { font-size: 30px; }
+  .footer-about { max-width: 290px; font-size: 11px; margin: 0 auto; text-align: center; }
+  .footer-col { align-items: center; text-align: center; width: 100%; }
+  .footer-col h3 { margin-bottom: 8px; text-align: center; }
+  .footer-links { align-items: center; }
+  .footer-links > a, .footer-links > button { justify-content: center; text-align: center; min-height: 32px; font-size: 12px; }
+  .footer-info ul { display: grid; justify-items: center; }
+  .footer-info li { justify-content: center; text-align: center; min-height: 32px; font-size: 12px; }
+  .footer-socials { grid-column: 1 / -1; align-items: center; width: 100%; }
+  .footer-social-list { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 2px; }
+  .footer-social-link { width: 44px; height: 44px; }
+  .footer-bottom { justify-content: center; text-align: center; flex-wrap: wrap; font-size: 10px; gap: 8px; padding: 14px 0 calc(18px + env(safe-area-inset-bottom)); }
   .demo-link { font-size: 9px; }
   .modal { max-width: calc(100% - 24px); max-height: calc(100dvh - 28px); border-radius: 10px; }
   .modal::backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: #21142e80; }

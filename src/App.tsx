@@ -157,9 +157,9 @@ export default function App() {
         {(store.contact.whatsappUrl || store.contact.instagramUrl || store.contact.email) && <nav className="footer-col footer-socials" aria-label="Contacto y redes sociales">
           <h3>Contacto</h3>
           <div className="footer-social-list">
-            {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)"><Icon name="whatsapp" size={17} /><span>WhatsApp</span></a>}
-            {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)"><Icon name="instagram" size={17} /><span>Instagram</span></a>}
-            {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo"><Icon name="mail" size={17} /><span>Correo</span></a>}
+            {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)" title="WhatsApp"><Icon name="whatsapp" size={22} /></a>}
+            {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)" title="Instagram"><Icon name="instagram" size={22} /></a>}
+            {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo" title="Correo"><Icon name="mail" size={22} /></a>}
           </div>
         </nav>}
       </div>
