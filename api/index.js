@@ -9,7 +9,8 @@ var store = {
   categories: { dessertsEnabled: false },
   // Reactivar cuando haya catálogo y fotografías reales.
   currency: { code: "CRC", locale: "es-CR", fractionDigits: 2 },
-  contact: { email: null, whatsappUrl: "https://wa.me/50661555619", instagramUrl: null },
+  // instagramUrl provisional: cambiar por el perfil real (p. ej. 'https://www.instagram.com/usuario') cuando exista.
+  contact: { email: null, whatsappUrl: "https://wa.me/50661555619", instagramUrl: "https://www.instagram.com/" },
   heroImage: "/images/bolsa-mix.webp",
   heroImageAlt: "Bolsa transparente de gomitas enchiladas con chamoy y sticker de Onky\u2019s",
   gummies: {
