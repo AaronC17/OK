@@ -18,9 +18,19 @@ const icons = {
   user: UserRound, eye: Eye, 'eye-off': EyeOff, gift: Gift, mail: Mail,
 }
 
-export type IconName = keyof typeof icons | 'bear'
+export type IconName = keyof typeof icons | 'bear' | 'whatsapp' | 'instagram'
 
 export function Icon({ name, size = 20, className = '', style }: { name: IconName; size?: number; className?: string; style?: CSSProperties }) {
+  if (name === 'whatsapp' || name === 'instagram') return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" className={`icon ${className}`} style={style}>
+    {name === 'whatsapp' ? <>
+      <path d="M20.5 11.8a8.5 8.5 0 0 1-12.6 7.5L3 21l1.6-4.8a8.5 8.5 0 1 1 15.9-4.4Z" />
+      <path d="M8.4 7.2c-.7 0-1.3.8-1.3 1.7 0 2.6 3.5 6.1 6.4 6.7 1 .2 2.2-.7 2.4-1.4l-2.6-1.4-.9 1c-1.7-.7-2.7-1.7-3.4-3.2l1-1-1.2-2.4Z" />
+    </> : <>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+    </>}
+  </svg>
   if (name === 'bear') {
     return (
       <svg

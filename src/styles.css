@@ -302,17 +302,18 @@ button, a, input, textarea { outline-offset: 4px; }
 summary::-webkit-details-marker { display: none; }
 .questions-list details[open] summary svg { transform: rotate(45deg); }
 .questions-list details > p { font-size: 12px; line-height: 1.85; color: var(--muted); padding: 0 24px 20px 0; }
-.site-footer { border-top: 1px solid #e4dce9; background: #f2edf4; padding: 39px 0 0; }
-.footer-main { display: grid; grid-template-columns: 1.6fr 1fr 1fr; padding-bottom: 32px; }
-.footer-main .wordmark { font-size: 34px; }
-.footer-main p { color: #6c5e75; font-size: 11px; line-height: 1.8; margin-top: 14px; }
-.footer-links, .footer-contact { display: flex; flex-direction: column; align-items: flex-start; }
-.footer-main .eyebrow { font-size: 8px; margin-bottom: 14px; }
-.footer-links > a { font-size: 11px; padding: 6px 0; }
-.footer-contact > a, .footer-contact > button { display: flex; align-items: center; gap: 20px; font-size: 11px; padding: 6px 0; text-decoration: none; }
-.footer-links > a:hover, .footer-contact > a:hover { text-decoration: underline; text-underline-offset: 4px; }
-.footer-contact p { margin-top: 7px; font-size: 9px; }
-.footer-bottom { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 20px; border-top: 1px solid #e2dce6; color: #6c5e75; font-size: 10px; gap: 16px; }
+.site-footer { border-top: 1px solid #e4dce9; background: #f5f1f7; padding: 32px 0 0; }
+.footer-main { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 32px; padding-bottom: 24px; }
+.footer-brand { display: grid; justify-items: start; gap: 9px; }
+.footer-brand .wordmark { font-size: 32px; letter-spacing: -2px; }
+.footer-brand p { color: #716379; font-size: 11px; line-height: 1.6; }
+.footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; }
+.footer-links > a, .footer-links > button { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; background: transparent; color: #5e4f68; font-size: 12px; line-height: 1.5; border-radius: 3px; }
+.footer-links > a:hover, .footer-links > button:hover { color: var(--purple); text-decoration: underline; text-underline-offset: 4px; }
+.footer-socials { display: flex; align-items: center; justify-self: end; gap: 6px; }
+.footer-social-link { display: grid; place-items: center; width: 44px; height: 44px; color: var(--purple); border-radius: 50%; transition: background .18s; }
+.footer-social-link:hover { background: #e9e0ef; }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 20px; border-top: 1px solid #e5dce9; color: #716379; font-size: 10px; line-height: 1.5; gap: 16px; }
 .demo-link { display: flex; align-items: center; gap: 7px; font-size: 8px; background: transparent; color: #766581; min-height: 28px; }
 
 /* Native dialogs provide keyboard trapping, Escape and background inertness. */
@@ -1118,18 +1119,15 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .questions-section h2 { font-size: 24px; }
   .questions-section h2 br { display: none; }
   .questions-list summary { font-size: 11px; padding: 19px 0; }
-  .site-footer { padding-top: 23px; }
-  .footer-main { grid-template-columns: 1fr 1fr; gap: 20px 16px; padding-bottom: 18px; }
-  .footer-main > div:first-child { grid-column: 1/-1; display: flex; align-items: center; justify-content: space-between; gap: 15px; }
-  .footer-main > div:first-child p { margin-top: 0; font-size: 9px; }
-  .footer-main .wordmark { font-size: 35px; }
-  .footer-main .eyebrow { margin-bottom: 10px; }
-  .footer-links > a { font-size: 11px; padding-block: 8px; }
-  .footer-contact > a, .footer-contact > button { font-size: 10px; gap: 9px; min-height: 32px; }
-  .footer-contact p { font-size: 10px; }
-  .footer-bottom { flex-wrap: wrap; font-size: 8px; gap: 8px; padding: 15px 0; }
-  .footer-bottom > span:nth-child(2) { margin-left: auto; }
-  .demo-link { font-size: 8px; width: 100%; justify-content: flex-end; }
+  .site-footer { padding-top: 24px; }
+  .footer-main { grid-template-columns: 1fr auto; gap: 16px; padding-bottom: 14px; }
+  .footer-brand .wordmark { font-size: 30px; }
+  .footer-brand p { font-size: 10px; }
+  .footer-socials { grid-column: 2; grid-row: 1; }
+  .footer-links { grid-column: 1 / -1; gap: 8px 24px; }
+  .footer-links > a, .footer-links > button { font-size: 11px; }
+  .footer-bottom { flex-wrap: wrap; font-size: 10px; gap: 8px; padding: 15px 0 18px; }
+  .demo-link { font-size: 9px; }
   .modal { max-width: calc(100% - 24px); max-height: calc(100dvh - 28px); border-radius: 10px; }
   .modal::backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: #21142e80; }
   /* Product sheet fits the viewport: options keep their natural height and the photo absorbs the remaining space. */

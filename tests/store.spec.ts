@@ -108,7 +108,7 @@ test('gummies-only cart, variant prices, persistence, delivery and server-create
   expect(result.order.totalMinor).toBe(1350000)
   expect(result.order.status).toBe('awaiting_payment')
   expect((await (await page.request.get('/api/orders/current')).json()).order).toBeNull()
-  await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0)
+  await expect(cart.locator('a[href*="wa.me"]')).toHaveCount(0)
   await cart.getByRole('button', { name: 'Cerrar carrito' }).click()
   expect(errors).toEqual([])
 })

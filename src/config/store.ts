@@ -12,7 +12,7 @@ export const store: StoreConfig = {
   demo: false,
   categories: { dessertsEnabled: false }, // Reactivar cuando haya catálogo y fotografías reales.
   currency: { code: 'CRC', locale: 'es-CR', fractionDigits: 2 },
-  contact: { email: null, instagramUrl: null },
+  contact: { email: null, whatsappUrl: 'https://wa.me/50661555619', instagramUrl: null },
   heroImage: '/images/bolsa-mix.webp',
   heroImageAlt: 'Bolsa transparente de gomitas enchiladas con chamoy y sticker de Onky’s',
   gummies: {

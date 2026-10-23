@@ -37,7 +37,7 @@ El frontend se compila en `dist/`, pero **publicar solo esa carpeta ya no basta*
 
 ## Datos confirmados y demostración
 
-- El flujo de WhatsApp fue retirado. El número SINPE y beneficiario se configuran explícitamente desde administración.
+- El checkout usa SINPE; el icono de WhatsApp del footer es un canal de contacto. El número SINPE y beneficiario se configuran explícitamente desde administración.
 - Moneda: **colón costarricense, CRC**, símbolo **₡**.
 - Bolsas del catálogo actual: **100, 250 y 500 g**.
 - Se permite **un solo tipo** o **mixto**, eligiendo dos o tres tipos.
@@ -58,7 +58,7 @@ Editar **`src/config/store.ts`** para catálogo, precios y entrega; no es necesa
 | Moneda y formato | `currency.code`, `locale`, `fractionDigits` |
 | SINPE receptor y beneficiario | Dashboard `/admin` → Configuración; no usar un teléfono inferido |
 | Avisos por correo al cliente | `SMTP_*`, `MAIL_FROM`, `MAIL_BCC` — guía: [`docs/correos-directmail.md`](docs/correos-directmail.md) |
-| Contactos adicionales | `contact.email`, `instagramUrl` |
+| Contactos del footer | `contact.email`, `contact.whatsappUrl`, `contact.instagramUrl` (URL completa; `null` oculta el icono) |
 | Portada | `heroImage`, `heroImageAlt` |
 | Tipos de gomita | `gummies.types` |
 | Mezclas y precios | `gummies.mixes` |

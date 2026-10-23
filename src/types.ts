@@ -85,7 +85,7 @@ export interface StoreConfig {
   demo: boolean
   categories: { dessertsEnabled: boolean }
   currency: { code: string; locale: string; fractionDigits: number }
-  contact: { email: string | null; instagramUrl: string | null }
+  contact: { email: string | null; whatsappUrl: string | null; instagramUrl: string | null }
   heroImage: string
   heroImageAlt: string
   heroVideo?: {

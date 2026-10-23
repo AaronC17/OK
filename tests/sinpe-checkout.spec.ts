@@ -14,7 +14,7 @@ test('SINPE: preview, private upload and manual confirmation create an order onl
   expect(order.code).toMatch(/^ONK-\d{4,}$/)
    expect(order.totalMinor).toBe(250000)
   expect(order.status).toBe('awaiting_payment')
-  await expect(page.locator('a[href*="wa.me"], a[href*="whatsapp"]')).toHaveCount(0)
+  await expect(page.locator('.cart-drawer a[href*="wa.me"], .cart-drawer a[href*="whatsapp"]')).toHaveCount(0)
   expect((await (await page.request.get('/api/orders/current')).json()).order).toBeNull()
   expect((await page.request.get(`/api/orders/${order.id}`)).status()).toBe(404)
   await expect(page.locator('.sinpe-pay-card')).toContainText('8000-0000')

@@ -1,6 +1,6 @@
 # Checkout SINPE y administración de pedidos
 
-Esta es la fase actual: **pedidos registrados en backend, comprobantes privados y confirmación manual desde administración**. WhatsApp dejó de ser una opción del checkout y de la tienda. No se inicia sesión en BAC ni se realiza ninguna transferencia desde el sistema.
+Esta es la fase actual: **pedidos registrados en backend, comprobantes privados y confirmación manual desde administración**. WhatsApp no es una opción del checkout; el icono del footer permite contactar con la tienda. No se inicia sesión en BAC ni se realiza ninguna transferencia desde el sistema.
 
 ## 1. Abrir la tienda y crear el administrador
 

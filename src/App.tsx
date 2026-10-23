@@ -133,17 +133,24 @@ export default function App() {
     </main>
     <footer className="site-footer"><div className="container">
       <div className="footer-main">
-        <div><SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink></div>
-        <div className="footer-links"><span className="eyebrow">EXPLORA</span><SectionLink section="gomitas">Gomitas enchiladas</SectionLink>{store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}{store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}<SectionLink section="como-pedir">Cómo pedir</SectionLink></div>
-        <div className="footer-contact"><span className="eyebrow">TU PEDIDO, AQUÍ</span>
-          <button className="text-button" {...cartDrawer.intent} onClick={openCart}>Pedido y seguimiento <Icon name="arrow-up" size={16} /></button>
-          <button className="text-button" {...accountDialog.intent} onClick={event => { event.currentTarget.focus({ preventScroll: true }); openAccount() }}>{customer.user ? 'Mi cuenta y mis pedidos' : 'Iniciar sesión o crear cuenta'} <Icon name="user" size={16} /></button>
-          <p>Pago con SINPE Móvil · Revisión del abono</p>
-          {store.contact.email && <a href={`mailto:${store.contact.email}`}>{store.contact.email}</a>}
-          {store.contact.instagramUrl && <a href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram <Icon name="arrow-up" size={14} /></a>}
+        <div className="footer-brand">
+          <SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink>
+          <p>Dulce. Ácido. Picosito.</p>
         </div>
+        <nav className="footer-links" aria-label="Enlaces de la tienda">
+          <SectionLink section="gomitas">Gomitas enchiladas</SectionLink>
+          {store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}
+          {store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}
+          <SectionLink section="como-pedir">Cómo pedir</SectionLink>
+          <button type="button" {...cartDrawer.intent} onClick={openCart}>Mi pedido</button>
+        </nav>
+        <nav className="footer-socials" aria-label="Contacto y redes sociales">
+          {store.contact.whatsappUrl && <a className="footer-social-link" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)" title="WhatsApp"><Icon name="whatsapp" size={22} /></a>}
+          {store.contact.instagramUrl && <a className="footer-social-link" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)" title="Instagram"><Icon name="instagram" size={22} /></a>}
+          {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo" title="Correo"><Icon name="mail" size={22} /></a>}
+        </nav>
       </div>
-      <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span><a href="/admin">Administración</a>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
+      <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
     </div></footer>
     <Suspense fallback={null}>
       {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
