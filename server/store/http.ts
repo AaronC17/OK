@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { unlinkSync } from 'node:fs'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import { reconcileBankMovement } from './automation.ts'
 import { isIP } from 'node:net'
 import type { ShopRepository } from './repository.ts'
 import type { Session } from './security.ts'
@@ -51,7 +53,7 @@ async function jsonBody(request: IncomingMessage) {
   catch (error) { if (error instanceof StoreError) throw error; throw new StoreError(400, 'JSON inválido.') }
 }
 
-export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string; mailer?: OrderMailer | null; trustVercelProxy?: boolean }
+export interface ShopHttpOptions { secureCookies?: boolean; publicOrigin?: string; setupTokenPath?: string; mailer?: OrderMailer | null; trustVercelProxy?: boolean; automationToken?: string }
 
 export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions = {}) {
   const limits = new RateLimits()
@@ -215,6 +217,20 @@ export function makeShopHandler(store: ShopRepository, options: ShopHttpOptions 
           'Content-Security-Policy': "sandbox; default-src 'none'; frame-ancestors 'none'",
         })
         response.end(receipt.data)
+        return
+      }
+      if (path === '/api/automation/bank-movements' && method === 'POST') {
+        // Server-to-server only (n8n). Disabled unless a dedicated token is configured.
+        if (!options.automationToken) throw new StoreError(404, 'Ruta no encontrada.')
+        limits.check(`automation:${ip}`, 600, 3600_000)
+        const supplied = request.headers.authorization ?? ''
+        const digest = (value: string) => createHash('sha256').update(value).digest()
+        if (!timingSafeEqual(digest(supplied), digest(`Bearer ${options.automationToken}`))) throw new StoreError(401, 'Autenticación requerida.')
+        const result = await reconcileBankMovement(store, await jsonBody(request))
+        if (result.decision === 'confirmed') {
+          await options.mailer?.notify('payment.confirmed_manual', result.order)
+          json(response, 200, { decision: result.decision, orderCode: result.orderCode, matchedBy: result.matchedBy, movement: result.movement })
+        } else json(response, 200, result)
         return
       }
       if (path === '/api/admin/customers' && method === 'GET') {

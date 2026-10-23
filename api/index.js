@@ -9,7 +9,7 @@ var store = {
   categories: { dessertsEnabled: false },
   // Reactivar cuando haya catálogo y fotografías reales.
   currency: { code: "CRC", locale: "es-CR", fractionDigits: 2 },
-  contact: { email: null, instagramUrl: null },
+  contact: { email: null, whatsappUrl: "https://wa.me/50661555619", instagramUrl: null },
   heroImage: "/images/bolsa-mix.webp",
   heroImageAlt: "Bolsa transparente de gomitas enchiladas con chamoy y sticker de Onky\u2019s",
   gummies: {
@@ -2193,6 +2193,100 @@ var MongoShopDatabase = class {
 
 // server/store/http.ts
 import { unlinkSync } from "node:fs";
+import { createHash as createHash5, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+
+// server/store/automation.ts
+var AUTO_ACTOR = "auto:n8n-bac";
+var CODE_PATTERN = /\bONK-[A-Z0-9]{3,16}\b/gi;
+var CLOCK_SKEW_MS = 5 * 6e4;
+var MAX_ORDER_AGE_MS = 72 * 36e5;
+var OPEN_STATUSES = ["pending_review", "awaiting_payment"];
+function parseBankMovement(value) {
+  const data = record(value);
+  fields2(data, ["source", "movementId", "bankReference", "amountMinor", "currency", "bookedAt", "description", "senderVerified"]);
+  const amountMinor = data.amountMinor;
+  if (typeof amountMinor !== "number" || !Number.isSafeInteger(amountMinor) || amountMinor < 1 || amountMinor > 1e8) {
+    throw new StoreError(422, "amountMinor debe ser un entero positivo en c\xE9ntimos de CRC.");
+  }
+  if (data.currency !== "CRC") throw new StoreError(422, "Solo se admiten abonos en CRC.");
+  if (typeof data.senderVerified !== "boolean") throw new StoreError(422, "senderVerified debe ser booleano.");
+  const bookedAt = text2(data.bookedAt, 20, 40, "bookedAt");
+  if (Number.isNaN(Date.parse(bookedAt)) || !/(Z|[+-]\d\d:\d\d)$/.test(bookedAt)) throw new StoreError(422, "bookedAt debe ser ISO 8601 con zona horaria.");
+  const optional = (item, max, label) => item === null || item === void 0 || item === "" ? null : text2(item, 1, max, label);
+  return {
+    source: text2(data.source, 1, 40, "source"),
+    movementId: text2(data.movementId, 6, 200, "movementId"),
+    bankReference: optional(data.bankReference, 80, "bankReference")?.toUpperCase().replace(/\s+/g, "") ?? null,
+    amountMinor,
+    currency: "CRC",
+    bookedAt: new Date(bookedAt).toISOString(),
+    description: optional(data.description, 1e3, "description"),
+    senderVerified: data.senderVerified
+  };
+}
+async function openOrders(store2) {
+  const found = [];
+  for (const status of OPEN_STATUSES) {
+    for (let page = 1; page <= 20; page++) {
+      const result = await store2.list(new URLSearchParams({ status, page: String(page) }));
+      found.push(...result.orders);
+      if (result.orders.length < 50) break;
+    }
+  }
+  return found;
+}
+async function decide(store2, movement, now) {
+  const booked = Date.parse(movement.bookedAt);
+  if (booked > now.getTime() + CLOCK_SKEW_MS) return { decision: "review", reason: "booked_in_the_future" };
+  const orders = await openOrders(store2);
+  const codes = [...new Set((movement.description?.match(CODE_PATTERN) ?? []).map((code) => code.toUpperCase()))];
+  if (codes.length > 1) return { decision: "review", reason: "multiple_order_codes" };
+  let order;
+  let matchedBy = null;
+  if (codes.length === 1) {
+    matchedBy = "code";
+    order = orders.find((candidate) => candidate.code === codes[0]);
+    if (!order) {
+      const known = (await store2.list(new URLSearchParams({ status: "ready", q: codes[0] }))).orders.find((candidate) => candidate.code === codes[0]);
+      if (known) return known.totalMinor === movement.amountMinor ? { decision: "already_confirmed", orderCode: known.code } : { decision: "review", reason: "amount_mismatch_on_paid_order", orderCode: known.code };
+      return { decision: "no_match", reason: "code_not_found_or_not_open" };
+    }
+  } else if (movement.bankReference) {
+    const byReference = orders.filter((candidate) => candidate.receipt?.bankReference.toUpperCase() === movement.bankReference);
+    if (byReference.length > 1) return { decision: "review", reason: "reference_matches_several_orders", candidates: byReference.map((item) => item.code) };
+    if (byReference.length === 1) {
+      order = byReference[0];
+      matchedBy = "reference";
+    }
+  }
+  if (!order || !matchedBy) {
+    const created = (candidate) => Date.parse(candidate.createdAt);
+    const candidates = orders.filter((candidate) => candidate.totalMinor === movement.amountMinor && booked >= created(candidate) - CLOCK_SKEW_MS && booked - created(candidate) <= MAX_ORDER_AGE_MS);
+    return candidates.length ? { decision: "review", reason: "amount_and_time_only", candidates: candidates.map((item) => item.code) } : { decision: "no_match", reason: "no_order_with_that_amount" };
+  }
+  if (order.totalMinor !== movement.amountMinor) return { decision: "review", reason: "amount_mismatch", orderCode: order.code };
+  const age = booked - Date.parse(order.createdAt);
+  if (age < -CLOCK_SKEW_MS) return { decision: "review", reason: "credit_predates_order", orderCode: order.code };
+  if (age > MAX_ORDER_AGE_MS) return { decision: "review", reason: "credit_too_late", orderCode: order.code };
+  if (!movement.senderVerified) return { decision: "review", reason: "sender_not_verified", orderCode: order.code };
+  try {
+    const confirmed = await store2.confirm(order.id, {
+      version: order.version,
+      receiptId: order.status === "pending_review" && order.receipt ? order.receipt.id : null
+    }, AUTO_ACTOR);
+    return { decision: "confirmed", orderCode: order.code, matchedBy, order: confirmed };
+  } catch (error) {
+    if (error instanceof StoreError && error.status === 409) return { decision: "review", reason: "confirmation_conflict", orderCode: order.code };
+    throw error;
+  }
+}
+async function reconcileBankMovement(store2, value, now = /* @__PURE__ */ new Date()) {
+  const movement = parseBankMovement(value);
+  const decision = await decide(store2, movement, now);
+  return { ...decision, movement: { movementId: movement.movementId, amountMinor: movement.amountMinor, bankReference: movement.bankReference, bookedAt: movement.bookedAt } };
+}
+
+// server/store/http.ts
 import { isIP } from "node:net";
 
 // server/store/receipts.ts
@@ -2442,6 +2536,19 @@ function makeShopHandler(store2, options = {}) {
           "Content-Security-Policy": "sandbox; default-src 'none'; frame-ancestors 'none'"
         });
         response.end(receipt.data);
+        return;
+      }
+      if (path === "/api/automation/bank-movements" && method === "POST") {
+        if (!options.automationToken) throw new StoreError(404, "Ruta no encontrada.");
+        limits.check(`automation:${ip}`, 600, 36e5);
+        const supplied = request.headers.authorization ?? "";
+        const digest = (value) => createHash5("sha256").update(value).digest();
+        if (!timingSafeEqual3(digest(supplied), digest(`Bearer ${options.automationToken}`))) throw new StoreError(401, "Autenticaci\xF3n requerida.");
+        const result = await reconcileBankMovement(store2, await jsonBody(request));
+        if (result.decision === "confirmed") {
+          await options.mailer?.notify("payment.confirmed_manual", result.order);
+          json(response, 200, { decision: result.decision, orderCode: result.orderCode, matchedBy: result.matchedBy, movement: result.movement });
+        } else json(response, 200, result);
         return;
       }
       if (path === "/api/admin/customers" && method === "GET") {
@@ -2888,6 +2995,12 @@ function createOrderMailer(env = process.env, deliver) {
 }
 
 // server/store/runtime.ts
+function automationToken() {
+  const token = process.env.BANK_AUTOMATION_TOKEN?.trim();
+  if (!token) return void 0;
+  if (token.length < 32) throw new Error("BANK_AUTOMATION_TOKEN debe tener al menos 32 caracteres (usa 32 bytes en base64url).");
+  return token;
+}
 async function createShopRuntime() {
   const directory = resolve(process.env.STORE_DATA_DIR || (process.env.VERCEL ? "/tmp/store" : ".data/store"));
   const unsafeRoots = [resolve("public"), resolve("dist")];
@@ -2929,7 +3042,7 @@ async function createShopRuntime() {
     if (process.env.NODE_ENV === "production" && !process.env.VERCEL && (!secure || !publicOrigin?.startsWith("https://"))) {
       throw new Error("Para producci\xF3n se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa tambi\xE9n la gu\xEDa de despliegue y privacidad.");
     }
-    const handler2 = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer(), trustVercelProxy: process.env.VERCEL === "1" });
+    const handler2 = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer(), trustVercelProxy: process.env.VERCEL === "1", automationToken: automationToken() });
     let closed = false;
     return { database, handler: handler2, close: () => {
       if (!closed) {

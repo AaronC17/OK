@@ -8,6 +8,14 @@ import { newToken } from './security.ts'
 import { createOrderMailer } from './mailer.ts'
 import type { ShopRepository } from './repository.ts'
 
+/** Token used only by the n8n bank-reconciliation workflow. Weak or missing tokens leave the endpoint disabled. */
+function automationToken(): string | undefined {
+  const token = process.env.BANK_AUTOMATION_TOKEN?.trim()
+  if (!token) return undefined
+  if (token.length < 32) throw new Error('BANK_AUTOMATION_TOKEN debe tener al menos 32 caracteres (usa 32 bytes en base64url).')
+  return token
+}
+
 export async function createShopRuntime() {
   const directory = resolve(process.env.STORE_DATA_DIR || (process.env.VERCEL ? '/tmp/store' : '.data/store'))
   const unsafeRoots = [resolve('public'), resolve('dist')]
@@ -45,7 +53,7 @@ export async function createShopRuntime() {
     if (process.env.NODE_ENV === 'production' && !process.env.VERCEL && (!secure || !publicOrigin?.startsWith('https://'))) {
       throw new Error('Para producción se requieren STORE_SECURE_COOKIES=true y STORE_PUBLIC_ORIGIN con HTTPS. Revisa también la guía de despliegue y privacidad.')
     }
-    const handler = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer(), trustVercelProxy: process.env.VERCEL === '1' })
+    const handler = makeShopHandler(database, { secureCookies: secure, publicOrigin, setupTokenPath: setupPath, mailer: createOrderMailer(), trustVercelProxy: process.env.VERCEL === '1', automationToken: automationToken() })
     let closed = false
     return { database, handler, close: () => { if (!closed) { closed = true; void database.close() } } }
   } catch (error) {
