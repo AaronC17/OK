@@ -320,7 +320,6 @@ summary::-webkit-details-marker { display: none; }
 .footer-social-link { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 0; color: #5e4f68; font-size: 12px; line-height: 1.4; border-radius: 3px; background: transparent; }
 .footer-social-link .icon { flex-shrink: 0; }
 .footer-social-link.is-whatsapp .icon { color: #25d366; }
-.footer-social-link small { color: #8a7b94; font-size: 11px; white-space: nowrap; margin-left: 2px; }
 .footer-social-link:hover > span { color: var(--purple); text-decoration: underline; text-underline-offset: 4px; }
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 18px; border-top: 1px solid #e5dce9; color: #716379; font-size: 10px; line-height: 1.5; gap: 8px 16px; }
 .demo-link { display: flex; align-items: center; gap: 7px; font-size: 8px; background: transparent; color: #766581; min-height: 28px; }

@@ -21,16 +21,6 @@ const ProductDialog = lazy(productDialog.load)
 const CartDrawer = lazy(cartDrawer.load)
 const AccountDialog = lazy(accountDialog.load)
 const weightList = new Intl.ListFormat('es').format(store.gummies.weights.map(weight => `${weight} g`))
-// Etiquetas legibles para el footer a partir de las URL configuradas en `store.contact`.
-const whatsappLabel = (() => {
-  const digits = store.contact.whatsappUrl?.match(/(?:wa\.me\/|phone=)(\d+)/)?.[1]
-  if (!digits) return 'Escríbenos'
-  return digits.length === 11 && digits.startsWith('506') ? `+506 ${digits.slice(3, 7)} ${digits.slice(7)}` : `+${digits}`
-})()
-const instagramLabel = (() => {
-  const handle = store.contact.instagramUrl?.match(/instagram\.com\/([^/?#]+)/)?.[1]
-  return handle ? `@${handle}` : 'Síguenos'
-})()
 
 export default function App() {
   useSectionNavigation()
@@ -167,9 +157,9 @@ export default function App() {
         {(store.contact.whatsappUrl || store.contact.instagramUrl || store.contact.email) && <nav className="footer-col footer-socials" aria-label="Contacto y redes sociales">
           <h3>Contacto</h3>
           <div className="footer-social-list">
-            {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)"><Icon name="whatsapp" size={17} /><span>WhatsApp</span><small>{whatsappLabel}</small></a>}
-            {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)"><Icon name="instagram" size={17} /><span>Instagram</span><small>{instagramLabel}</small></a>}
-            {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo"><Icon name="mail" size={17} /><span>Correo</span><small>{store.contact.email}</small></a>}
+            {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)"><Icon name="whatsapp" size={17} /><span>WhatsApp</span></a>}
+            {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)"><Icon name="instagram" size={17} /><span>Instagram</span></a>}
+            {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo"><Icon name="mail" size={17} /><span>Correo</span></a>}
           </div>
         </nav>}
       </div>
