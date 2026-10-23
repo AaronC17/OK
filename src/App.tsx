@@ -138,14 +138,6 @@ export default function App() {
           <p className="footer-tagline">Dulce. Ácido. Picosito.</p>
           <p className="footer-about">Gomitas enchiladas, hechas en Orotina, Costa Rica.</p>
         </div>
-        <nav className="footer-col footer-links" aria-label="Enlaces de la tienda">
-          <h3>Tienda</h3>
-          <SectionLink section="gomitas">Gomitas enchiladas</SectionLink>
-          {store.products && store.products.length > 0 && <SectionLink section="uvarindas">Uvarindas</SectionLink>}
-          {store.categories.dessertsEnabled && <SectionLink section="postres">Postres</SectionLink>}
-          <SectionLink section="como-pedir">Cómo pedir</SectionLink>
-          <button type="button" {...cartDrawer.intent} onClick={openCart}>Mi pedido</button>
-        </nav>
         <div className="footer-col footer-info">
           <h3>Entregas</h3>
           <ul>

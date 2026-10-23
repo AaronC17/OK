@@ -304,7 +304,7 @@ summary::-webkit-details-marker { display: none; }
 .questions-list details > p { font-size: 12px; line-height: 1.85; color: var(--muted); padding: 0 24px 20px 0; }
 /* Footer minimalista: columnas sobre el lila del sitio y logotipos oficiales de WhatsApp e Instagram con su color de marca. */
 .site-footer { border-top: 1px solid #e4dce9; background: #f5f1f7; padding: 40px 0 0; }
-.footer-main { display: grid; grid-template-columns: 1.4fr 1fr 1.1fr 1.1fr; align-items: start; gap: 32px; padding-bottom: 32px; }
+.footer-main { display: grid; grid-template-columns: 1.6fr 1.3fr 0.8fr; align-items: start; gap: 32px; padding-bottom: 32px; }
 .footer-brand { display: grid; justify-items: start; gap: 6px; }
 .footer-brand .wordmark { font-size: 32px; letter-spacing: -2px; }
 .footer-tagline { color: #5e4f68; font-size: 12px; font-weight: 500; line-height: 1.5; }
@@ -965,7 +965,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 @media (min-width: 1500px) { .hero { min-height: 550px; } .hero-visual { height: 530px; } }
 @media (max-width: 1100px) {
   .container { width: calc(100% - 64px); }
-  .footer-main { grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .footer-main { grid-template-columns: 1.3fr 1fr; gap: 24px; }
   .footer-brand { grid-column: 1 / -1; }
   .hero-copy { padding: 36px 16px 36px 0; }
   .hero h1 { font-size: 52px; }
@@ -1130,16 +1130,15 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .questions-section h2 br { display: none; }
   .questions-list summary { font-size: 11px; padding: 19px 0; }
   .site-footer { padding-top: 32px; text-align: center; }
-  .footer-main { grid-template-columns: 1fr 1fr; gap: 26px 16px; padding-bottom: 24px; }
-  .footer-brand { grid-column: 1 / -1; justify-items: center; text-align: center; gap: 6px; }
+  .footer-main { display: flex; flex-direction: column; align-items: center; gap: 24px; padding-bottom: 24px; }
+  .footer-brand { justify-items: center; text-align: center; gap: 6px; }
   .footer-brand .wordmark { font-size: 30px; }
   .footer-about { max-width: 290px; font-size: 11px; margin: 0 auto; text-align: center; }
-  .footer-col { display: flex; flex-direction: column; align-items: flex-start; justify-self: center; width: max-content; max-width: 100%; }
+  .footer-col { display: flex; flex-direction: column; align-items: center; width: auto; max-width: 100%; }
   .footer-col h3 { width: 100%; margin-bottom: 8px; text-align: center; }
-  .footer-links > a, .footer-links > button { justify-content: flex-start; text-align: left; min-height: 32px; font-size: 12px; }
-  .footer-info ul { display: grid; justify-items: start; width: 100%; }
+  .footer-info ul { display: inline-grid; justify-items: start; width: auto; }
   .footer-info li { justify-content: flex-start; text-align: left; min-height: 32px; font-size: 12px; }
-  .footer-socials { grid-column: 1 / -1; align-items: center; justify-self: center; width: 100%; }
+  .footer-socials { align-items: center; width: 100%; }
   .footer-social-list { display: flex; justify-content: center; align-items: center; gap: 18px; margin-top: 2px; }
   .footer-social-link { width: 44px; height: 44px; }
   .footer-bottom { justify-content: center; text-align: center; flex-wrap: wrap; font-size: 10px; gap: 8px; padding: 14px 0 calc(18px + env(safe-area-inset-bottom)); }
@@ -1283,8 +1282,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .cart-line-bottom .quantity > button { width: 29px; }
   .cart-line-bottom > strong { font-size: 10px; }
   .delivery-option small { font-size: 9px; }
-  .footer-main { gap: 22px 10px; }
-  .footer-links > a, .footer-links > button, .footer-info li { font-size: 11px; }
+  .footer-main { gap: 20px; }
+  .footer-info li { font-size: 11.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *:not(.sinpe-transit-card):not(.sinpe-transit-card *), *::before, *::after, dialog::backdrop { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
