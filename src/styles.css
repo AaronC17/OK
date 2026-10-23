@@ -304,7 +304,7 @@ summary::-webkit-details-marker { display: none; }
 .questions-list details > p { font-size: 12px; line-height: 1.85; color: var(--muted); padding: 0 24px 20px 0; }
 /* Footer minimalista: columnas sobre el lila del sitio y logotipos oficiales de WhatsApp e Instagram con su color de marca. */
 .site-footer { border-top: 1px solid #e4dce9; background: #f5f1f7; padding: 40px 0 0; }
-.footer-main { display: grid; grid-template-columns: 1.6fr 1.3fr 0.8fr; align-items: start; gap: 32px; padding-bottom: 32px; }
+.footer-main { display: grid; grid-template-columns: 1.6fr 1.3fr 0.8fr; align-items: start; gap: 32px; padding-bottom: 40px; }
 .footer-brand { display: grid; justify-items: start; gap: 6px; }
 .footer-brand .wordmark { font-size: 32px; letter-spacing: -2px; }
 .footer-tagline { color: #5e4f68; font-size: 12px; font-weight: 500; line-height: 1.5; }
@@ -1130,7 +1130,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .questions-section h2 br { display: none; }
   .questions-list summary { font-size: 11px; padding: 19px 0; }
   .site-footer { padding-top: 32px; text-align: center; }
-  .footer-main { display: flex; flex-direction: column; align-items: center; gap: 24px; padding-bottom: 24px; }
+  .footer-main { display: flex; flex-direction: column; align-items: center; gap: 24px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
   .footer-brand { justify-items: center; text-align: center; gap: 6px; }
   .footer-brand .wordmark { font-size: 30px; }
   .footer-about { max-width: 290px; font-size: 11px; margin: 0 auto; text-align: center; }

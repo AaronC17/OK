@@ -155,7 +155,7 @@ export default function App() {
           </div>
         </nav>}
       </div>
-      <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
+      {store.demo && <div className="footer-bottom"><button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button></div>}
     </div></footer>
     <Suspense fallback={null}>
       {product && <ProductDialog key={product.instance} target={product.target} open={productOpen} onClose={() => setProductOpen(false)} onAdd={addProduct} onZoom={setZoom} />}
