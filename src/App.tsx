@@ -145,7 +145,8 @@ export default function App() {
       <div className="footer-main">
         <div className="footer-brand">
           <SectionLink section="inicio" className="wordmark" aria-label={`${store.name}, volver al inicio`}>{store.name}<span className="brand-dot">.</span></SectionLink>
-          <p>Dulce. Ácido. Picosito.</p>
+          <p className="footer-tagline">Dulce. Ácido. Picosito.</p>
+          <p className="footer-about">Gomitas enchiladas, hechas en Orotina, Costa Rica.</p>
         </div>
         <nav className="footer-col footer-links" aria-label="Enlaces de la tienda">
           <h3>Tienda</h3>
@@ -158,16 +159,18 @@ export default function App() {
         <div className="footer-col footer-info">
           <h3>Entregas</h3>
           <ul>
-            <li>Envíos a todo Costa Rica</li>
-            <li>Retiro en Orotina Centro</li>
-            <li>Pago con SINPE Móvil</li>
+            <li><Icon name="truck" size={14} />Envíos a todo Costa Rica</li>
+            <li><Icon name="pin" size={14} />Retiro en Orotina Centro</li>
+            <li><Icon name="shield" size={14} />Pago con SINPE Móvil</li>
           </ul>
         </div>
         {(store.contact.whatsappUrl || store.contact.instagramUrl || store.contact.email) && <nav className="footer-col footer-socials" aria-label="Contacto y redes sociales">
           <h3>Contacto</h3>
-          {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)"><Icon name="whatsapp" size={18} /><span>WhatsApp</span><small>{whatsappLabel}</small></a>}
-          {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)"><Icon name="instagram" size={17} /><span>Instagram</span><small>{instagramLabel}</small></a>}
-          {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo"><Icon name="mail" size={17} /><span>Correo</span><small>{store.contact.email}</small></a>}
+          <div className="footer-social-list">
+            {store.contact.whatsappUrl && <a className="footer-social-link is-whatsapp" href={store.contact.whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp de Onky’s (abre en una pestaña nueva)"><Icon name="whatsapp" size={17} /><span>WhatsApp</span><small>{whatsappLabel}</small></a>}
+            {store.contact.instagramUrl && <a className="footer-social-link is-instagram" href={store.contact.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram de Onky’s (abre en una pestaña nueva)"><Icon name="instagram" size={17} /><span>Instagram</span><small>{instagramLabel}</small></a>}
+            {store.contact.email && <a className="footer-social-link" href={`mailto:${store.contact.email}`} aria-label="Escribir a Onky’s por correo"><Icon name="mail" size={17} /><span>Correo</span><small>{store.contact.email}</small></a>}
+          </div>
         </nav>}
       </div>
       <div className="footer-bottom"><span>© {new Date().getFullYear()} {store.name}</span>{store.demo && <button className="demo-link" onClick={() => setInfoOpen(true)}>Catálogo de demostración <Icon name="info" size={14} /></button>}</div>
